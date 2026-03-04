@@ -6,7 +6,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.navigation.NavDestination
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -21,8 +23,11 @@ fun AppBottomBar(navController: NavHostController) {
 
     NavigationBar {
         BottomNavItems.forEach { item ->
+            val label = stringResource(item.labelRes)
+
             NavigationBarItem(
-                selected = graphHierarchy.any { it.hasRoute(item::class) },
+                modifier = Modifier.testTag(item.testTag),
+                selected = graphHierarchy.any { it.hasRoute(item.destination::class) },
                 onClick = {
                     navController.navigate(item.destination) {
                         popUpTo(navController.graph.findStartDestination().id) {
@@ -35,10 +40,10 @@ fun AppBottomBar(navController: NavHostController) {
                 icon = {
                     Icon(
                         imageVector = item.icon,
-                        contentDescription = item.label,
+                        contentDescription = label,
                     )
                 },
-                label = { Text(item.label) },
+                label = { Text(label) },
             )
         }
     }
