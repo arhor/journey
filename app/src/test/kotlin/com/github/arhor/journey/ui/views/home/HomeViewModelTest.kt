@@ -9,6 +9,7 @@ import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.progression.ProgressionPolicy
 import com.github.arhor.journey.domain.usecase.LogActivityResult
 import com.github.arhor.journey.domain.usecase.LogActivityUseCase
+import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCurrentHeroUseCase
 import com.github.arhor.journey.test.MainDispatcherRule
 import io.kotest.matchers.shouldBe
@@ -20,6 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -43,12 +45,15 @@ class HomeViewModelTest {
         val hero = hero()
         val heroFlow = MutableSharedFlow<Hero>(replay = 1).apply { tryEmit(hero) }
         val observeCurrentHeroUseCase = mockk<ObserveCurrentHeroUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
 
         val vm = HomeViewModel(
             observeCurrentHero = observeCurrentHeroUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
@@ -71,6 +76,8 @@ class HomeViewModelTest {
         state.selectedActivityType shouldBe ActivityType.WALK
         state.durationMinutesInput shouldBe "30"
         state.isSubmitting shouldBe false
+        state.importedTodayActivities shouldBe 0
+        state.importedTodaySteps shouldBe 0L
     }
 
     @Test
@@ -79,13 +86,16 @@ class HomeViewModelTest {
         val hero = hero()
         val heroFlow = MutableSharedFlow<Hero>(replay = 1).apply { tryEmit(hero) }
         val observeCurrentHeroUseCase = mockk<ObserveCurrentHeroUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
         coEvery { logActivityUseCase.invoke(any()) } returns logActivityResult(hero)
 
         val vm = HomeViewModel(
             observeCurrentHero = observeCurrentHeroUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
@@ -130,12 +140,15 @@ class HomeViewModelTest {
         // Given
         val heroFlow = MutableSharedFlow<Hero>(replay = 1).apply { tryEmit(hero()) }
         val observeCurrentHeroUseCase = mockk<ObserveCurrentHeroUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
 
         val vm = HomeViewModel(
             observeCurrentHero = observeCurrentHeroUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
@@ -163,13 +176,16 @@ class HomeViewModelTest {
         // Given
         val heroFlow = MutableSharedFlow<Hero>(replay = 1).apply { tryEmit(hero()) }
         val observeCurrentHeroUseCase = mockk<ObserveCurrentHeroUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
         coEvery { logActivityUseCase.invoke(any()) } throws IllegalStateException("boom")
 
         val vm = HomeViewModel(
             observeCurrentHero = observeCurrentHeroUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,

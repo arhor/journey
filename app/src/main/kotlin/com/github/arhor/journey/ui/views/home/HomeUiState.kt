@@ -24,5 +24,7 @@ sealed interface HomeUiState {
         val selectedActivityType: ActivityType,
         val durationMinutesInput: String,
         val isSubmitting: Boolean,
+        val importedTodayActivities: Int,
+        val importedTodaySteps: Long,
     ) : HomeUiState
 }
