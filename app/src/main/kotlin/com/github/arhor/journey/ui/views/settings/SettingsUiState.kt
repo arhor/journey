@@ -12,5 +12,24 @@ sealed interface SettingsUiState {
     data class Failure(val errorMessage: String) : SettingsUiState
 
     @Immutable
-    data class Content(val isUpdating: Boolean, val distanceUnit: DistanceUnit) : SettingsUiState
+    data class Content(
+        val isUpdating: Boolean,
+        val distanceUnit: DistanceUnit,
+        val healthConnectConnectionStatus: HealthConnectConnectionStatus,
+        val healthConnectPermissionStatus: HealthConnectPermissionStatus,
+        val missingHealthConnectPermissions: Set<String>,
+    ) : SettingsUiState
+}
+
+enum class HealthConnectConnectionStatus {
+    DISCONNECTED,
+    CONNECTING,
+    CONNECTED,
+}
+
+enum class HealthConnectPermissionStatus {
+    NOT_REQUESTED,
+    REQUESTING,
+    GRANTED,
+    DENIED,
 }
