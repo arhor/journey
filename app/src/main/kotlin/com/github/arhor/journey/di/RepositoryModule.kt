@@ -5,9 +5,15 @@ import com.github.arhor.journey.data.repository.RoomExplorationRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
 import com.github.arhor.journey.data.healthconnect.HealthConnectAvailabilityChecker
 import com.github.arhor.journey.data.repository.RoomPointOfInterestRepository
+import com.github.arhor.journey.data.repository.DataStoreHealthSyncCheckpointRepository
+import com.github.arhor.journey.data.repository.HealthConnectPermissionRepositoryImpl
+import com.github.arhor.journey.data.repository.HealthDataSyncRepositoryImpl
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import com.github.arhor.journey.domain.repository.ExplorationRepository
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
+import com.github.arhor.journey.domain.repository.HealthDataSyncRepository
+import com.github.arhor.journey.domain.repository.HealthPermissionRepository
+import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import dagger.Binds
@@ -41,5 +47,23 @@ abstract class RepositoryModule {
     abstract fun bindHealthConnectAvailabilityRepository(
         impl: HealthConnectAvailabilityChecker,
     ): HealthConnectAvailabilityRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHealthDataSyncRepository(
+        impl: HealthDataSyncRepositoryImpl,
+    ): HealthDataSyncRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHealthPermissionRepository(
+        impl: HealthConnectPermissionRepositoryImpl,
+    ): HealthPermissionRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHealthSyncCheckpointRepository(
+        impl: DataStoreHealthSyncCheckpointRepository,
+    ): HealthSyncCheckpointRepository
 }
 

@@ -9,8 +9,9 @@ import com.github.arhor.journey.domain.model.HealthDataTimeRange
 import com.github.arhor.journey.domain.model.HealthDataType
 import com.github.arhor.journey.domain.repository.HealthDataSyncRepository
 import com.github.arhor.journey.domain.repository.HealthPermissionRepository
+import javax.inject.Inject
 
-class SyncHealthDataUseCase(
+class SyncHealthDataUseCase @Inject constructor(
     private val healthDataSyncRepository: HealthDataSyncRepository,
     private val healthPermissionRepository: HealthPermissionRepository? = null,
 ) {
