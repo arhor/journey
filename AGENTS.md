@@ -32,6 +32,10 @@ Style is enforced via `.editorconfig` and Gradle settings:
 - Package names: lowercase (`com.github.arhor.journey...`).
 - Type names: PascalCase (`HomeViewModel`, `AppNavGraph`).
 - Keep feature contracts explicit with `Intent`, `UiState`, and `Effect` types.
+- For `MviViewModel` screens, prefer unidirectional state composition:
+  implement `buildUiState()` by combining internal feature state (`MutableStateFlow`) with domain flows,
+  update internal state via `_state.update { ... }` in intent handlers,
+  and keep domain-to-UiState mapping in pure helper functions.
 
 ## Testing Guidelines
 - Put fast logic tests in `app/src/test`; Android/Compose behavior tests in `app/src/androidTest`.

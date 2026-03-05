@@ -9,4 +9,3 @@ data class Reward(
     val xp: Long,
     val stats: StatsDelta = StatsDelta(),
 )
-

@@ -19,6 +19,7 @@ fun HomeRoute(
         vm.effects.collect {
             when (it) {
                 is HomeEffect.Error -> snackbarHostState.showSnackbar(it.message)
+                is HomeEffect.Success -> snackbarHostState.showSnackbar(it.message)
             }
         }
     }

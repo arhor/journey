@@ -2,6 +2,7 @@ package com.github.arhor.journey.ui.views.settings
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.logging.LoggerFactory
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
@@ -25,7 +26,9 @@ private data class State(
 class SettingsViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
     private val setDistanceUnit: SetDistanceUnitUseCase,
+    loggerFactory: LoggerFactory,
 ) : MviViewModel<SettingsUiState, SettingsEffect, SettingsIntent>(
+    loggerFactory = loggerFactory,
     initialState = SettingsUiState.Loading,
 ) {
     private val _state = MutableStateFlow(State())
@@ -59,15 +62,15 @@ class SettingsViewModel @Inject constructor(
     private fun intoUiState(state: State, settings: Resource<AppSettings>): SettingsUiState {
         return when (settings) {
             is Resource.Loading -> SettingsUiState.Loading
-            is Resource.Failure -> SettingsUiState.Failure(errorMessage = settings.message ?: "Can't load settings")
-            is Resource.Success -> mapToContent(state, settings.value)
-        }
-    }
 
-    private fun mapToContent(state: State, settings: AppSettings): SettingsUiState.Content {
-        return SettingsUiState.Content(
-            isUpdating = state.isUpdating,
-            distanceUnit = settings.distanceUnit,
-        )
+            is Resource.Failure -> SettingsUiState.Failure(
+                errorMessage = settings.message ?: "Can't load settings",
+            )
+
+            is Resource.Success -> SettingsUiState.Content(
+                isUpdating = state.isUpdating,
+                distanceUnit = settings.value.distanceUnit,
+            )
+        }
     }
 }

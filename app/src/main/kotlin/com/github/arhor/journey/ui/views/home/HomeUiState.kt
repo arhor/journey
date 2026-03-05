@@ -1,6 +1,7 @@
 package com.github.arhor.journey.ui.views.home
 
 import androidx.compose.runtime.Immutable
+import com.github.arhor.journey.domain.model.ActivityType
 
 sealed interface HomeUiState {
 
@@ -11,5 +12,17 @@ sealed interface HomeUiState {
     data class Failure(val errorMessage: String) : HomeUiState
 
     @Immutable
-    data object Content : HomeUiState
+    data class Content(
+        val heroName: String,
+        val level: Int,
+        val xpInLevel: Long,
+        val xpToNextLevel: Long,
+        val strength: Int,
+        val vitality: Int,
+        val dexterity: Int,
+        val stamina: Int,
+        val selectedActivityType: ActivityType,
+        val durationMinutesInput: String,
+        val isSubmitting: Boolean,
+    ) : HomeUiState
 }

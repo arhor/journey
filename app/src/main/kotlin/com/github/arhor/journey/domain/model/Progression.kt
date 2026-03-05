@@ -9,4 +9,3 @@ data class Progression(
     val level: Int,
     val xpInLevel: Long,
 )
-

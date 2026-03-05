@@ -16,4 +16,3 @@ data class Hero(
     val createdAt: Instant,
     val updatedAt: Instant,
 )
-

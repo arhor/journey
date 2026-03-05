@@ -2,6 +2,8 @@ package com.github.arhor.journey.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.arhor.journey.core.logging.LoggerFactory
+import com.github.arhor.journey.core.logging.getLogger
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -43,16 +45,20 @@ import kotlinx.coroutines.launch
  * @property effects A hot flow of one-time UI effects.
  */
 abstract class MviViewModel<S : Any, E : Any, I : Any>(
+    loggerFactory: LoggerFactory,
     initialState: S,
     started: SharingStarted = SharingStarted.WhileSubscribed(5_000),
     intentsBuffer: Int = 64,
     effectsBuffer: Int = 16,
 ) : ViewModel() {
 
+    private val logger = loggerFactory.getLogger()
     private val _effects = createMutableSharedFlow<E>(bufferCapacity = effectsBuffer)
     private val _intents = createMutableSharedFlow<I>(bufferCapacity = intentsBuffer)
 
-    val uiState: StateFlow<S> = buildUiState().stateIn(viewModelScope, started, initialState)
+    val uiState: StateFlow<S> by lazy(LazyThreadSafetyMode.NONE) {
+        buildUiState().stateIn(viewModelScope, started, initialState)
+    }
     val effects: SharedFlow<E> = _effects
 
     init {

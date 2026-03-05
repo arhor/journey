@@ -3,19 +3,6 @@ package com.github.arhor.journey.domain.model
 import java.time.Duration
 import java.time.Instant
 
-enum class ActivityType {
-    WALK,
-    RUN,
-    WORKOUT,
-    STRETCHING,
-    REST,
-}
-
-enum class ActivitySource {
-    MANUAL,
-    IMPORTED,
-}
-
 /**
  * Raw activity data recorded by the app or imported from an external provider.
  *
@@ -30,15 +17,3 @@ data class RecordedActivity(
     val steps: Int?,
     val note: String?,
 )
-
-/**
- * A single, persisted activity log entry.
- *
- * [reward] represents what was granted at logging time.
- */
-data class ActivityLogEntry(
-    val id: Long,
-    val recorded: RecordedActivity,
-    val reward: Reward,
-)
-
