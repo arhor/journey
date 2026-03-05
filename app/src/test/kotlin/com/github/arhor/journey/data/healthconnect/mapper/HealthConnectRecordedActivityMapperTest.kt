@@ -3,6 +3,7 @@ package com.github.arhor.journey.data.healthconnect.mapper
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.Test
 import java.time.Duration
 import java.time.Instant
@@ -70,6 +71,63 @@ class HealthConnectRecordedActivityMapperTest {
         result.steps shouldBe null
         result.distanceMeters shouldBe null
         result.note shouldBe null
+    }
+
+    @Test
+    fun `mapSession should generate identical import hash when sessions share the same time range`() {
+        // Given
+        val startedAt = Instant.parse("2025-01-10T10:00:00Z")
+        val endedAt = Instant.parse("2025-01-10T10:45:00Z")
+        val first = HealthConnectSessionInput(
+            externalRecordId = "record-1",
+            originPackageName = "com.example.first",
+            exerciseType = HealthConnectExerciseType.WALKING,
+            sourceType = HealthConnectSourceType.HEALTH_CONNECT,
+            startedAt = startedAt,
+            endedAt = endedAt,
+            steps = 1_234,
+            distanceMeters = 1_000.0,
+            note = "first",
+        )
+        val second = first.copy(
+            externalRecordId = "record-2",
+            originPackageName = "com.example.second",
+            exerciseType = HealthConnectExerciseType.RUNNING,
+            steps = 4_321,
+            note = "second",
+        )
+
+        // When
+        val firstResult = mapper.mapSession(first)
+        val secondResult = mapper.mapSession(second)
+
+        // Then
+        firstResult.importMetadata?.timeBoundsHash shouldBe secondResult.importMetadata?.timeBoundsHash
+    }
+
+    @Test
+    fun `mapSession should generate different import hash when session time range changes`() {
+        // Given
+        val startedAt = Instant.parse("2025-01-10T10:00:00Z")
+        val first = HealthConnectSessionInput(
+            externalRecordId = "record-1",
+            originPackageName = "com.example.provider",
+            exerciseType = HealthConnectExerciseType.WALKING,
+            sourceType = HealthConnectSourceType.HEALTH_CONNECT,
+            startedAt = startedAt,
+            endedAt = Instant.parse("2025-01-10T10:45:00Z"),
+            steps = 100,
+            distanceMeters = 120.0,
+            note = null,
+        )
+        val second = first.copy(endedAt = Instant.parse("2025-01-10T10:50:00Z"))
+
+        // When
+        val firstResult = mapper.mapSession(first)
+        val secondResult = mapper.mapSession(second)
+
+        // Then
+        firstResult.importMetadata?.timeBoundsHash shouldNotBe secondResult.importMetadata?.timeBoundsHash
     }
 
     @Test

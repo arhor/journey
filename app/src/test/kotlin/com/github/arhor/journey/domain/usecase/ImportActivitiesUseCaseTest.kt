@@ -92,6 +92,40 @@ class ImportActivitiesUseCaseTest {
         activityRepo.entries.single().reward.xp shouldBe 0L
     }
 
+
+
+    @Test
+    fun `invoke should avoid duplicate rewards when the same imported records are synced repeatedly`() = runTest {
+        // Given
+        val initialHero = createHero(xpInLevel = 100L)
+        val heroRepo = FakeHeroRepository(initialHero)
+        val activityRepo = FakeActivityLogRepository()
+        val useCase = ImportActivitiesUseCase(
+            heroRepository = heroRepo,
+            activityLogRepository = activityRepo,
+            transactionRunner = FakeTransactionRunner(),
+            rewardCalculator = ActivityRewardCalculator(),
+            progressionEngine = ProgressionEngine(ProgressionPolicy()),
+            clock = Clock.fixed(Instant.parse("2026-01-01T00:10:00Z"), ZoneOffset.UTC),
+        )
+        val records = listOf(
+            createImportedRecordedActivity("record-1"),
+            createImportedRecordedActivity("record-2"),
+        )
+
+        // When
+        val first = useCase(records = records)
+        val second = useCase(records = records)
+
+        // Then
+        first.rewardedCount shouldBe 2
+        first.totalReward.xp shouldBe 40L
+        second.rewardedCount shouldBe 0
+        second.skippedRewardCount shouldBe 2
+        second.totalReward.xp shouldBe 0L
+        second.heroAfter shouldBe first.heroAfter
+    }
+
     private fun createHero(xpInLevel: Long = 10L) = Hero(
         id = "player",
         name = "Adventurer",
@@ -135,6 +169,7 @@ class ImportActivitiesUseCaseTest {
     ) : ActivityLogRepository {
         val entries = mutableListOf<ActivityLogEntry>()
         private var nextId = 1L
+        private val seenImportIds = mutableSetOf<String>()
 
         override fun observeHistory(): Flow<List<ActivityLogEntry>> = flowOf(entries.toList())
 
@@ -144,7 +179,12 @@ class ImportActivitiesUseCaseTest {
         ): ActivityLogInsertResult {
             val id = nextId++
             entries += ActivityLogEntry(id = id, recorded = recorded, reward = reward)
-            val shouldApplyReward = recorded.importMetadata?.externalRecordId !in duplicateImportIds
+
+            val importId = recorded.importMetadata?.externalRecordId
+            val isDuplicateFromSeed = importId != null && importId in duplicateImportIds
+            val isDuplicateFromPreviousInsert = importId != null && !seenImportIds.add(importId)
+            val shouldApplyReward = !isDuplicateFromSeed && !isDuplicateFromPreviousInsert
+
             return ActivityLogInsertResult(logEntryId = id, shouldApplyReward = shouldApplyReward)
         }
     }
