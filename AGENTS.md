@@ -35,8 +35,11 @@ Style is enforced via `.editorconfig` and Gradle settings:
 
 ## Testing Guidelines
 - Put fast logic tests in `app/src/test`; Android/Compose behavior tests in `app/src/androidTest`.
-- Frameworks in use: JUnit4, AndroidX test runner, Compose UI test APIs; MockK and Truth are available.
-- Name test files with `*Test.kt` and use descriptive method names (backtick names are acceptable for scenarios).
+- Frameworks in use: JUnit4, AndroidX test runner, Compose UI test APIs; MockK and Kotest assertions are available.
+- Name test files with `*Test.kt`.
+- Use backtick test names in the form: `{function/method/action} should {expected behavior} when {given context}`.
+- Split each test visually into 3 sections with comments: `// Given`, `// When`, `// Then`.
+- If strict phrasing is not possible (for example framework constraints), use the closest readable equivalent while preserving intent.
 
 ## Commit & Pull Request Guidelines
 Recent history favors short, imperative, sentence-style commits (for example: `Refactor ViewModels to use a new base MviViewModel class.`).

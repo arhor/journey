@@ -19,12 +19,15 @@ class AppBottomBarTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun `Home is selected on launch and Settings becomes selected after click`() {
+    fun `bottomBar should select settings tab when settings item is clicked from home`() {
+        // Given
         composeRule.onNodeWithTag(BottomNavItem.HomeItem.testTag).assertIsSelected()
         composeRule.onNodeWithTag(BottomNavItem.SettingsItem.testTag).assertIsNotSelected()
 
+        // When
         composeRule.onNodeWithTag(BottomNavItem.SettingsItem.testTag).performClick()
 
+        // Then
         composeRule.onNodeWithTag(BottomNavItem.HomeItem.testTag).assertIsNotSelected()
         composeRule.onNodeWithTag(BottomNavItem.SettingsItem.testTag).assertIsSelected()
     }

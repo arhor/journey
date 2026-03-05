@@ -3,7 +3,7 @@ package com.github.arhor.journey.domain.progression
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
 import com.github.arhor.journey.domain.model.RecordedActivity
-import com.google.common.truth.Truth.assertThat
+import io.kotest.matchers.shouldBe
 import org.junit.Test
 import java.time.Duration
 import java.time.Instant
@@ -13,7 +13,8 @@ class ActivityRewardCalculatorTest {
     private val calculator = ActivityRewardCalculator()
 
     @Test
-    fun `walk rounds up to full minutes`() {
+    fun `calculate should return rounded up xp when walk duration is a partial minute`() {
+        // Given
         val recorded = RecordedActivity(
             type = ActivityType.WALK,
             source = ActivitySource.MANUAL,
@@ -24,13 +25,16 @@ class ActivityRewardCalculatorTest {
             note = null,
         )
 
+        // When
         val reward = calculator.calculate(recorded)
 
-        assertThat(reward.xp).isEqualTo(10L)
+        // Then
+        reward.xp shouldBe 10L
     }
 
     @Test
-    fun `rest gives zero xp`() {
+    fun `calculate should return zero xp when activity type is rest`() {
+        // Given
         val recorded = RecordedActivity(
             type = ActivityType.REST,
             source = ActivitySource.MANUAL,
@@ -41,9 +45,10 @@ class ActivityRewardCalculatorTest {
             note = null,
         )
 
+        // When
         val reward = calculator.calculate(recorded)
 
-        assertThat(reward.xp).isEqualTo(0L)
+        // Then
+        reward.xp shouldBe 0L
     }
 }
-

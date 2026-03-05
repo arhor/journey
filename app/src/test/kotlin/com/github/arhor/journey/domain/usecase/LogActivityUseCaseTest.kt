@@ -14,7 +14,8 @@ import com.github.arhor.journey.domain.progression.ProgressionPolicy
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.TransactionRunner
-import com.google.common.truth.Truth.assertThat
+import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -28,7 +29,8 @@ import java.time.ZoneOffset
 class LogActivityUseCaseTest {
 
     @Test
-    fun `invoke persists log entry and updates hero in one transaction`() = runTest {
+    fun `invoke should persist activity log and update hero when activity is logged`() = runTest {
+        // Given
         val initialHero = Hero(
             id = "player",
             name = "Adventurer",
@@ -62,17 +64,19 @@ class LogActivityUseCaseTest {
             note = "Evening walk",
         )
 
+        // When
         val result = useCase(recorded)
 
-        assertThat(tx.calls).isEqualTo(1)
-        assertThat(result.reward.xp).isEqualTo(20L)
-        assertThat(result.levelUps).isEqualTo(1)
-        assertThat(result.heroAfter.progression.level).isEqualTo(2)
-        assertThat(result.heroAfter.progression.xpInLevel).isEqualTo(10L)
+        // Then
+        tx.calls shouldBe 1
+        result.reward.xp shouldBe 20L
+        result.levelUps shouldBe 1
+        result.heroAfter.progression.level shouldBe 2
+        result.heroAfter.progression.xpInLevel shouldBe 10L
 
-        assertThat(heroRepo.current.value).isEqualTo(result.heroAfter)
-        assertThat(activityRepo.entries).hasSize(1)
-        assertThat(activityRepo.entries.single().reward).isEqualTo(Reward(xp = 20L))
+        heroRepo.current.value shouldBe result.heroAfter
+        activityRepo.entries shouldHaveSize 1
+        activityRepo.entries.single().reward shouldBe Reward(xp = 20L)
     }
 
     private class FakeHeroRepository(initial: Hero) : HeroRepository {
@@ -112,4 +116,3 @@ class LogActivityUseCaseTest {
         }
     }
 }
-

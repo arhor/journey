@@ -2,11 +2,10 @@ package com.github.arhor.journey
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.kotest.matchers.shouldBe
 
 import org.junit.Test
 import org.junit.runner.RunWith
-
-import org.junit.Assert.*
 
 /**
  * Instrumented test, which will execute on an Android device.
@@ -16,9 +15,14 @@ import org.junit.Assert.*
 @RunWith(AndroidJUnit4::class)
 class ExampleInstrumentedTest {
     @Test
-    fun useAppContext() {
-        // Context of the app under test.
+    fun `useAppContext should return journey package name when target context is requested`() {
+        // Given
+        val expectedPackageName = "com.github.arhor.journey"
+
+        // When
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("com.github.arhor.journey", appContext.packageName)
+
+        // Then
+        appContext.packageName shouldBe expectedPackageName
     }
 }
