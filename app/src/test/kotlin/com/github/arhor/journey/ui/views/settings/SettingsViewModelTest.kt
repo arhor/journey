@@ -4,6 +4,7 @@ import com.github.arhor.journey.data.healthconnect.HealthConnectPermissionGatewa
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.Resource
+import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.test.MainDispatcherRule
@@ -16,10 +17,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 import org.junit.Rule
 import org.junit.Test
 
@@ -37,14 +42,18 @@ class SettingsViewModelTest {
             tryEmit(Resource.Success(AppSettings(distanceUnit = DistanceUnit.IMPERIAL)))
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
 
         val vm = SettingsViewModel(
             observeSettings = observeSettingsUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             healthConnectPermissionGateway = permissionGateway,
+            clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
         )
         backgroundScope.launch { vm.uiState.collect() }
 
@@ -67,15 +76,19 @@ class SettingsViewModelTest {
             tryEmit(Resource.Success(AppSettings(distanceUnit = DistanceUnit.METRIC)))
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
         coEvery { setDistanceUnitUseCase.invoke(DistanceUnit.IMPERIAL) } returns Unit
 
         val vm = SettingsViewModel(
             observeSettings = observeSettingsUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             healthConnectPermissionGateway = permissionGateway,
+            clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()
@@ -97,15 +110,19 @@ class SettingsViewModelTest {
             tryEmit(Resource.Success(AppSettings(distanceUnit = DistanceUnit.METRIC)))
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
         coEvery { setDistanceUnitUseCase.invoke(any()) } throws IllegalStateException("cannot save")
 
         val vm = SettingsViewModel(
             observeSettings = observeSettingsUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             healthConnectPermissionGateway = permissionGateway,
+            clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()
@@ -129,15 +146,19 @@ class SettingsViewModelTest {
             tryEmit(Resource.Success(AppSettings(distanceUnit = DistanceUnit.METRIC)))
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
         coEvery { permissionGateway.getMissingPermissions() } returns setOf("permission.steps")
 
         val vm = SettingsViewModel(
             observeSettings = observeSettingsUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             healthConnectPermissionGateway = permissionGateway,
+            clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()
@@ -163,15 +184,19 @@ class SettingsViewModelTest {
             tryEmit(Resource.Success(AppSettings(distanceUnit = DistanceUnit.METRIC)))
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
+        val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
+        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
         every { permissionGateway.requiredPermissions } returns setOf("permission.steps", "permission.exercise")
 
         val vm = SettingsViewModel(
             observeSettings = observeSettingsUseCase,
+            observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             healthConnectPermissionGateway = permissionGateway,
+            clock = Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()

@@ -25,6 +25,8 @@ import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SettingsScreen(
@@ -121,12 +123,92 @@ internal fun SettingsContent(
                 text = healthConnectStatusLabel(state),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Button(
-                onClick = { dispatch(SettingsIntent.ConnectHealthConnect) },
-                enabled = state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
+            Text(
+                text = stringResource(
+                    R.string.settings_health_connect_last_sync,
+                    state.lastSyncTimestamp?.atOffset(ZoneOffset.UTC)?.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                        ?: stringResource(R.string.settings_health_connect_last_sync_never),
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(text = stringResource(R.string.settings_health_connect_connect_action))
+                Button(
+                    onClick = { dispatch(SettingsIntent.ConnectHealthConnect) },
+                    enabled = state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.settings_health_connect_connect_action))
+                }
+                Button(
+                    onClick = { dispatch(SettingsIntent.ManageHealthConnectPermissions) },
+                    enabled = state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(text = stringResource(R.string.settings_health_connect_manage_permissions_action))
+                }
             }
+
+            Button(
+                onClick = { dispatch(SettingsIntent.ManualSyncHealthData) },
+                enabled = !state.isSyncInProgress,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (state.isSyncInProgress) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.height(20.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                Text(
+                    text = if (state.isSyncInProgress) {
+                        stringResource(R.string.settings_health_connect_manual_sync_loading)
+                    } else {
+                        stringResource(R.string.settings_health_connect_manual_sync_action)
+                    },
+                )
+            }
+
+            ImportSummaryCard(
+                title = stringResource(R.string.settings_health_connect_imported_today_title),
+                summary = state.importedTodaySummary,
+            )
+            ImportSummaryCard(
+                title = stringResource(R.string.settings_health_connect_imported_week_title),
+                summary = state.importedWeekSummary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImportSummaryCard(
+    title: String,
+    summary: ImportedActivitySummary,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(text = title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = stringResource(
+                    R.string.settings_health_connect_imported_summary_activities,
+                    summary.importedActivities,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = stringResource(
+                    R.string.settings_health_connect_imported_summary_steps,
+                    summary.importedSteps,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }

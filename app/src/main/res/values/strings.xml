@@ -25,6 +25,9 @@
     <string name="home_activity_workout">Workout</string>
     <string name="home_activity_stretching">Stretching</string>
     <string name="home_activity_rest">Rest</string>
+    <string name="home_import_summary_title">Imported Activity (Today)</string>
+    <string name="home_import_summary_today_activities">Imported activities: %1$d</string>
+    <string name="home_import_summary_today_steps">Imported steps: %1$d</string>
 
     <string name="settings_title">Settings</string>
     <string name="settings_distance_unit_title">Distance Unit</string>
@@ -35,6 +38,15 @@
     <string name="settings_health_connect_data_usage">Journey requests read access to your Health Connect data so it can enrich your activity progression.</string>
     <string name="settings_health_connect_import_scope">Imported data includes step counts and exercise sessions.</string>
     <string name="settings_health_connect_connect_action">Connect Health Connect</string>
+    <string name="settings_health_connect_manage_permissions_action">Manage Permissions</string>
+    <string name="settings_health_connect_manual_sync_action">Sync Now</string>
+    <string name="settings_health_connect_manual_sync_loading">Syncing...</string>
+    <string name="settings_health_connect_last_sync">Last sync: %1$s</string>
+    <string name="settings_health_connect_last_sync_never">Never</string>
+    <string name="settings_health_connect_imported_today_title">Imported Today</string>
+    <string name="settings_health_connect_imported_week_title">Imported This Week</string>
+    <string name="settings_health_connect_imported_summary_activities">Activities: %1$d</string>
+    <string name="settings_health_connect_imported_summary_steps">Steps: %1$d</string>
     <string name="settings_health_connect_status_connected">Connected. Required permissions are granted.</string>
     <string name="settings_health_connect_status_requesting">Waiting for permission approval…</string>
     <string name="settings_health_connect_status_denied">Permissions are missing (%1$d still needed).</string>

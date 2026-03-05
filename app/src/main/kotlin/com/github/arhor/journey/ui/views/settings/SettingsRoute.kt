@@ -30,6 +30,7 @@ fun SettingsRoute(
         vm.effects.collect {
             when (it) {
                 is SettingsEffect.Error -> snackbarHostState.showSnackbar(it.message)
+                is SettingsEffect.Success -> snackbarHostState.showSnackbar(it.message)
                 is SettingsEffect.LaunchHealthConnectPermissionRequest -> {
                     vm.dispatch(SettingsIntent.HealthConnectPermissionRequestLaunched)
                     requestPermissions.launch(it.permissions)

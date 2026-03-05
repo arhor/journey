@@ -3,6 +3,7 @@ package com.github.arhor.journey.ui.views.home
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.github.arhor.journey.core.logging.LoggerFactory
+import com.github.arhor.journey.domain.model.ActivityLogEntry
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
 import com.github.arhor.journey.domain.model.Hero
@@ -11,6 +12,7 @@ import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.model.asResourceFlow
 import com.github.arhor.journey.domain.progression.ProgressionPolicy
 import com.github.arhor.journey.domain.usecase.LogActivityUseCase
+import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCurrentHeroUseCase
 import com.github.arhor.journey.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Duration
+import java.time.ZoneOffset
 import javax.inject.Inject
 
 @Immutable
@@ -37,6 +40,7 @@ private data class State(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val observeCurrentHero: ObserveCurrentHeroUseCase,
+    private val observeActivityLog: ObserveActivityLogUseCase,
     private val logActivity: LogActivityUseCase,
     private val progressionPolicy: ProgressionPolicy,
     private val clock: Clock,
@@ -51,6 +55,7 @@ class HomeViewModel @Inject constructor(
         combine(
             _state,
             heroResourceFlow(),
+            observeActivityLog(),
             ::intoUiState,
         ).distinctUntilChanged()
 
@@ -129,6 +134,7 @@ class HomeViewModel @Inject constructor(
     private fun intoUiState(
         state: State,
         hero: Resource<Hero>,
+        activityLog: List<ActivityLogEntry>,
     ): HomeUiState {
         return when (hero) {
             is Resource.Loading -> HomeUiState.Loading
@@ -137,19 +143,32 @@ class HomeViewModel @Inject constructor(
                 errorMessage = hero.message ?: HERO_LOADING_FAILED_MESSAGE,
             )
 
-            is Resource.Success -> HomeUiState.Content(
-                heroName = hero.value.name,
-                level = hero.value.progression.level,
-                xpInLevel = hero.value.progression.xpInLevel,
-                xpToNextLevel = progressionPolicy.xpToNextLevel(hero.value.progression.level),
-                strength = hero.value.stats.strength,
-                vitality = hero.value.stats.vitality,
-                dexterity = hero.value.stats.dexterity,
-                stamina = hero.value.stats.stamina,
-                selectedActivityType = state.selectedActivityType,
-                durationMinutesInput = state.durationMinutesInput,
-                isSubmitting = state.isSubmitting,
-            )
+            is Resource.Success -> {
+                val importedTodayEntries = importedTodayEntries(activityLog)
+                HomeUiState.Content(
+                    heroName = hero.value.name,
+                    level = hero.value.progression.level,
+                    xpInLevel = hero.value.progression.xpInLevel,
+                    xpToNextLevel = progressionPolicy.xpToNextLevel(hero.value.progression.level),
+                    strength = hero.value.stats.strength,
+                    vitality = hero.value.stats.vitality,
+                    dexterity = hero.value.stats.dexterity,
+                    stamina = hero.value.stats.stamina,
+                    selectedActivityType = state.selectedActivityType,
+                    durationMinutesInput = state.durationMinutesInput,
+                    isSubmitting = state.isSubmitting,
+                    importedTodayActivities = importedTodayEntries.size,
+                    importedTodaySteps = importedTodayEntries.sumOf { it.recorded.steps?.toLong() ?: 0L },
+                )
+            }
+        }
+    }
+
+    private fun importedTodayEntries(activityLog: List<ActivityLogEntry>): List<ActivityLogEntry> {
+        val today = clock.instant().atZone(ZoneOffset.UTC).toLocalDate()
+        return activityLog.filter { entry ->
+            entry.recorded.source == ActivitySource.IMPORTED &&
+                entry.recorded.startedAt.atZone(ZoneOffset.UTC).toLocalDate() == today
         }
     }
 
