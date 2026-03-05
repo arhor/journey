@@ -31,4 +31,12 @@
     <string name="settings_distance_unit_metric">Metric (km, m)</string>
     <string name="settings_distance_unit_imperial">Imperial (mi, ft)</string>
     <string name="settings_updating">Updating...</string>
+    <string name="settings_health_connect_title">Health Connect</string>
+    <string name="settings_health_connect_data_usage">Journey requests read access to your Health Connect data so it can enrich your activity progression.</string>
+    <string name="settings_health_connect_import_scope">Imported data includes step counts and exercise sessions.</string>
+    <string name="settings_health_connect_connect_action">Connect Health Connect</string>
+    <string name="settings_health_connect_status_connected">Connected. Required permissions are granted.</string>
+    <string name="settings_health_connect_status_requesting">Waiting for permission approval…</string>
+    <string name="settings_health_connect_status_denied">Permissions are missing (%1$d still needed).</string>
+    <string name="settings_health_connect_status_disconnected">Not connected yet.</string>
 </resources>

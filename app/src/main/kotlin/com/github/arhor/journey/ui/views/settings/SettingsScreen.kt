@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -102,6 +103,30 @@ internal fun SettingsContent(
                     )
                 }
             }
+
+            Text(
+                text = stringResource(R.string.settings_health_connect_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.settings_health_connect_data_usage),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = stringResource(R.string.settings_health_connect_import_scope),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = healthConnectStatusLabel(state),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Button(
+                onClick = { dispatch(SettingsIntent.ConnectHealthConnect) },
+                enabled = state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
+            ) {
+                Text(text = stringResource(R.string.settings_health_connect_connect_action))
+            }
         }
     }
 }
@@ -111,4 +136,25 @@ private fun distanceUnitLabel(unit: DistanceUnit): String =
     when (unit) {
         DistanceUnit.METRIC -> stringResource(R.string.settings_distance_unit_metric)
         DistanceUnit.IMPERIAL -> stringResource(R.string.settings_distance_unit_imperial)
+    }
+
+@Composable
+private fun healthConnectStatusLabel(state: SettingsUiState.Content): String =
+    when {
+        state.healthConnectConnectionStatus == HealthConnectConnectionStatus.CONNECTED -> {
+            stringResource(R.string.settings_health_connect_status_connected)
+        }
+
+        state.healthConnectPermissionStatus == HealthConnectPermissionStatus.REQUESTING -> {
+            stringResource(R.string.settings_health_connect_status_requesting)
+        }
+
+        state.healthConnectPermissionStatus == HealthConnectPermissionStatus.DENIED -> {
+            stringResource(
+                R.string.settings_health_connect_status_denied,
+                state.missingHealthConnectPermissions.size,
+            )
+        }
+
+        else -> stringResource(R.string.settings_health_connect_status_disconnected)
     }

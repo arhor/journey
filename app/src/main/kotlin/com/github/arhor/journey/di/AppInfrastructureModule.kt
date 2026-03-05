@@ -1,8 +1,11 @@
 package com.github.arhor.journey.di
 
+import android.content.Context
+import androidx.health.connect.client.HealthConnectClient
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +29,13 @@ object AppInfrastructureModule {
     @Singleton
     @AppCoroutineScope
     fun provideAppCoroutineScope(): CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+
+    @Provides
+    @Singleton
+    fun provideHealthConnectClient(
+        @ApplicationContext context: Context,
+    ): HealthConnectClient = HealthConnectClient.getOrCreate(context)
 
     @Provides
     @Singleton
