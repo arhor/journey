@@ -74,6 +74,25 @@ class SyncHealthDataUseCaseTest {
     }
 
     @Test
+    fun `invoke should return transient error failure when repository reports partial failure`() = runTest {
+        // Given
+        val repository = FakeHealthDataSyncRepository(
+            result = HealthDataSyncResult.Failure(HealthDataSyncFailure.TransientError("sessions read failed")),
+        )
+        val useCase = SyncHealthDataUseCase(repository)
+
+        // When
+        val result = useCase(
+            timeRange = defaultTimeRange,
+            selectedDataTypes = setOf(HealthDataType.STEPS, HealthDataType.SESSIONS),
+            syncMode = HealthDataSyncMode.BACKGROUND,
+        )
+
+        // Then
+        result shouldBe SyncHealthDataUseCaseResult.Failure(HealthDataSyncFailure.TransientError("sessions read failed"))
+    }
+
+    @Test
     fun `invoke should return synced payload when repository succeeds`() = runTest {
         // Given
         val payload = HealthDataSyncPayload(
