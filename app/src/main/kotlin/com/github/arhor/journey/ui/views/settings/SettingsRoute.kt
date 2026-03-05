@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.arhor.journey.ui.LocalSnackbarHostState
-import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun SettingsRoute(
@@ -16,10 +15,10 @@ fun SettingsRoute(
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(vm.effects) {
-        vm.effects.collectLatest { effect ->
-            when (effect) {
-                is SettingsEffect.Error -> snackbarHostState.showSnackbar(effect.message)
+    LaunchedEffect(Unit) {
+        vm.effects.collect {
+            when (it) {
+                is SettingsEffect.Error -> snackbarHostState.showSnackbar(it.message)
             }
         }
     }
