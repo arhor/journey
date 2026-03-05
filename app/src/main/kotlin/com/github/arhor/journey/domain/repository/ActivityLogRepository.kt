@@ -13,11 +13,15 @@ interface ActivityLogRepository {
     fun observeHistory(): Flow<List<ActivityLogEntry>>
 
     /**
-     * Inserts a new activity log entry and returns the generated id.
+     * Inserts a new activity log entry.
      */
     suspend fun insert(
         recorded: RecordedActivity,
         reward: Reward,
-    ): Long
+    ): ActivityLogInsertResult
 }
 
+data class ActivityLogInsertResult(
+    val logEntryId: Long,
+    val shouldApplyReward: Boolean,
+)

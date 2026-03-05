@@ -4,6 +4,7 @@ import com.github.arhor.journey.data.local.db.entity.ActivityLogEntity
 import com.github.arhor.journey.domain.model.ActivityLogEntry
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
+import com.github.arhor.journey.domain.model.ImportedActivityMetadata
 import com.github.arhor.journey.domain.model.RecordedActivity
 import com.github.arhor.journey.domain.model.Reward
 import java.time.Duration
@@ -23,6 +24,19 @@ fun ActivityLogEntity.toDomain(): ActivityLogEntry {
             distanceMeters = distanceMeters,
             steps = steps,
             note = note,
+            importMetadata = if (
+                externalRecordId != null &&
+                originPackageName != null &&
+                timeBoundsHash != null
+            ) {
+                ImportedActivityMetadata(
+                    externalRecordId = externalRecordId,
+                    originPackageName = originPackageName,
+                    timeBoundsHash = timeBoundsHash,
+                )
+            } else {
+                null
+            },
         ),
         reward = Reward(xp = rewardXp),
     )
@@ -38,5 +52,7 @@ fun RecordedActivity.toEntity(reward: Reward): ActivityLogEntity =
         steps = steps,
         note = note,
         rewardXp = reward.xp.coerceAtLeast(0L),
+        externalRecordId = importMetadata?.externalRecordId,
+        originPackageName = importMetadata?.originPackageName,
+        timeBoundsHash = importMetadata?.timeBoundsHash,
     )
-

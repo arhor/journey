@@ -17,6 +17,8 @@ class HealthConnectRecordedActivityMapperTest {
         val startedAt = Instant.parse("2025-01-10T10:00:00Z")
         val endedAt = Instant.parse("2025-01-10T10:45:00Z")
         val input = HealthConnectSessionInput(
+            externalRecordId = "record-1",
+            originPackageName = "com.google.android.apps.healthdata",
             exerciseType = HealthConnectExerciseType.RUNNING,
             sourceType = HealthConnectSourceType.HEALTH_CONNECT,
             startedAt = startedAt,
@@ -37,6 +39,8 @@ class HealthConnectRecordedActivityMapperTest {
         result.steps shouldBe 5_432
         result.distanceMeters shouldBe 6_100
         result.note shouldBe "Morning run"
+        result.importMetadata?.externalRecordId shouldBe "record-1"
+        result.importMetadata?.originPackageName shouldBe "com.google.android.apps.healthdata"
     }
 
     @Test
@@ -45,6 +49,8 @@ class HealthConnectRecordedActivityMapperTest {
         val startedAt = Instant.parse("2025-01-10T10:00:00Z")
         val endedAt = Instant.parse("2025-01-10T09:30:00Z")
         val input = HealthConnectSessionInput(
+            externalRecordId = "record-2",
+            originPackageName = "com.example.provider",
             exerciseType = HealthConnectExerciseType.OTHER,
             sourceType = HealthConnectSourceType.UNKNOWN,
             startedAt = startedAt,

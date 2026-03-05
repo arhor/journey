@@ -11,6 +11,7 @@ import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.progression.ActivityRewardCalculator
 import com.github.arhor.journey.domain.progression.ProgressionEngine
 import com.github.arhor.journey.domain.progression.ProgressionPolicy
+import com.github.arhor.journey.domain.repository.ActivityLogInsertResult
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.TransactionRunner
@@ -31,15 +32,7 @@ class LogActivityUseCaseTest {
     @Test
     fun `invoke should persist activity log and update hero when activity is logged`() = runTest {
         // Given
-        val initialHero = Hero(
-            id = "player",
-            name = "Adventurer",
-            stats = HeroStats(strength = 1, vitality = 1, dexterity = 1, stamina = 1),
-            progression = Progression(level = 1, xpInLevel = 990L),
-            createdAt = Instant.parse("2026-01-01T00:00:00Z"),
-            updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
-        )
-
+        val initialHero = createHero()
         val heroRepo = FakeHeroRepository(initialHero)
         val activityRepo = FakeActivityLogRepository()
         val tx = FakeTransactionRunner()
@@ -54,15 +47,7 @@ class LogActivityUseCaseTest {
             clock = clock,
         )
 
-        val recorded = RecordedActivity(
-            type = ActivityType.WALK,
-            source = ActivitySource.MANUAL,
-            startedAt = Instant.parse("2026-01-01T00:08:00Z"),
-            duration = Duration.ofMinutes(2),
-            distanceMeters = 200,
-            steps = 300,
-            note = "Evening walk",
-        )
+        val recorded = createRecordedActivity()
 
         // When
         val result = useCase(recorded)
@@ -79,6 +64,52 @@ class LogActivityUseCaseTest {
         activityRepo.entries.single().reward shouldBe Reward(xp = 20L)
     }
 
+    @Test
+    fun `invoke should skip reward application when repository reports duplicate import`() = runTest {
+        // Given
+        val initialHero = createHero()
+        val heroRepo = FakeHeroRepository(initialHero)
+        val activityRepo = FakeActivityLogRepository(shouldApplyReward = false)
+        val tx = FakeTransactionRunner()
+
+        val useCase = LogActivityUseCase(
+            heroRepository = heroRepo,
+            activityLogRepository = activityRepo,
+            transactionRunner = tx,
+            rewardCalculator = ActivityRewardCalculator(),
+            progressionEngine = ProgressionEngine(ProgressionPolicy()),
+            clock = Clock.fixed(Instant.parse("2026-01-01T00:10:00Z"), ZoneOffset.UTC),
+        )
+
+        // When
+        val result = useCase(createRecordedActivity())
+
+        // Then
+        result.reward.xp shouldBe 0L
+        result.levelUps shouldBe 0
+        result.heroAfter shouldBe initialHero
+        heroRepo.current.value shouldBe initialHero
+    }
+
+    private fun createHero() = Hero(
+        id = "player",
+        name = "Adventurer",
+        stats = HeroStats(strength = 1, vitality = 1, dexterity = 1, stamina = 1),
+        progression = Progression(level = 1, xpInLevel = 990L),
+        createdAt = Instant.parse("2026-01-01T00:00:00Z"),
+        updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
+    )
+
+    private fun createRecordedActivity() = RecordedActivity(
+        type = ActivityType.WALK,
+        source = ActivitySource.MANUAL,
+        startedAt = Instant.parse("2026-01-01T00:08:00Z"),
+        duration = Duration.ofMinutes(2),
+        distanceMeters = 200,
+        steps = 300,
+        note = "Evening walk",
+    )
+
     private class FakeHeroRepository(initial: Hero) : HeroRepository {
         val current = MutableStateFlow(initial)
 
@@ -91,7 +122,9 @@ class LogActivityUseCaseTest {
         }
     }
 
-    private class FakeActivityLogRepository : ActivityLogRepository {
+    private class FakeActivityLogRepository(
+        private val shouldApplyReward: Boolean = true,
+    ) : ActivityLogRepository {
         val entries = mutableListOf<ActivityLogEntry>()
         private var nextId = 1L
 
@@ -100,10 +133,10 @@ class LogActivityUseCaseTest {
         override suspend fun insert(
             recorded: RecordedActivity,
             reward: Reward,
-        ): Long {
+        ): ActivityLogInsertResult {
             val id = nextId++
             entries += ActivityLogEntry(id = id, recorded = recorded, reward = reward)
-            return id
+            return ActivityLogInsertResult(logEntryId = id, shouldApplyReward = shouldApplyReward)
         }
     }
 
