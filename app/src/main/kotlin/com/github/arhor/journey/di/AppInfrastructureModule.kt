@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
+import java.time.Clock
 import javax.inject.Singleton
 
 @Module
@@ -25,4 +26,8 @@ object AppInfrastructureModule {
     @Singleton
     @AppCoroutineScope
     fun provideAppCoroutineScope(): CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    @Provides
+    @Singleton
+    fun provideClock(): Clock = Clock.systemUTC()
 }
