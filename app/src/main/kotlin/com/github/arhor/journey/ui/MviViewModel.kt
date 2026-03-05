@@ -36,6 +36,9 @@ import kotlinx.coroutines.launch
  * @param E one-off effect type emitted through [effects]
  * @param I intent type consumed by [handleIntent]
  * @param initialState initial value of the UI state exposed by [uiState]
+ * @param started [SharingStarted] strategy for the [uiState] StateFlow
+ * @param intentsBuffer capacity of the internal [MutableSharedFlow] for intents
+ * @param effectsBuffer capacity of the internal [MutableSharedFlow] for effects
  * @property uiState A hot flow containing the latest UI state.
  * @property effects A hot flow of one-time UI effects.
  */
