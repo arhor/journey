@@ -20,5 +20,10 @@ data class ActivityLogEntity(
     val note: String?,
     @ColumnInfo(name = "reward_xp")
     val rewardXp: Long,
+    @ColumnInfo(name = "external_record_id")
+    val externalRecordId: String?,
+    @ColumnInfo(name = "origin_package_name")
+    val originPackageName: String?,
+    @ColumnInfo(name = "time_bounds_hash")
+    val timeBoundsHash: String?,
 )
-

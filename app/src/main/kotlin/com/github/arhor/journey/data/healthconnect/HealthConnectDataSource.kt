@@ -35,6 +35,8 @@ class HealthConnectDataSource @Inject constructor(
         ).records.map { record ->
             mapper.mapSession(
                 HealthConnectSessionInput(
+                    externalRecordId = record.metadata.id,
+                    originPackageName = record.metadata.dataOrigin.packageName,
                     exerciseType = record.exerciseType.toHealthConnectExerciseType(),
                     sourceType = HealthConnectSourceType.HEALTH_CONNECT,
                     startedAt = record.startTime,

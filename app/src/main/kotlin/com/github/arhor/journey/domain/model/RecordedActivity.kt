@@ -16,4 +16,11 @@ data class RecordedActivity(
     val distanceMeters: Int?,
     val steps: Int?,
     val note: String?,
+    val importMetadata: ImportedActivityMetadata? = null,
+)
+
+data class ImportedActivityMetadata(
+    val externalRecordId: String,
+    val originPackageName: String,
+    val timeBoundsHash: String,
 )

@@ -29,7 +29,9 @@ object DatabaseModule {
             context,
             JourneyDatabase::class.java,
             "journey.db",
-        ).build()
+        )
+            .addMigrations(JourneyDatabase.MIGRATION_1_2)
+            .build()
 
     @Provides
     fun provideHeroDao(db: JourneyDatabase): HeroDao = db.heroDao()
@@ -47,4 +49,3 @@ object DatabaseModule {
     @Singleton
     fun provideTransactionRunner(db: JourneyDatabase): TransactionRunner = RoomTransactionRunner(db)
 }
-
