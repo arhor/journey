@@ -3,9 +3,11 @@ package com.github.arhor.journey.di
 import com.github.arhor.journey.data.repository.RoomActivityLogRepository
 import com.github.arhor.journey.data.repository.RoomExplorationRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
+import com.github.arhor.journey.data.healthconnect.HealthConnectAvailabilityChecker
 import com.github.arhor.journey.data.repository.RoomPointOfInterestRepository
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import com.github.arhor.journey.domain.repository.ExplorationRepository
+import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import dagger.Binds
@@ -33,5 +35,11 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindExplorationRepository(impl: RoomExplorationRepository): ExplorationRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHealthConnectAvailabilityRepository(
+        impl: HealthConnectAvailabilityChecker,
+    ): HealthConnectAvailabilityRepository
 }
 
