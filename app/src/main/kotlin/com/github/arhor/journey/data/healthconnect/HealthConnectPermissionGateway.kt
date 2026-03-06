@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
+import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.Lazy
@@ -18,6 +20,8 @@ class HealthConnectPermissionGateway @Inject constructor(
     val requiredPermissions: Set<String> = setOf(
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         HealthPermission.getReadPermission(StepsRecord::class),
+        HealthPermission.getReadPermission(DistanceRecord::class),
+        HealthPermission.getReadPermission(SleepSessionRecord::class),
     )
 
     suspend fun getGrantedPermissions(): Set<String> =

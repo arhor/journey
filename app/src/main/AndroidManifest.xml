@@ -4,6 +4,8 @@
 
     <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:ignore="HealthConnectPolicy" />
     <uses-permission android:name="android.permission.health.READ_STEPS" tools:ignore="HealthConnectPolicy" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:ignore="HealthConnectPolicy" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" tools:ignore="HealthConnectPolicy" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
