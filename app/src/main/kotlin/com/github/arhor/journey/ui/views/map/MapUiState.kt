@@ -9,6 +9,17 @@ data class LatLng(
 )
 
 @Immutable
+data class CameraPositionState(
+    val target: LatLng,
+    val zoom: Double,
+)
+
+enum class CameraUpdateOrigin {
+    USER,
+    PROGRAMMATIC,
+}
+
+@Immutable
 data class MapObjectUiModel(
     val id: String,
     val title: String,
@@ -20,8 +31,8 @@ data class MapObjectUiModel(
 
 @Immutable
 data class MapUiState(
-    val cameraTarget: LatLng,
-    val zoom: Double,
+    val cameraPosition: CameraPositionState,
+    val cameraUpdateOrigin: CameraUpdateOrigin,
     val selectedStyle: MapStyleKey,
     val resolvedStyle: MapResolvedStyle,
     val styleLoadErrorMessage: String?,
@@ -35,11 +46,14 @@ data class MapUiState(
         const val DefaultStyleUri = "https://tiles.openfreemap.org/styles/liberty"
 
         val Loading = MapUiState(
-            cameraTarget = LatLng(
-                latitude = 0.0,
-                longitude = 0.0,
+            cameraPosition = CameraPositionState(
+                target = LatLng(
+                    latitude = 0.0,
+                    longitude = 0.0,
+                ),
+                zoom = 12.0,
             ),
-            zoom = 12.0,
+            cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
             selectedStyle = MapStyleKey.Default,
             resolvedStyle = MapResolvedStyle.Uri(DefaultStyleUri),
             styleLoadErrorMessage = null,
