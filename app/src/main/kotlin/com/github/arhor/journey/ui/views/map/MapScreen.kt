@@ -24,6 +24,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.arhor.journey.R
 import com.github.arhor.journey.ui.LocalSnackbarHostState
+import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
@@ -141,6 +142,14 @@ fun MapScreen(
                 onMapLoadFailed = { error ->
                     isMapLoaded = false
                     dispatch(MapIntent.OnMapLoadFailed(error?.message))
+                },
+                content = {
+                    MapObjectsRendererAdapter(
+                        objects = state.visibleObjects,
+                        onObjectTapped = { objectId ->
+                            dispatch(MapIntent.OnObjectTapped(objectId))
+                        },
+                    )
                 },
             )
         }
