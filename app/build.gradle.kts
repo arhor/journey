@@ -79,6 +79,7 @@ dependencies {
     implementation(libs.androidx.health.connect.client)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.maplibre.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.room.ktx)

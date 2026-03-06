@@ -24,6 +24,7 @@ import javax.inject.Inject
 private data class State(
     val cameraTarget: LatLng = DEFAULT_CAMERA_TARGET,
     val zoom: Double = DEFAULT_ZOOM,
+    val styleUri: String = MapUiState.DefaultStyleUri,
     val isAttributionVisible: Boolean = true,
 )
 
@@ -84,6 +85,7 @@ class MapViewModel @Inject constructor(
             return MapUiState(
                 cameraTarget = state.cameraTarget,
                 zoom = state.zoom,
+                styleUri = state.styleUri,
                 visibleObjects = emptyList(),
                 isLoading = false,
                 errorMessage = pointsOfInterest.message ?: POINTS_LOADING_FAILED_MESSAGE,
@@ -95,6 +97,7 @@ class MapViewModel @Inject constructor(
             return MapUiState(
                 cameraTarget = state.cameraTarget,
                 zoom = state.zoom,
+                styleUri = state.styleUri,
                 visibleObjects = emptyList(),
                 isLoading = false,
                 errorMessage = explorationProgress.message ?: EXPLORATION_LOADING_FAILED_MESSAGE,
@@ -117,6 +120,7 @@ class MapViewModel @Inject constructor(
         return MapUiState(
             cameraTarget = state.cameraTarget,
             zoom = state.zoom,
+            styleUri = state.styleUri,
             visibleObjects = visibleObjects,
             isLoading = pointsOfInterest is Resource.Loading || explorationProgress is Resource.Loading,
             errorMessage = null,

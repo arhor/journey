@@ -18,6 +18,7 @@ ksp = "2.3.4"
 lifecycleRuntimeKtx = "2.10.0"
 materialIconsExtended = "1.7.8"
 mockk = "1.14.9"
+maplibreCompose = "0.12.1"
 navigationCompose = "2.9.7"
 room = "2.8.4"
 workRuntimeKtx = "2.10.5"
@@ -28,6 +29,7 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
+maplibre-compose = { module = "org.maplibre.compose:maplibre-compose", version.ref = "maplibreCompose" }
 androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigationCompose" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
