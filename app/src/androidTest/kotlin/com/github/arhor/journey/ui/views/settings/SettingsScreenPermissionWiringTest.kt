@@ -1,9 +1,11 @@
 package com.github.arhor.journey.ui.views.settings
 
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.model.DistanceUnit
@@ -42,6 +44,9 @@ class SettingsScreenPermissionWiringTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val connectLabel = context.getString(R.string.settings_health_connect_connect_action)
+        val mapCreditsTitle = context.getString(R.string.settings_map_credits_title)
+        val mapLibreCredits = context.getString(R.string.settings_map_credits_maplibre)
+        val openFreeMapCredits = context.getString(R.string.settings_map_credits_openfreemap)
         val managePermissionsLabel = context.getString(R.string.settings_health_connect_manage_permissions_action)
 
         // When
@@ -49,6 +54,9 @@ class SettingsScreenPermissionWiringTest {
         composeRule.onNodeWithText(managePermissionsLabel).performClick()
 
         // Then
+        composeRule.onNodeWithText(mapCreditsTitle).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(mapLibreCredits).performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText(openFreeMapCredits).performScrollTo().assertIsDisplayed()
         dispatchedIntents.shouldContainInOrder(
             SettingsIntent.ConnectHealthConnect,
             SettingsIntent.ManageHealthConnectPermissions,

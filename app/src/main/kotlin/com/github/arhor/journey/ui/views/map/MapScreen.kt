@@ -140,9 +140,7 @@ fun MapScreen(
                 styleState = styleState,
                 options = MapOptions(
                     gestureOptions = GestureOptions.Standard,
-                    ornamentOptions = OrnamentOptions(
-                        isAttributionEnabled = state.isAttributionVisible,
-                    ),
+                    ornamentOptions = OrnamentOptions.AllDisabled,
                 ),
                 onMapClick = { position, _ ->
                     dispatch(

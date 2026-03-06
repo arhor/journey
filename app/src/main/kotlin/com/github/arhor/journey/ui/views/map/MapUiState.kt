@@ -40,7 +40,6 @@ data class MapUiState(
     val visibleObjects: List<MapObjectUiModel>,
     val isLoading: Boolean,
     val errorMessage: String?,
-    val isAttributionVisible: Boolean,
 ) {
     companion object {
         const val DefaultStyleUri = "https://tiles.openfreemap.org/styles/liberty"
@@ -61,7 +60,6 @@ data class MapUiState(
             visibleObjects = emptyList(),
             isLoading = true,
             errorMessage = null,
-            isAttributionVisible = true,
         )
     }
 }

@@ -37,7 +37,6 @@ private data class State(
     val selectedStyle: MapStyleKey = MapStyleKey.Default,
     val styleLoadErrorMessage: String? = null,
     val styleReloadToken: Int = 0,
-    val isAttributionVisible: Boolean = true,
 )
 
 @Stable
@@ -147,7 +146,6 @@ class MapViewModel @Inject constructor(
                 visibleObjects = emptyList(),
                 isLoading = false,
                 errorMessage = pointsOfInterest.message ?: POINTS_LOADING_FAILED_MESSAGE,
-                isAttributionVisible = state.isAttributionVisible,
             )
         }
 
@@ -162,7 +160,6 @@ class MapViewModel @Inject constructor(
                 visibleObjects = emptyList(),
                 isLoading = false,
                 errorMessage = explorationProgress.message ?: EXPLORATION_LOADING_FAILED_MESSAGE,
-                isAttributionVisible = state.isAttributionVisible,
             )
         }
 
@@ -188,7 +185,6 @@ class MapViewModel @Inject constructor(
             visibleObjects = visibleObjects,
             isLoading = pointsOfInterest is Resource.Loading || explorationProgress is Resource.Loading,
             errorMessage = null,
-            isAttributionVisible = state.isAttributionVisible,
         )
     }
 

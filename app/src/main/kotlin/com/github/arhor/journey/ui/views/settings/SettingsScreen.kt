@@ -1,5 +1,7 @@
 package com.github.arhor.journey.ui.views.settings
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,6 +56,7 @@ internal fun SettingsContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -184,6 +187,7 @@ internal fun SettingsContent(
                 title = stringResource(R.string.settings_health_connect_imported_week_title),
                 summary = state.importedWeekSummary,
             )
+            MapCreditsCard()
         }
     }
 }
@@ -211,6 +215,29 @@ private fun ImportSummaryCard(
                     R.string.settings_health_connect_imported_summary_steps,
                     summary.importedSteps,
                 ),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MapCreditsCard() {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_map_credits_title),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = stringResource(R.string.settings_map_credits_maplibre),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = stringResource(R.string.settings_map_credits_openfreemap),
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

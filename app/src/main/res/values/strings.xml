@@ -54,6 +54,9 @@
     <string name="settings_health_connect_status_requesting">Waiting for permission approval…</string>
     <string name="settings_health_connect_status_denied">Permissions are missing (%1$d still needed).</string>
     <string name="settings_health_connect_status_disconnected">Not connected yet.</string>
+    <string name="settings_map_credits_title">Map Credits</string>
+    <string name="settings_map_credits_maplibre">Maps powered by MapLibre.</string>
+    <string name="settings_map_credits_openfreemap">OpenFreeMap © OpenMapTiles Data from OpenStreetMap</string>
     <string name="health_connect_permissions_rationale_title">Health Connect data usage</string>
     <string name="health_connect_permissions_rationale_body">Journey reads your Health Connect exercise sessions to import completed activities into your in-app progression. It does not write, modify, or share your Health Connect data.</string>
 </resources>
