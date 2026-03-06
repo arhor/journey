@@ -1,0 +1,166 @@
+package com.github.arhor.journey.ui.views.map
+
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.logging.LoggerFactory
+import com.github.arhor.journey.domain.model.ExplorationProgress
+import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.model.Resource
+import com.github.arhor.journey.domain.model.asResourceFlow
+import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
+import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
+import com.github.arhor.journey.ui.MviViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.update
+import javax.inject.Inject
+
+@Immutable
+private data class State(
+    val cameraTarget: LatLng = DEFAULT_CAMERA_TARGET,
+    val zoom: Double = DEFAULT_ZOOM,
+    val isAttributionVisible: Boolean = true,
+)
+
+@Stable
+@HiltViewModel
+class MapViewModel @Inject constructor(
+    private val observePointsOfInterest: ObservePointsOfInterestUseCase,
+    private val observeExplorationProgress: ObserveExplorationProgressUseCase,
+    private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
+    loggerFactory: LoggerFactory,
+) : MviViewModel<MapUiState, MapEffect, MapIntent>(
+    loggerFactory = loggerFactory,
+    initialState = MapUiState.Loading,
+) {
+    private val _state = MutableStateFlow(State())
+
+    override fun buildUiState(): Flow<MapUiState> =
+        combine(
+            _state,
+            observePointsOfInterest().asResourceFlow(),
+            observeExplorationProgress().asResourceFlow(),
+            ::intoUiState,
+        ).distinctUntilChanged()
+
+    override suspend fun handleIntent(intent: MapIntent) {
+        when (intent) {
+            is MapIntent.OnMapLoaded -> _state.update {
+                it.copy(
+                    cameraTarget = intent.cameraTarget,
+                    zoom = intent.zoom,
+                )
+            }
+
+            is MapIntent.OnMapTapped -> _state.update {
+                it.copy(cameraTarget = intent.target)
+            }
+
+            MapIntent.OnRecenterClicked -> emitEffect(MapEffect.RequestLocationPermission)
+            is MapIntent.OnObjectTapped -> handleObjectTapped(intent.objectId)
+        }
+    }
+
+    private suspend fun handleObjectTapped(objectId: String) {
+        try {
+            discoverPointOfInterest(objectId)
+            emitEffect(MapEffect.OpenObjectDetails(objectId))
+        } catch (e: Throwable) {
+            emitEffect(MapEffect.ShowMessage(e.message ?: OBJECT_DISCOVERY_FAILED_MESSAGE))
+        }
+    }
+
+    private fun intoUiState(
+        state: State,
+        pointsOfInterest: Resource<List<PointOfInterest>>,
+        explorationProgress: Resource<ExplorationProgress>,
+    ): MapUiState {
+        if (pointsOfInterest is Resource.Failure) {
+            return MapUiState(
+                cameraTarget = state.cameraTarget,
+                zoom = state.zoom,
+                visibleObjects = emptyList(),
+                isLoading = false,
+                errorMessage = pointsOfInterest.message ?: POINTS_LOADING_FAILED_MESSAGE,
+                isAttributionVisible = state.isAttributionVisible,
+            )
+        }
+
+        if (explorationProgress is Resource.Failure) {
+            return MapUiState(
+                cameraTarget = state.cameraTarget,
+                zoom = state.zoom,
+                visibleObjects = emptyList(),
+                isLoading = false,
+                errorMessage = explorationProgress.message ?: EXPLORATION_LOADING_FAILED_MESSAGE,
+                isAttributionVisible = state.isAttributionVisible,
+            )
+        }
+
+        val visibleObjects = if (
+            pointsOfInterest is Resource.Success &&
+            explorationProgress is Resource.Success
+        ) {
+            mapObjects(
+                pointsOfInterest = pointsOfInterest.value,
+                explorationProgress = explorationProgress.value,
+            )
+        } else {
+            emptyList()
+        }
+
+        return MapUiState(
+            cameraTarget = state.cameraTarget,
+            zoom = state.zoom,
+            visibleObjects = visibleObjects,
+            isLoading = pointsOfInterest is Resource.Loading || explorationProgress is Resource.Loading,
+            errorMessage = null,
+            isAttributionVisible = state.isAttributionVisible,
+        )
+    }
+
+    private fun mapObjects(
+        pointsOfInterest: List<PointOfInterest>,
+        explorationProgress: ExplorationProgress,
+    ): List<MapObjectUiModel> {
+        val discoveredPoiIds = explorationProgress.discovered
+            .map { it.poiId }
+            .toSet()
+
+        return pointsOfInterest.map { poi ->
+            poi.toUiModel(isDiscovered = poi.id in discoveredPoiIds)
+        }
+    }
+
+    private fun PointOfInterest.toUiModel(isDiscovered: Boolean): MapObjectUiModel =
+        MapObjectUiModel(
+            id = id,
+            title = name,
+            description = description,
+            position = location.toLatLng(),
+            radiusMeters = radiusMeters,
+            isDiscovered = isDiscovered,
+        )
+
+    private fun GeoPoint.toLatLng(): LatLng =
+        LatLng(
+            latitude = lat,
+            longitude = lon,
+        )
+
+    private companion object {
+        val DEFAULT_CAMERA_TARGET = LatLng(
+            latitude = 37.7749,
+            longitude = -122.4194,
+        )
+        const val DEFAULT_ZOOM = 12.0
+        const val POINTS_LOADING_FAILED_MESSAGE = "Failed to load map objects."
+        const val EXPLORATION_LOADING_FAILED_MESSAGE = "Failed to load exploration progress."
+        const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
+    }
+}
