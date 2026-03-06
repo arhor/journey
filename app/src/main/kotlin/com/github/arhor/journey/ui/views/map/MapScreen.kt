@@ -160,7 +160,7 @@ fun MapScreen(
                 },
                 onMapLoadFailed = { error ->
                     isMapLoaded = false
-                    dispatch(MapIntent.OnMapLoadFailed(error?.message))
+                    dispatch(MapIntent.OnMapLoadFailed(error))
                 },
                 content = {
                     MapObjectsRendererAdapter(

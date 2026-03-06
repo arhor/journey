@@ -1,7 +1,7 @@
 package com.github.arhor.journey.data.healthconnect
 
 import androidx.health.connect.client.HealthConnectClient
-import androidx.health.connect.client.permission.PermissionController
+import androidx.health.connect.client.PermissionController
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery

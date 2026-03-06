@@ -1,5 +1,6 @@
 package com.github.arhor.journey.ui.views.home
 
+import com.github.arhor.journey.core.logging.NoOpLoggerFactory
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
 import com.github.arhor.journey.domain.model.Hero
@@ -21,8 +22,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -49,7 +50,7 @@ class HomeViewModelTest {
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
 
         val vm = HomeViewModel(
             observeCurrentHero = observeCurrentHeroUseCase,
@@ -57,6 +58,7 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
+            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
 
@@ -90,7 +92,7 @@ class HomeViewModelTest {
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         coEvery { logActivityUseCase.invoke(any()) } returns logActivityResult(hero)
 
         val vm = HomeViewModel(
@@ -99,6 +101,7 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
+            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()
@@ -144,7 +147,7 @@ class HomeViewModelTest {
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
 
         val vm = HomeViewModel(
             observeCurrentHero = observeCurrentHeroUseCase,
@@ -152,6 +155,7 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
+            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()
@@ -180,7 +184,7 @@ class HomeViewModelTest {
         val logActivityUseCase = mockk<LogActivityUseCase>()
         val clock = Clock.fixed(Instant.parse("2026-01-01T01:00:00Z"), ZoneOffset.UTC)
         every { observeCurrentHeroUseCase.invoke() } returns heroFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         coEvery { logActivityUseCase.invoke(any()) } throws IllegalStateException("boom")
 
         val vm = HomeViewModel(
@@ -189,6 +193,7 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
+            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()

@@ -5,8 +5,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.PermissionController
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.github.arhor.journey.ui.LocalSnackbarHostState
@@ -17,10 +16,8 @@ fun SettingsRoute(
     snackbarHostState: SnackbarHostState = LocalSnackbarHostState.current,
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val permissionController = HealthConnectClient.getOrCreate(context).permissionController
     val requestPermissions = rememberLauncherForActivityResult(
-        contract = permissionController.createRequestPermissionResultContract(),
+        contract = PermissionController.createRequestPermissionResultContract(),
         onResult = { grantedPermissions ->
             vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult(grantedPermissions))
         },

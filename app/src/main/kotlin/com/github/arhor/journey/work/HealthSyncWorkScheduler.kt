@@ -26,7 +26,7 @@ class HealthSyncWorkScheduler @Inject constructor(
             )
             .setBackoffCriteria(
                 BackoffPolicy.EXPONENTIAL,
-                BACKOFF_DELAY.inWholeMinutes,
+                BACKOFF_DELAY.toMinutes(),
                 TimeUnit.MINUTES,
             )
             .build()

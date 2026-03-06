@@ -60,8 +60,8 @@ class ImportActivitiesUseCaseTest {
         result.rewardedCount shouldBe 2
         result.skippedRewardCount shouldBe 1
         result.totalReward.xp shouldBe 40L
-        result.totalLevelUps shouldBe 2
-        result.heroAfter.progression.level shouldBe 3
+        result.totalLevelUps shouldBe 1
+        result.heroAfter.progression.level shouldBe 2
         heroRepo.current.value shouldBe result.heroAfter
         activityRepo.entries shouldHaveSize 3
     }

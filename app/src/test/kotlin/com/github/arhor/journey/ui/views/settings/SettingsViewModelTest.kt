@@ -17,8 +17,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -46,7 +46,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
 
         val vm = SettingsViewModel(
             observeSettings = observeSettingsUseCase,
@@ -80,7 +80,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         coEvery { setDistanceUnitUseCase.invoke(DistanceUnit.IMPERIAL) } returns Unit
 
         val vm = SettingsViewModel(
@@ -114,7 +114,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         coEvery { setDistanceUnitUseCase.invoke(any()) } throws IllegalStateException("cannot save")
 
         val vm = SettingsViewModel(
@@ -150,7 +150,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         coEvery { permissionGateway.getMissingPermissions() } returns setOf("permission.steps")
 
         val vm = SettingsViewModel(
@@ -190,7 +190,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         coEvery { permissionGateway.getMissingPermissions() } throws IllegalStateException("health connect unavailable")
 
         val vm = SettingsViewModel(
@@ -227,7 +227,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         coEvery { permissionGateway.getMissingPermissions() } returns setOf("permission.sessions")
 
         val vm = SettingsViewModel(
@@ -266,7 +266,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
 
         val vm = SettingsViewModel(
             observeSettings = observeSettingsUseCase,
@@ -300,7 +300,7 @@ class SettingsViewModelTest {
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observeActivityLogUseCase.invoke() } returns emptyFlow()
+        every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         every { permissionGateway.requiredPermissions } returns setOf("permission.steps", "permission.exercise")
 
         val vm = SettingsViewModel(

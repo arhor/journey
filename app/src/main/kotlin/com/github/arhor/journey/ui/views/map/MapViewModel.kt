@@ -20,6 +20,13 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
+private val DEFAULT_CAMERA_TARGET = LatLng(
+    latitude = 37.7749,
+    longitude = -122.4194,
+)
+
+private const val DEFAULT_ZOOM = 12.0
+
 @Immutable
 private data class State(
     val cameraPosition: CameraPositionState = CameraPositionState(
@@ -215,11 +222,6 @@ class MapViewModel @Inject constructor(
         )
 
     private companion object {
-        val DEFAULT_CAMERA_TARGET = LatLng(
-            latitude = 37.7749,
-            longitude = -122.4194,
-        )
-        const val DEFAULT_ZOOM = 12.0
         const val POINTS_LOADING_FAILED_MESSAGE = "Failed to load map objects."
         const val EXPLORATION_LOADING_FAILED_MESSAGE = "Failed to load exploration progress."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."

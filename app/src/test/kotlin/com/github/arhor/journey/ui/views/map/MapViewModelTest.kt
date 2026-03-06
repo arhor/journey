@@ -17,6 +17,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -76,11 +77,11 @@ class MapViewModelTest {
         advanceUntilIdle()
 
         // Then
-        vm.uiState.value.isLoading shouldBe false
-        vm.uiState.value.errorMessage shouldBe null
-        vm.uiState.value.selectedStyle shouldBe MapStyleKey.Default
-        vm.uiState.value.resolvedStyle shouldBe MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
-        vm.uiState.value.visibleObjects shouldBe listOf(
+        val state = vm.uiState.first { !it.isLoading }
+        state.errorMessage shouldBe null
+        state.selectedStyle shouldBe MapStyleKey.Default
+        state.resolvedStyle shouldBe MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
+        state.visibleObjects shouldBe listOf(
             MapObjectUiModel(
                 id = "poi-1",
                 title = "Town Square",
