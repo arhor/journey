@@ -22,18 +22,22 @@ data class MapObjectUiModel(
 data class MapUiState(
     val cameraTarget: LatLng,
     val zoom: Double,
+    val styleUri: String,
     val visibleObjects: List<MapObjectUiModel>,
     val isLoading: Boolean,
     val errorMessage: String?,
     val isAttributionVisible: Boolean,
 ) {
     companion object {
+        const val DefaultStyleUri = "https://tiles.openfreemap.org/styles/liberty"
+
         val Loading = MapUiState(
             cameraTarget = LatLng(
                 latitude = 0.0,
                 longitude = 0.0,
             ),
             zoom = 12.0,
+            styleUri = DefaultStyleUri,
             visibleObjects = emptyList(),
             isLoading = true,
             errorMessage = null,

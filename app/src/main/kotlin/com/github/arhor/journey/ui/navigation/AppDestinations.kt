@@ -3,6 +3,7 @@ package com.github.arhor.journey.ui.navigation
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.github.arhor.journey.R
@@ -10,6 +11,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data object Home
+
+@Serializable
+data object Map
 
 @Serializable
 data object Settings
@@ -28,6 +32,13 @@ sealed class BottomNavItem<T : Any>(
         testTag = "bottomNav:home",
     )
 
+    data object MapItem : BottomNavItem<Map>(
+        destination = Map,
+        labelRes = R.string.nav_map,
+        icon = Icons.Outlined.Map,
+        testTag = "bottomNav:map",
+    )
+
     data object SettingsItem : BottomNavItem<Settings>(
         destination = Settings,
         labelRes = R.string.nav_settings,
@@ -38,5 +49,6 @@ sealed class BottomNavItem<T : Any>(
 
 val BottomNavItems = listOf(
     BottomNavItem.HomeItem,
+    BottomNavItem.MapItem,
     BottomNavItem.SettingsItem,
 )
