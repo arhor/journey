@@ -3,14 +3,28 @@ package com.github.arhor.journey.ui.views.map.renderer
 import com.github.arhor.journey.ui.views.map.LatLng
 import com.github.arhor.journey.ui.views.map.MapObjectUiModel
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Test
+import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.Point
 
 class MapObjectsRendererAdapterTest {
+
+    @Test
+    fun `toGeoJsonDataOrNull should return null when objects are empty`() {
+        // Given
+        val objects = emptyList<MapObjectUiModel>()
+
+        // When
+        val geoJsonData = objects.toGeoJsonDataOrNull()
+
+        // Then
+        geoJsonData.shouldBeNull()
+    }
 
     @Test
     fun `toFeatureCollection should map object metadata and id into feature properties when objects are provided`() {
@@ -39,6 +53,27 @@ class MapObjectsRendererAdapterTest {
         feature.properties[PROPERTY_OBJECT_DESCRIPTION] shouldBe JsonPrimitive("Main plaza")
         feature.properties[PROPERTY_OBJECT_RADIUS_METERS] shouldBe JsonPrimitive(120)
         feature.properties[PROPERTY_OBJECT_IS_DISCOVERED] shouldBe JsonPrimitive(true)
+    }
+
+    @Test
+    fun `toGeoJsonDataOrNull should wrap feature collection when objects are provided`() {
+        // Given
+        val objects = listOf(
+            MapObjectUiModel(
+                id = "poi-1",
+                title = "Town Square",
+                description = "Main plaza",
+                position = LatLng(latitude = 48.8584, longitude = 2.2945),
+                radiusMeters = 120,
+                isDiscovered = true,
+            ),
+        )
+
+        // When
+        val geoJsonData = objects.toGeoJsonDataOrNull()
+
+        // Then
+        geoJsonData shouldBe GeoJsonData.Features(objects.toFeatureCollection())
     }
 
     @Test

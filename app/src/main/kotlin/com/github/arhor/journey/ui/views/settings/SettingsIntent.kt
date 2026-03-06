@@ -12,6 +12,8 @@ sealed interface SettingsIntent {
 
     data object ManualSyncHealthData : SettingsIntent
 
+    data object RefreshHealthConnectStatus : SettingsIntent
+
     data object HealthConnectPermissionRequestLaunched : SettingsIntent
 
     data class HandleHealthConnectPermissionResult(val grantedPermissions: Set<String>) : SettingsIntent

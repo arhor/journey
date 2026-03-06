@@ -11,15 +11,16 @@ import com.github.arhor.journey.data.healthconnect.mapper.HealthConnectSessionIn
 import com.github.arhor.journey.data.healthconnect.mapper.HealthConnectSourceType
 import com.github.arhor.journey.domain.model.HealthDataTimeRange
 import com.github.arhor.journey.domain.model.RecordedActivity
+import dagger.Lazy
 import javax.inject.Inject
 
 class HealthConnectDataSource @Inject constructor(
-    private val healthConnectClient: HealthConnectClient,
+    private val healthConnectClient: Lazy<HealthConnectClient>,
     private val mapper: HealthConnectRecordedActivityMapper,
 ) {
 
     suspend fun readSteps(range: HealthDataTimeRange): List<StepsRecord> =
-        healthConnectClient.readRecords(
+        healthConnectClient.get().readRecords(
             ReadRecordsRequest(
                 recordType = StepsRecord::class,
                 timeRangeFilter = TimeRangeFilter.between(range.startTime, range.endTime),
@@ -27,7 +28,7 @@ class HealthConnectDataSource @Inject constructor(
         ).records
 
     suspend fun readExerciseSessions(range: HealthDataTimeRange): List<RecordedActivity> =
-        healthConnectClient.readRecords(
+        healthConnectClient.get().readRecords(
             ReadRecordsRequest(
                 recordType = ExerciseSessionRecord::class,
                 timeRangeFilter = TimeRangeFilter.between(range.startTime, range.endTime),

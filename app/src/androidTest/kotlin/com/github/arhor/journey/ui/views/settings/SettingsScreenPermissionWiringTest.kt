@@ -7,6 +7,7 @@ import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import io.kotest.matchers.collections.shouldContainInOrder
 import org.junit.Rule
 import org.junit.Test
@@ -26,6 +27,7 @@ class SettingsScreenPermissionWiringTest {
                 state = SettingsUiState.Content(
                     isUpdating = false,
                     distanceUnit = DistanceUnit.METRIC,
+                    healthConnectAvailability = HealthConnectAvailability.AVAILABLE,
                     healthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
                     healthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
                     missingHealthConnectPermissions = emptySet(),

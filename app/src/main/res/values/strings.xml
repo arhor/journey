@@ -36,8 +36,8 @@
     <string name="settings_distance_unit_imperial">Imperial (mi, ft)</string>
     <string name="settings_updating">Updating...</string>
     <string name="settings_health_connect_title">Health Connect</string>
-    <string name="settings_health_connect_data_usage">Journey requests read access to your Health Connect data so it can enrich your activity progression.</string>
-    <string name="settings_health_connect_import_scope">Imported data includes step counts and exercise sessions.</string>
+    <string name="settings_health_connect_data_usage">Journey requests read access to your Health Connect exercise sessions so it can enrich your activity progression.</string>
+    <string name="settings_health_connect_import_scope">Journey currently imports exercise sessions from Health Connect.</string>
     <string name="settings_health_connect_connect_action">Connect Health Connect</string>
     <string name="settings_health_connect_manage_permissions_action">Manage Permissions</string>
     <string name="settings_health_connect_manual_sync_action">Sync Now</string>
@@ -49,7 +49,11 @@
     <string name="settings_health_connect_imported_summary_activities">Activities: %1$d</string>
     <string name="settings_health_connect_imported_summary_steps">Steps: %1$d</string>
     <string name="settings_health_connect_status_connected">Connected. Required permissions are granted.</string>
+    <string name="settings_health_connect_status_needs_update">Health Connect needs to be installed or updated before Journey can connect.</string>
+    <string name="settings_health_connect_status_not_supported">Health Connect is not supported on this device.</string>
     <string name="settings_health_connect_status_requesting">Waiting for permission approval…</string>
     <string name="settings_health_connect_status_denied">Permissions are missing (%1$d still needed).</string>
     <string name="settings_health_connect_status_disconnected">Not connected yet.</string>
+    <string name="health_connect_permissions_rationale_title">Health Connect data usage</string>
+    <string name="health_connect_permissions_rationale_body">Journey reads your Health Connect exercise sessions to import completed activities into your in-app progression. It does not write, modify, or share your Health Connect data.</string>
 </resources>

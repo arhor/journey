@@ -39,11 +39,11 @@ fun MapObjectsRendererAdapter(
     objects: List<MapObjectUiModel>,
     onObjectTapped: (String) -> Unit,
 ) {
-    val featureCollection = remember(objects) { objects.toFeatureCollection() }
+    val geoJsonData = remember(objects) { objects.toGeoJsonDataOrNull() } ?: return
     val source = remember {
         GeoJsonSource(
             id = GAME_ENTITIES_SOURCE_ID,
-            data = GeoJsonData.Features(featureCollection),
+            data = geoJsonData,
             options = GeoJsonOptions(
                 cluster = true,
                 clusterRadius = CLUSTER_RADIUS,
@@ -52,8 +52,8 @@ fun MapObjectsRendererAdapter(
         )
     }
 
-    LaunchedEffect(source, featureCollection) {
-        source.setData(GeoJsonData.Features(featureCollection))
+    LaunchedEffect(source, geoJsonData) {
+        source.setData(geoJsonData)
     }
 
     CircleLayer(
@@ -116,6 +116,11 @@ internal fun List<MapObjectUiModel>.toFeatureCollection(): FeatureCollection<Poi
             )
         },
     )
+
+internal fun List<MapObjectUiModel>.toGeoJsonDataOrNull(): GeoJsonData.Features? =
+    takeIf { it.isNotEmpty() }
+        ?.toFeatureCollection()
+        ?.let(GeoJsonData::Features)
 
 internal fun MapObjectUiModel.toFeatureProperties(): JsonObject = buildJsonObject {
     put(PROPERTY_OBJECT_ID, id)

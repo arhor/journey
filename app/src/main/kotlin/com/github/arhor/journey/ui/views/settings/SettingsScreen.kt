@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
 import java.time.ZoneOffset
@@ -138,14 +139,16 @@ internal fun SettingsContent(
             ) {
                 Button(
                     onClick = { dispatch(SettingsIntent.ConnectHealthConnect) },
-                    enabled = state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
+                    enabled = state.healthConnectAvailability == HealthConnectAvailability.AVAILABLE &&
+                        state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(text = stringResource(R.string.settings_health_connect_connect_action))
                 }
                 Button(
                     onClick = { dispatch(SettingsIntent.ManageHealthConnectPermissions) },
-                    enabled = state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
+                    enabled = state.healthConnectAvailability != HealthConnectAvailability.NOT_SUPPORTED &&
+                        state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(text = stringResource(R.string.settings_health_connect_manage_permissions_action))
@@ -154,7 +157,8 @@ internal fun SettingsContent(
 
             Button(
                 onClick = { dispatch(SettingsIntent.ManualSyncHealthData) },
-                enabled = !state.isSyncInProgress,
+                enabled = state.healthConnectAvailability == HealthConnectAvailability.AVAILABLE &&
+                    !state.isSyncInProgress,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (state.isSyncInProgress) {
@@ -223,6 +227,14 @@ private fun distanceUnitLabel(unit: DistanceUnit): String =
 @Composable
 private fun healthConnectStatusLabel(state: SettingsUiState.Content): String =
     when {
+        state.healthConnectAvailability == HealthConnectAvailability.NEEDS_UPDATE_OR_INSTALL -> {
+            stringResource(R.string.settings_health_connect_status_needs_update)
+        }
+
+        state.healthConnectAvailability == HealthConnectAvailability.NOT_SUPPORTED -> {
+            stringResource(R.string.settings_health_connect_status_not_supported)
+        }
+
         state.healthConnectConnectionStatus == HealthConnectConnectionStatus.CONNECTED -> {
             stringResource(R.string.settings_health_connect_status_connected)
         }
