@@ -46,7 +46,6 @@ android {
 }
 
 kotlin {
-    jvmToolchain(17)
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
         languageVersion = KotlinVersion.KOTLIN_2_3
