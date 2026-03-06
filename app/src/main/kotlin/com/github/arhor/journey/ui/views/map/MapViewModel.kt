@@ -22,8 +22,11 @@ import javax.inject.Inject
 
 @Immutable
 private data class State(
-    val cameraTarget: LatLng = DEFAULT_CAMERA_TARGET,
-    val zoom: Double = DEFAULT_ZOOM,
+    val cameraPosition: CameraPositionState = CameraPositionState(
+        target = DEFAULT_CAMERA_TARGET,
+        zoom = DEFAULT_ZOOM,
+    ),
+    val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
     val selectedStyle: MapStyleKey = MapStyleKey.Default,
     val styleLoadErrorMessage: String? = null,
     val styleReloadToken: Int = 0,
@@ -54,18 +57,35 @@ class MapViewModel @Inject constructor(
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
-            is MapIntent.OnMapLoaded -> _state.update {
+            is MapIntent.OnCameraSettled -> _state.update {
                 it.copy(
-                    cameraTarget = intent.cameraTarget,
-                    zoom = intent.zoom,
+                    cameraPosition = intent.position,
+                    cameraUpdateOrigin = intent.origin,
                 )
             }
 
             is MapIntent.OnMapTapped -> _state.update {
-                it.copy(cameraTarget = intent.target)
+                it.copy(
+                    cameraPosition = CameraPositionState(
+                        target = intent.target,
+                        zoom = it.cameraPosition.zoom,
+                    ),
+                    cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+                )
             }
 
-            MapIntent.OnRecenterClicked -> emitEffect(MapEffect.RequestLocationPermission)
+            MapIntent.OnRecenterClicked -> {
+                _state.update {
+                    it.copy(
+                        cameraPosition = CameraPositionState(
+                            target = DEFAULT_CAMERA_TARGET,
+                            zoom = DEFAULT_ZOOM,
+                        ),
+                        cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+                    )
+                }
+                emitEffect(MapEffect.RequestLocationPermission)
+            }
             is MapIntent.OnObjectTapped -> handleObjectTapped(intent.objectId)
             is MapIntent.OnMapLoadFailed -> _state.update {
                 it.copy(styleLoadErrorMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
@@ -81,6 +101,20 @@ class MapViewModel @Inject constructor(
 
     private suspend fun handleObjectTapped(objectId: String) {
         try {
+            uiState.value.visibleObjects
+                .firstOrNull { it.id == objectId }
+                ?.let { objectUiModel ->
+                    _state.update {
+                        it.copy(
+                            cameraPosition = CameraPositionState(
+                                target = objectUiModel.position,
+                                zoom = it.cameraPosition.zoom,
+                            ),
+                            cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+                        )
+                    }
+                }
+
             discoverPointOfInterest(objectId)
             emitEffect(MapEffect.OpenObjectDetails(objectId))
         } catch (e: Throwable) {
@@ -97,8 +131,8 @@ class MapViewModel @Inject constructor(
 
         if (pointsOfInterest is Resource.Failure) {
             return MapUiState(
-                cameraTarget = state.cameraTarget,
-                zoom = state.zoom,
+                cameraPosition = state.cameraPosition,
+                cameraUpdateOrigin = state.cameraUpdateOrigin,
                 selectedStyle = state.selectedStyle,
                 resolvedStyle = resolvedStyle,
                 styleLoadErrorMessage = state.styleLoadErrorMessage,
@@ -112,8 +146,8 @@ class MapViewModel @Inject constructor(
 
         if (explorationProgress is Resource.Failure) {
             return MapUiState(
-                cameraTarget = state.cameraTarget,
-                zoom = state.zoom,
+                cameraPosition = state.cameraPosition,
+                cameraUpdateOrigin = state.cameraUpdateOrigin,
                 selectedStyle = state.selectedStyle,
                 resolvedStyle = resolvedStyle,
                 styleLoadErrorMessage = state.styleLoadErrorMessage,
@@ -138,8 +172,8 @@ class MapViewModel @Inject constructor(
         }
 
         return MapUiState(
-            cameraTarget = state.cameraTarget,
-            zoom = state.zoom,
+            cameraPosition = state.cameraPosition,
+            cameraUpdateOrigin = state.cameraUpdateOrigin,
             selectedStyle = state.selectedStyle,
             resolvedStyle = resolvedStyle,
             styleLoadErrorMessage = state.styleLoadErrorMessage,

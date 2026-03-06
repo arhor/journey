@@ -13,6 +13,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,8 @@ import com.github.arhor.journey.R
 import com.github.arhor.journey.ui.LocalSnackbarHostState
 import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.map.GestureOptions
@@ -37,6 +40,7 @@ import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.Position
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlin.math.absoluteValue
 
 @Composable
 fun MapRoute(
@@ -71,30 +75,54 @@ fun MapScreen(
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
             target = Position(
-                latitude = state.cameraTarget.latitude,
-                longitude = state.cameraTarget.longitude,
+                latitude = state.cameraPosition.target.latitude,
+                longitude = state.cameraPosition.target.longitude,
             ),
-            zoom = state.zoom,
+            zoom = state.cameraPosition.zoom,
         ),
     )
     val styleState = rememberStyleState()
     var isMapLoaded by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.cameraTarget, state.zoom) {
+    LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
+        if (state.cameraUpdateOrigin != CameraUpdateOrigin.PROGRAMMATIC) {
+            return@LaunchedEffect
+        }
+
         val current = cameraState.position
         if (
-            current.target.latitude != state.cameraTarget.latitude ||
-            current.target.longitude != state.cameraTarget.longitude ||
-            current.zoom != state.zoom
+            current.target.latitude != state.cameraPosition.target.latitude ||
+            current.target.longitude != state.cameraPosition.target.longitude ||
+            current.zoom != state.cameraPosition.zoom
         ) {
             cameraState.position = current.copy(
                 target = Position(
-                    latitude = state.cameraTarget.latitude,
-                    longitude = state.cameraTarget.longitude,
+                    latitude = state.cameraPosition.target.latitude,
+                    longitude = state.cameraPosition.target.longitude,
                 ),
-                zoom = state.zoom,
+                zoom = state.cameraPosition.zoom,
             )
         }
+    }
+
+    LaunchedEffect(cameraState) {
+        snapshotFlow { cameraState.position }
+            .debounce(CAMERA_SETTLE_DEBOUNCE_MS)
+            .distinctUntilChanged(::areCameraPositionsEquivalent)
+            .collectLatest { position ->
+                dispatch(
+                    MapIntent.OnCameraSettled(
+                        position = CameraPositionState(
+                            target = LatLng(
+                                latitude = position.target.latitude,
+                                longitude = position.target.longitude,
+                            ),
+                            zoom = position.zoom,
+                        ),
+                        origin = CameraUpdateOrigin.USER,
+                    ),
+                )
+            }
     }
 
     LaunchedEffect(state.styleLoadErrorMessage) {
@@ -129,15 +157,6 @@ fun MapScreen(
                 },
                 onMapLoadFinished = {
                     isMapLoaded = true
-                    dispatch(
-                        MapIntent.OnMapLoaded(
-                            cameraTarget = LatLng(
-                                latitude = cameraState.position.target.latitude,
-                                longitude = cameraState.position.target.longitude,
-                            ),
-                            zoom = cameraState.position.zoom,
-                        ),
-                    )
                 },
                 onMapLoadFailed = { error ->
                     isMapLoaded = false
@@ -182,3 +201,14 @@ private fun MapResolvedStyle.toBaseStyle(): BaseStyle = when (this) {
     is MapResolvedStyle.Json -> BaseStyle.Json(value)
     is MapResolvedStyle.Uri -> BaseStyle.Uri(value)
 }
+
+private const val CAMERA_SETTLE_DEBOUNCE_MS = 300L
+
+private fun areCameraPositionsEquivalent(first: CameraPosition, second: CameraPosition): Boolean {
+    return (first.target.latitude - second.target.latitude).absoluteValue < CAMERA_SETTLE_COORDINATE_THRESHOLD &&
+        (first.target.longitude - second.target.longitude).absoluteValue < CAMERA_SETTLE_COORDINATE_THRESHOLD &&
+        (first.zoom - second.zoom).absoluteValue < CAMERA_SETTLE_ZOOM_THRESHOLD
+}
+
+private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
+private const val CAMERA_SETTLE_ZOOM_THRESHOLD = 0.01

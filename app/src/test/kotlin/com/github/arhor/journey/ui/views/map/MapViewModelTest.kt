@@ -137,6 +137,11 @@ class MapViewModelTest {
         // Then
         coVerify(exactly = 1) { discoverPointOfInterestUseCase.invoke("poi-1") }
         effect.await() shouldBe MapEffect.OpenObjectDetails(objectId = "poi-1")
+        vm.uiState.value.cameraPosition shouldBe CameraPositionState(
+            target = LatLng(latitude = 37.7749, longitude = -122.4194),
+            zoom = 12.0,
+        )
+        vm.uiState.value.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
     }
 
     @Test
@@ -174,6 +179,57 @@ class MapViewModelTest {
 
         // Then
         effect.await() shouldBe MapEffect.RequestLocationPermission
+        vm.uiState.value.cameraPosition shouldBe CameraPositionState(
+            target = LatLng(latitude = 37.7749, longitude = -122.4194),
+            zoom = 12.0,
+        )
+        vm.uiState.value.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+    }
+
+    @Test
+    fun `on camera settled should update stored camera position when camera movement was user-driven`() = runTest(mainDispatcherRule.testDispatcher) {
+        // Given
+        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
+            tryEmit(emptyList())
+        }
+        val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
+            tryEmit(ExplorationProgress(discovered = emptySet()))
+        }
+        val observePointsOfInterestUseCase = mockk<ObservePointsOfInterestUseCase>()
+        val observeExplorationProgressUseCase = mockk<ObserveExplorationProgressUseCase>()
+        val discoverPointOfInterestUseCase = mockk<DiscoverPointOfInterestUseCase>()
+        val mapStyleRepository = mockk<MapStyleRepository>()
+        every { observePointsOfInterestUseCase.invoke() } returns poiFlow
+        every { observeExplorationProgressUseCase.invoke() } returns explorationFlow
+        every { mapStyleRepository.resolve(any()) } returns MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
+        val vm = MapViewModel(
+            observePointsOfInterest = observePointsOfInterestUseCase,
+            observeExplorationProgress = observeExplorationProgressUseCase,
+            discoverPointOfInterest = discoverPointOfInterestUseCase,
+            mapStyleRepository = mapStyleRepository,
+            loggerFactory = NoOpLoggerFactory,
+        )
+        backgroundScope.launch { vm.uiState.collect() }
+        advanceUntilIdle()
+
+        // When
+        vm.dispatch(
+            MapIntent.OnCameraSettled(
+                position = CameraPositionState(
+                    target = LatLng(latitude = 48.8566, longitude = 2.3522),
+                    zoom = 14.5,
+                ),
+                origin = CameraUpdateOrigin.USER,
+            ),
+        )
+        advanceUntilIdle()
+
+        // Then
+        vm.uiState.value.cameraPosition shouldBe CameraPositionState(
+            target = LatLng(latitude = 48.8566, longitude = 2.3522),
+            zoom = 14.5,
+        )
+        vm.uiState.value.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
     }
 
     @Test
