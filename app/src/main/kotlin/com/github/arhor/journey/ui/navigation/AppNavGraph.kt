@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.github.arhor.journey.ui.views.home.HomeRoute
+import com.github.arhor.journey.ui.views.map.MapRoute
 import com.github.arhor.journey.ui.views.settings.SettingsRoute
 
 @Composable
@@ -22,6 +23,9 @@ fun AppNavGraph(
     ) {
         composable<Home> {
             HomeRoute()
+        }
+        composable<Map> {
+            MapRoute()
         }
         composable<Settings> {
             SettingsRoute()

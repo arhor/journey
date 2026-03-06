@@ -40,21 +40,29 @@ class LogActivityUseCase @Inject constructor(
         transactionRunner.runInTransaction {
             val now = clock.instant()
             val heroBefore = heroRepository.getCurrentHero()
+            val calculatedReward = rewardCalculator.calculate(recorded)
 
-            val reward = rewardCalculator.calculate(recorded)
-            val applied = progressionEngine.applyReward(hero = heroBefore, reward = reward, now = now)
+            val insertResult = activityLogRepository.insert(recorded = recorded, reward = calculatedReward)
+            if (!insertResult.shouldApplyReward) {
+                return@runInTransaction LogActivityResult(
+                    logEntryId = insertResult.logEntryId,
+                    reward = Reward(xp = 0L),
+                    heroBefore = heroBefore,
+                    heroAfter = heroBefore,
+                    levelUps = 0,
+                )
+            }
+
+            val applied = progressionEngine.applyReward(hero = heroBefore, reward = calculatedReward, now = now)
             val heroAfter = applied.hero
-
             heroRepository.upsert(heroAfter)
-            val logEntryId = activityLogRepository.insert(recorded = recorded, reward = reward)
 
             LogActivityResult(
-                logEntryId = logEntryId,
-                reward = reward,
+                logEntryId = insertResult.logEntryId,
+                reward = calculatedReward,
                 heroBefore = heroBefore,
                 heroAfter = heroAfter,
                 levelUps = applied.levelUps,
             )
         }
 }
-

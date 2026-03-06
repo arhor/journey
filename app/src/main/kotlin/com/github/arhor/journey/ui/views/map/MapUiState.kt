@@ -1,0 +1,53 @@
+package com.github.arhor.journey.ui.views.map
+
+import androidx.compose.runtime.Immutable
+
+@Immutable
+data class LatLng(
+    val latitude: Double,
+    val longitude: Double,
+)
+
+@Immutable
+data class MapObjectUiModel(
+    val id: String,
+    val title: String,
+    val description: String?,
+    val position: LatLng,
+    val radiusMeters: Int,
+    val isDiscovered: Boolean,
+)
+
+@Immutable
+data class MapUiState(
+    val cameraTarget: LatLng,
+    val zoom: Double,
+    val selectedStyle: MapStyleKey,
+    val resolvedStyle: MapResolvedStyle,
+    val styleLoadErrorMessage: String?,
+    val styleReloadToken: Int,
+    val visibleObjects: List<MapObjectUiModel>,
+    val isLoading: Boolean,
+    val errorMessage: String?,
+    val isAttributionVisible: Boolean,
+) {
+    companion object {
+        const val DefaultStyleUri = "https://tiles.openfreemap.org/styles/liberty"
+
+        val Loading = MapUiState(
+            cameraTarget = LatLng(
+                latitude = 0.0,
+                longitude = 0.0,
+            ),
+            zoom = 12.0,
+            selectedStyle = MapStyleKey.Default,
+            resolvedStyle = MapResolvedStyle.Uri(DefaultStyleUri),
+            styleLoadErrorMessage = null,
+            styleReloadToken = 0,
+            visibleObjects = emptyList(),
+            isLoading = true,
+            errorMessage = null,
+            isAttributionVisible = true,
+        )
+    }
+}
