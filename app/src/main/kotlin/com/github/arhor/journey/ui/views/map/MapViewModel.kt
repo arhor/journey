@@ -24,7 +24,9 @@ import javax.inject.Inject
 private data class State(
     val cameraTarget: LatLng = DEFAULT_CAMERA_TARGET,
     val zoom: Double = DEFAULT_ZOOM,
-    val styleUri: String = MapUiState.DefaultStyleUri,
+    val selectedStyle: MapStyleKey = MapStyleKey.Default,
+    val styleLoadErrorMessage: String? = null,
+    val styleReloadToken: Int = 0,
     val isAttributionVisible: Boolean = true,
 )
 
@@ -34,6 +36,7 @@ class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
+    private val mapStyleRepository: MapStyleRepository,
     loggerFactory: LoggerFactory,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     loggerFactory = loggerFactory,
@@ -64,6 +67,15 @@ class MapViewModel @Inject constructor(
 
             MapIntent.OnRecenterClicked -> emitEffect(MapEffect.RequestLocationPermission)
             is MapIntent.OnObjectTapped -> handleObjectTapped(intent.objectId)
+            is MapIntent.OnMapLoadFailed -> _state.update {
+                it.copy(styleLoadErrorMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
+            }
+            MapIntent.RetryStyleLoad -> _state.update {
+                it.copy(
+                    styleLoadErrorMessage = null,
+                    styleReloadToken = it.styleReloadToken + 1,
+                )
+            }
         }
     }
 
@@ -81,11 +93,16 @@ class MapViewModel @Inject constructor(
         pointsOfInterest: Resource<List<PointOfInterest>>,
         explorationProgress: Resource<ExplorationProgress>,
     ): MapUiState {
+        val resolvedStyle = mapStyleRepository.resolve(state.selectedStyle)
+
         if (pointsOfInterest is Resource.Failure) {
             return MapUiState(
                 cameraTarget = state.cameraTarget,
                 zoom = state.zoom,
-                styleUri = state.styleUri,
+                selectedStyle = state.selectedStyle,
+                resolvedStyle = resolvedStyle,
+                styleLoadErrorMessage = state.styleLoadErrorMessage,
+                styleReloadToken = state.styleReloadToken,
                 visibleObjects = emptyList(),
                 isLoading = false,
                 errorMessage = pointsOfInterest.message ?: POINTS_LOADING_FAILED_MESSAGE,
@@ -97,7 +114,10 @@ class MapViewModel @Inject constructor(
             return MapUiState(
                 cameraTarget = state.cameraTarget,
                 zoom = state.zoom,
-                styleUri = state.styleUri,
+                selectedStyle = state.selectedStyle,
+                resolvedStyle = resolvedStyle,
+                styleLoadErrorMessage = state.styleLoadErrorMessage,
+                styleReloadToken = state.styleReloadToken,
                 visibleObjects = emptyList(),
                 isLoading = false,
                 errorMessage = explorationProgress.message ?: EXPLORATION_LOADING_FAILED_MESSAGE,
@@ -120,7 +140,10 @@ class MapViewModel @Inject constructor(
         return MapUiState(
             cameraTarget = state.cameraTarget,
             zoom = state.zoom,
-            styleUri = state.styleUri,
+            selectedStyle = state.selectedStyle,
+            resolvedStyle = resolvedStyle,
+            styleLoadErrorMessage = state.styleLoadErrorMessage,
+            styleReloadToken = state.styleReloadToken,
             visibleObjects = visibleObjects,
             isLoading = pointsOfInterest is Resource.Loading || explorationProgress is Resource.Loading,
             errorMessage = null,
@@ -166,5 +189,6 @@ class MapViewModel @Inject constructor(
         const val POINTS_LOADING_FAILED_MESSAGE = "Failed to load map objects."
         const val EXPLORATION_LOADING_FAILED_MESSAGE = "Failed to load exploration progress."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
+        const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
     }
 }

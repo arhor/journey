@@ -15,4 +15,10 @@ sealed interface MapIntent {
     data class OnObjectTapped(
         val objectId: String,
     ) : MapIntent
+
+    data class OnMapLoadFailed(
+        val message: String? = null,
+    ) : MapIntent
+
+    data object RetryStyleLoad : MapIntent
 }

@@ -58,13 +58,16 @@ class MapViewModelTest {
         val observePointsOfInterestUseCase = mockk<ObservePointsOfInterestUseCase>()
         val observeExplorationProgressUseCase = mockk<ObserveExplorationProgressUseCase>()
         val discoverPointOfInterestUseCase = mockk<DiscoverPointOfInterestUseCase>()
+        val mapStyleRepository = mockk<MapStyleRepository>()
         every { observePointsOfInterestUseCase.invoke() } returns poiFlow
         every { observeExplorationProgressUseCase.invoke() } returns explorationFlow
+        every { mapStyleRepository.resolve(any()) } returns MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
 
         val vm = MapViewModel(
             observePointsOfInterest = observePointsOfInterestUseCase,
             observeExplorationProgress = observeExplorationProgressUseCase,
             discoverPointOfInterest = discoverPointOfInterestUseCase,
+            mapStyleRepository = mapStyleRepository,
             loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
@@ -75,6 +78,8 @@ class MapViewModelTest {
         // Then
         vm.uiState.value.isLoading shouldBe false
         vm.uiState.value.errorMessage shouldBe null
+        vm.uiState.value.selectedStyle shouldBe MapStyleKey.Default
+        vm.uiState.value.resolvedStyle shouldBe MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
         vm.uiState.value.visibleObjects shouldBe listOf(
             MapObjectUiModel(
                 id = "poi-1",
@@ -107,14 +112,17 @@ class MapViewModelTest {
         val observePointsOfInterestUseCase = mockk<ObservePointsOfInterestUseCase>()
         val observeExplorationProgressUseCase = mockk<ObserveExplorationProgressUseCase>()
         val discoverPointOfInterestUseCase = mockk<DiscoverPointOfInterestUseCase>()
+        val mapStyleRepository = mockk<MapStyleRepository>()
         every { observePointsOfInterestUseCase.invoke() } returns poiFlow
         every { observeExplorationProgressUseCase.invoke() } returns explorationFlow
         coEvery { discoverPointOfInterestUseCase.invoke(any()) } returns Unit
+        every { mapStyleRepository.resolve(any()) } returns MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
 
         val vm = MapViewModel(
             observePointsOfInterest = observePointsOfInterestUseCase,
             observeExplorationProgress = observeExplorationProgressUseCase,
             discoverPointOfInterest = discoverPointOfInterestUseCase,
+            mapStyleRepository = mapStyleRepository,
             loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
@@ -143,13 +151,16 @@ class MapViewModelTest {
         val observePointsOfInterestUseCase = mockk<ObservePointsOfInterestUseCase>()
         val observeExplorationProgressUseCase = mockk<ObserveExplorationProgressUseCase>()
         val discoverPointOfInterestUseCase = mockk<DiscoverPointOfInterestUseCase>()
+        val mapStyleRepository = mockk<MapStyleRepository>()
         every { observePointsOfInterestUseCase.invoke() } returns poiFlow
         every { observeExplorationProgressUseCase.invoke() } returns explorationFlow
+        every { mapStyleRepository.resolve(any()) } returns MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
 
         val vm = MapViewModel(
             observePointsOfInterest = observePointsOfInterestUseCase,
             observeExplorationProgress = observeExplorationProgressUseCase,
             discoverPointOfInterest = discoverPointOfInterestUseCase,
+            mapStyleRepository = mapStyleRepository,
             loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
@@ -163,6 +174,48 @@ class MapViewModelTest {
 
         // Then
         effect.await() shouldBe MapEffect.RequestLocationPermission
+    }
+
+    @Test
+    fun `on map load failed should expose error and clear it when retry is dispatched`() = runTest(mainDispatcherRule.testDispatcher) {
+        // Given
+        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
+            tryEmit(emptyList())
+        }
+        val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
+            tryEmit(ExplorationProgress(discovered = emptySet()))
+        }
+        val observePointsOfInterestUseCase = mockk<ObservePointsOfInterestUseCase>()
+        val observeExplorationProgressUseCase = mockk<ObserveExplorationProgressUseCase>()
+        val discoverPointOfInterestUseCase = mockk<DiscoverPointOfInterestUseCase>()
+        val mapStyleRepository = mockk<MapStyleRepository>()
+        every { observePointsOfInterestUseCase.invoke() } returns poiFlow
+        every { observeExplorationProgressUseCase.invoke() } returns explorationFlow
+        every { mapStyleRepository.resolve(any()) } returns MapResolvedStyle.Uri(MapUiState.DefaultStyleUri)
+        val vm = MapViewModel(
+            observePointsOfInterest = observePointsOfInterestUseCase,
+            observeExplorationProgress = observeExplorationProgressUseCase,
+            discoverPointOfInterest = discoverPointOfInterestUseCase,
+            mapStyleRepository = mapStyleRepository,
+            loggerFactory = NoOpLoggerFactory,
+        )
+        backgroundScope.launch { vm.uiState.collect() }
+        advanceUntilIdle()
+
+        // When
+        vm.dispatch(MapIntent.OnMapLoadFailed())
+        advanceUntilIdle()
+
+        // Then
+        vm.uiState.value.styleLoadErrorMessage shouldBe "Failed to load map style."
+
+        // When
+        vm.dispatch(MapIntent.RetryStyleLoad)
+        advanceUntilIdle()
+
+        // Then
+        vm.uiState.value.styleLoadErrorMessage shouldBe null
+        vm.uiState.value.styleReloadToken shouldBe 1
     }
 
     private fun pointOfInterest(id: String, name: String): PointOfInterest =
