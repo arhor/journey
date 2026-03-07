@@ -15,13 +15,41 @@ sealed interface MapResolvedStyle {
     data class Json(val value: String) : MapResolvedStyle
 }
 
+internal sealed interface MapStyleDefinition {
+    data class Remote(val uri: String) : MapStyleDefinition
+
+    data class Asset(
+        val path: String,
+        val fallbackUri: String,
+    ) : MapStyleDefinition
+}
+
+internal fun resolveMapStyleDefinition(style: MapStyle): MapStyleDefinition =
+    when (style) {
+        MapStyle.DEFAULT -> MapStyleDefinition.Asset(
+            path = MapStyleRepository.DEFAULT_STYLE_ASSET_PATH,
+            fallbackUri = MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI,
+        )
+        MapStyle.CLASSIC -> MapStyleDefinition.Remote(uri = MapStyleRepository.CLASSIC_STYLE_URI)
+        MapStyle.DARK -> MapStyleDefinition.Remote(uri = MapStyleRepository.DARK_STYLE_URI)
+        MapStyle.SATELLITE -> MapStyleDefinition.Asset(
+            path = MapStyleRepository.SATELLITE_STYLE_ASSET_PATH,
+            fallbackUri = MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI,
+        )
+        MapStyle.TERRAIN -> MapStyleDefinition.Asset(
+            path = MapStyleRepository.TERRAIN_STYLE_ASSET_PATH,
+            fallbackUri = MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI,
+        )
+    }
+
 class MapStyleRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    fun resolve(style: MapStyle): MapResolvedStyle = when (style) {
-        MapStyle.DEFAULT -> MapResolvedStyle.Uri(defaultStyleFallbackUri)
-        MapStyle.TERRAIN -> resolveFromAssetOrFallback(TERRAIN_STYLE_ASSET_PATH, TERRAIN_STYLE_URI)
-        else -> MapResolvedStyle.Uri(resolveRemoteStyleUri(style))
+    fun resolve(style: MapStyle): MapResolvedStyle {
+        return when (val definition = resolveMapStyleDefinition(style)) {
+            is MapStyleDefinition.Remote -> MapResolvedStyle.Uri(definition.uri)
+            is MapStyleDefinition.Asset -> resolveFromAssetOrFallback(definition.path, definition.fallbackUri)
+        }
     }
 
     private fun resolveFromAssetOrFallback(assetPath: String, fallbackUri: String): MapResolvedStyle {
@@ -39,14 +67,13 @@ class MapStyleRepository @Inject constructor(
     }
 
     companion object {
-        const val defaultStyleFallbackUri = "https://tiles.openfreemap.org/styles/liberty"
-
+        const val DEFAULT_STYLE_FALLBACK_URI = "https://tiles.openfreemap.org/styles/liberty"
         const val CLASSIC_STYLE_URI = "https://tiles.openfreemap.org/styles/bright"
         const val DARK_STYLE_URI = "https://tiles.openfreemap.org/styles/dark"
-        const val SATELLITE_STYLE_URI = "https://tiles.openfreemap.org/styles/positron"
-        const val TERRAIN_STYLE_URI = "https://tiles.openfreemap.org/styles/liberty"
 
-        private const val TERRAIN_STYLE_ASSET_PATH = "map/styles/default.json"
+        const val DEFAULT_STYLE_ASSET_PATH = "map/styles/default.json"
+        const val SATELLITE_STYLE_ASSET_PATH = "map/styles/satellite.json"
+        const val TERRAIN_STYLE_ASSET_PATH = "map/styles/terrain.json"
     }
 }
 
@@ -67,12 +94,3 @@ internal fun isRenderableMapStyle(styleJson: String): Boolean {
 
     return hasSources && hasRenderableLayers
 }
-
-internal fun resolveRemoteStyleUri(style: MapStyle): String =
-    when (style) {
-        MapStyle.DEFAULT -> MapStyleRepository.defaultStyleFallbackUri
-        MapStyle.CLASSIC -> MapStyleRepository.CLASSIC_STYLE_URI
-        MapStyle.DARK -> MapStyleRepository.DARK_STYLE_URI
-        MapStyle.SATELLITE -> MapStyleRepository.SATELLITE_STYLE_URI
-        MapStyle.TERRAIN -> MapStyleRepository.TERRAIN_STYLE_URI
-    }

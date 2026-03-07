@@ -95,7 +95,7 @@ class MapViewModelTest {
 
         // Then
         fixture.vm.uiState.value.selectedStyle shouldBe MapStyle.DEFAULT
-        fixture.vm.uiState.value.resolvedStyle shouldBe MapResolvedStyle.Uri(MapStyleRepository.defaultStyleFallbackUri)
+        fixture.vm.uiState.value.resolvedStyle shouldBe MapResolvedStyle.Uri(MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI)
     }
 
     @Test

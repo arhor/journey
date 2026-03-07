@@ -53,7 +53,7 @@ data class MapUiState(
             ),
             cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
             selectedStyle = MapStyle.DEFAULT,
-            resolvedStyle = MapResolvedStyle.Uri(MapStyleRepository.defaultStyleFallbackUri),
+            resolvedStyle = MapResolvedStyle.Uri(MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI),
             styleLoadErrorMessage = null,
             styleReloadToken = 0,
             visibleObjects = emptyList(),

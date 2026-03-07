@@ -6,19 +6,28 @@ import org.junit.Test
 
 class MapStyleRepositoryTest {
     @Test
-    fun `resolveRemoteStyleUri should return expected uri when each style is selected`() {
+    fun `resolveMapStyleDefinition should return style definitions for all supported map styles`() {
         // Given
         val styles = MapStyle.entries
 
         // When
-        val resolved = styles.associateWith(::resolveRemoteStyleUri)
+        val resolved = styles.associateWith(::resolveMapStyleDefinition)
 
         // Then
-        resolved[MapStyle.DEFAULT] shouldBe MapStyleRepository.defaultStyleFallbackUri
-        resolved[MapStyle.CLASSIC] shouldBe MapStyleRepository.CLASSIC_STYLE_URI
-        resolved[MapStyle.DARK] shouldBe MapStyleRepository.DARK_STYLE_URI
-        resolved[MapStyle.SATELLITE] shouldBe MapStyleRepository.SATELLITE_STYLE_URI
-        resolved[MapStyle.TERRAIN] shouldBe MapStyleRepository.TERRAIN_STYLE_URI
+        resolved[MapStyle.DEFAULT] shouldBe MapStyleDefinition.Asset(
+            path = MapStyleRepository.DEFAULT_STYLE_ASSET_PATH,
+            fallbackUri = MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI,
+        )
+        resolved[MapStyle.CLASSIC] shouldBe MapStyleDefinition.Remote(MapStyleRepository.CLASSIC_STYLE_URI)
+        resolved[MapStyle.DARK] shouldBe MapStyleDefinition.Remote(MapStyleRepository.DARK_STYLE_URI)
+        resolved[MapStyle.SATELLITE] shouldBe MapStyleDefinition.Asset(
+            path = MapStyleRepository.SATELLITE_STYLE_ASSET_PATH,
+            fallbackUri = MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI,
+        )
+        resolved[MapStyle.TERRAIN] shouldBe MapStyleDefinition.Asset(
+            path = MapStyleRepository.TERRAIN_STYLE_ASSET_PATH,
+            fallbackUri = MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI,
+        )
     }
 
     @Test
