@@ -2,6 +2,7 @@ package com.github.arhor.journey.ui.views.settings
 
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import java.time.Instant
 
@@ -17,6 +18,7 @@ sealed interface SettingsUiState {
     data class Content(
         val isUpdating: Boolean,
         val distanceUnit: DistanceUnit,
+        val mapStyle: MapStyle,
         val healthConnectAvailability: HealthConnectAvailability,
         val healthConnectConnectionStatus: HealthConnectConnectionStatus,
         val healthConnectPermissionStatus: HealthConnectPermissionStatus,

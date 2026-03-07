@@ -20,6 +20,7 @@ import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
+import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCaseResult
 import com.github.arhor.journey.ui.MviViewModel
@@ -60,6 +61,7 @@ class SettingsViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
     private val observeActivityLog: ObserveActivityLogUseCase,
     private val setDistanceUnit: SetDistanceUnitUseCase,
+    private val setMapStyle: SetMapStyleUseCase,
     private val healthConnectPermissionGateway: HealthConnectPermissionGateway,
     private val healthConnectAvailabilityRepository: HealthConnectAvailabilityRepository,
     private val healthSyncCheckpointRepository: HealthSyncCheckpointRepository,
@@ -89,6 +91,7 @@ class SettingsViewModel @Inject constructor(
     override suspend fun handleIntent(intent: SettingsIntent) {
         when (intent) {
             is SettingsIntent.SelectDistanceUnit -> handleSelectDistanceUnit(intent)
+            is SettingsIntent.SelectMapStyle -> handleSelectMapStyle(intent)
             SettingsIntent.ConnectHealthConnect -> handleConnectHealthConnect()
             SettingsIntent.ManageHealthConnectPermissions -> handleManageHealthConnectPermissions()
             SettingsIntent.ManualSyncHealthData -> handleManualSyncHealthData()
@@ -110,6 +113,21 @@ class SettingsViewModel @Inject constructor(
             setDistanceUnit(intent.unit)
         } catch (e: Throwable) {
             emitEffect(SettingsEffect.Error(message = e.message ?: "Failed to update distance unit."))
+        } finally {
+            _state.update { it.copy(isUpdating = false) }
+        }
+    }
+
+    private suspend fun handleSelectMapStyle(intent: SettingsIntent.SelectMapStyle) {
+        if (_state.value.isUpdating) {
+            return
+        }
+
+        _state.update { it.copy(isUpdating = true) }
+        try {
+            setMapStyle(intent.style)
+        } catch (e: Throwable) {
+            emitEffect(SettingsEffect.Error(message = e.message ?: "Failed to update map style."))
         } finally {
             _state.update { it.copy(isUpdating = false) }
         }
@@ -519,6 +537,7 @@ class SettingsViewModel @Inject constructor(
                 SettingsUiState.Content(
                     isUpdating = state.isUpdating,
                     distanceUnit = settings.value.distanceUnit,
+                    mapStyle = settings.value.mapStyle,
                     healthConnectAvailability = state.healthConnectAvailability,
                     healthConnectConnectionStatus = state.healthConnectConnectionStatus,
                     healthConnectPermissionStatus = state.healthConnectPermissionStatus,

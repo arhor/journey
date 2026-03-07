@@ -3,14 +3,17 @@ package com.github.arhor.journey.ui.views.map
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.github.arhor.journey.core.logging.LoggerFactory
+import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.model.asResourceFlow
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -34,7 +37,6 @@ private data class State(
         zoom = DEFAULT_ZOOM,
     ),
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
-    val selectedStyle: MapStyleKey = MapStyleKey.Default,
     val styleLoadErrorMessage: String? = null,
     val styleReloadToken: Int = 0,
 )
@@ -44,6 +46,7 @@ private data class State(
 class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
+    private val observeSettings: ObserveSettingsUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
     private val mapStyleRepository: MapStyleRepository,
     loggerFactory: LoggerFactory,
@@ -56,6 +59,7 @@ class MapViewModel @Inject constructor(
     override fun buildUiState(): Flow<MapUiState> =
         combine(
             _state,
+            observeSettings(),
             observePointsOfInterest().asResourceFlow(),
             observeExplorationProgress().asResourceFlow(),
             ::intoUiState,
@@ -130,16 +134,26 @@ class MapViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
+        settings: Resource<AppSettings>,
         pointsOfInterest: Resource<List<PointOfInterest>>,
         explorationProgress: Resource<ExplorationProgress>,
     ): MapUiState {
-        val resolvedStyle = mapStyleRepository.resolve(state.selectedStyle)
+        if (settings is Resource.Failure) {
+            return failureUiState(
+                state = state,
+                selectedStyle = MapStyle.DEFAULT,
+                errorMessage = settings.message ?: SETTINGS_LOADING_FAILED_MESSAGE,
+            )
+        }
+
+        val selectedStyle = (settings as? Resource.Success)?.value?.mapStyle ?: MapStyle.DEFAULT
+        val resolvedStyle = mapStyleRepository.resolve(selectedStyle)
 
         if (pointsOfInterest is Resource.Failure) {
             return MapUiState(
                 cameraPosition = state.cameraPosition,
                 cameraUpdateOrigin = state.cameraUpdateOrigin,
-                selectedStyle = state.selectedStyle,
+                selectedStyle = selectedStyle,
                 resolvedStyle = resolvedStyle,
                 styleLoadErrorMessage = state.styleLoadErrorMessage,
                 styleReloadToken = state.styleReloadToken,
@@ -153,7 +167,7 @@ class MapViewModel @Inject constructor(
             return MapUiState(
                 cameraPosition = state.cameraPosition,
                 cameraUpdateOrigin = state.cameraUpdateOrigin,
-                selectedStyle = state.selectedStyle,
+                selectedStyle = selectedStyle,
                 resolvedStyle = resolvedStyle,
                 styleLoadErrorMessage = state.styleLoadErrorMessage,
                 styleReloadToken = state.styleReloadToken,
@@ -178,13 +192,33 @@ class MapViewModel @Inject constructor(
         return MapUiState(
             cameraPosition = state.cameraPosition,
             cameraUpdateOrigin = state.cameraUpdateOrigin,
-            selectedStyle = state.selectedStyle,
+            selectedStyle = selectedStyle,
             resolvedStyle = resolvedStyle,
             styleLoadErrorMessage = state.styleLoadErrorMessage,
             styleReloadToken = state.styleReloadToken,
             visibleObjects = visibleObjects,
-            isLoading = pointsOfInterest is Resource.Loading || explorationProgress is Resource.Loading,
+            isLoading = settings is Resource.Loading ||
+                pointsOfInterest is Resource.Loading ||
+                explorationProgress is Resource.Loading,
             errorMessage = null,
+        )
+    }
+
+    private fun failureUiState(
+        state: State,
+        selectedStyle: MapStyle,
+        errorMessage: String,
+    ): MapUiState {
+        return MapUiState(
+            cameraPosition = state.cameraPosition,
+            cameraUpdateOrigin = state.cameraUpdateOrigin,
+            selectedStyle = selectedStyle,
+            resolvedStyle = mapStyleRepository.resolve(selectedStyle),
+            styleLoadErrorMessage = state.styleLoadErrorMessage,
+            styleReloadToken = state.styleReloadToken,
+            visibleObjects = emptyList(),
+            isLoading = false,
+            errorMessage = errorMessage,
         )
     }
 
@@ -218,6 +252,7 @@ class MapViewModel @Inject constructor(
         )
 
     private companion object {
+        const val SETTINGS_LOADING_FAILED_MESSAGE = "Failed to load settings."
         const val POINTS_LOADING_FAILED_MESSAGE = "Failed to load map objects."
         const val EXPLORATION_LOADING_FAILED_MESSAGE = "Failed to load exploration progress."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."

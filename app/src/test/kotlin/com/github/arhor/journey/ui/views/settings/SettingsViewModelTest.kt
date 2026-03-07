@@ -4,6 +4,7 @@ import com.github.arhor.journey.data.healthconnect.HealthConnectPermissionGatewa
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.HealthDataSyncPayload
 import com.github.arhor.journey.domain.model.HealthDataSyncSummary
 import com.github.arhor.journey.domain.model.Resource
@@ -12,6 +13,7 @@ import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
+import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCaseResult
 import com.github.arhor.journey.test.MainDispatcherRule
@@ -50,7 +52,7 @@ class SettingsViewModelTest {
             availability = HealthConnectAvailability.AVAILABLE,
             missingPermissions = emptySet(),
             lastSuccessfulSyncAt = Instant.parse("2026-01-02T00:00:00Z"),
-            settings = AppSettings(distanceUnit = DistanceUnit.IMPERIAL),
+            settings = AppSettings(distanceUnit = DistanceUnit.IMPERIAL, mapStyle = MapStyle.DARK),
         )
         backgroundScope.launch { fixture.vm.uiState.collect() }
 
@@ -60,6 +62,7 @@ class SettingsViewModelTest {
         // Then
         val state = fixture.vm.uiState.first { it is SettingsUiState.Content } as SettingsUiState.Content
         state.distanceUnit shouldBe DistanceUnit.IMPERIAL
+        state.mapStyle shouldBe MapStyle.DARK
         state.healthConnectAvailability shouldBe HealthConnectAvailability.AVAILABLE
         state.healthConnectConnectionStatus shouldBe HealthConnectConnectionStatus.CONNECTED
         state.healthConnectPermissionStatus shouldBe HealthConnectPermissionStatus.GRANTED
@@ -81,6 +84,24 @@ class SettingsViewModelTest {
 
         // Then
         coVerify(exactly = 1) { fixture.setDistanceUnitUseCase.invoke(DistanceUnit.IMPERIAL) }
+        (fixture.vm.uiState.value as SettingsUiState.Content).isUpdating shouldBe false
+    }
+
+    @Test
+    fun `select map style should invoke SetMapStyleUseCase when selection changes`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+        // Given
+        val fixture = createFixture()
+        coEvery { fixture.setMapStyleUseCase.invoke(MapStyle.TERRAIN) } returns Unit
+        backgroundScope.launch { fixture.vm.uiState.collect() }
+        advanceUntilIdle()
+
+        // When
+        fixture.vm.dispatch(SettingsIntent.SelectMapStyle(MapStyle.TERRAIN))
+        advanceUntilIdle()
+
+        // Then
+        coVerify(exactly = 1) { fixture.setMapStyleUseCase.invoke(MapStyle.TERRAIN) }
         (fixture.vm.uiState.value as SettingsUiState.Content).isUpdating shouldBe false
     }
 
@@ -201,6 +222,7 @@ class SettingsViewModelTest {
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
+        val setMapStyleUseCase = mockk<SetMapStyleUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         val availabilityRepository = mockk<HealthConnectAvailabilityRepository>()
         val checkpointRepository = mockk<HealthSyncCheckpointRepository>()
@@ -232,6 +254,7 @@ class SettingsViewModelTest {
             observeSettings = observeSettingsUseCase,
             observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
+            setMapStyle = setMapStyleUseCase,
             healthConnectPermissionGateway = permissionGateway,
             healthConnectAvailabilityRepository = availabilityRepository,
             healthSyncCheckpointRepository = checkpointRepository,
@@ -273,6 +296,7 @@ class SettingsViewModelTest {
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
+        val setMapStyleUseCase = mockk<SetMapStyleUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         val availabilityRepository = mockk<HealthConnectAvailabilityRepository>()
         val checkpointRepository = mockk<HealthSyncCheckpointRepository>()
@@ -294,6 +318,7 @@ class SettingsViewModelTest {
             observeSettings = observeSettingsUseCase,
             observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
+            setMapStyle = setMapStyleUseCase,
             healthConnectPermissionGateway = permissionGateway,
             healthConnectAvailabilityRepository = availabilityRepository,
             healthSyncCheckpointRepository = checkpointRepository,
@@ -347,7 +372,7 @@ class SettingsViewModelTest {
         missingPermissions: Set<String> = emptySet(),
         lastSuccessfulSyncAt: Instant? = null,
         activityLog: List<com.github.arhor.journey.domain.model.ActivityLogEntry> = emptyList(),
-        settings: AppSettings = AppSettings(distanceUnit = DistanceUnit.METRIC),
+        settings: AppSettings = AppSettings(distanceUnit = DistanceUnit.METRIC, mapStyle = MapStyle.DEFAULT),
         syncResult: SyncHealthDataUseCaseResult = SyncHealthDataUseCaseResult.Success(
             HealthDataSyncPayload(
                 summary = HealthDataSyncSummary(
@@ -366,6 +391,7 @@ class SettingsViewModelTest {
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
+        val setMapStyleUseCase = mockk<SetMapStyleUseCase>()
         val permissionGateway = mockk<HealthConnectPermissionGateway>()
         val availabilityRepository = mockk<HealthConnectAvailabilityRepository>()
         val checkpointRepository = mockk<HealthSyncCheckpointRepository>()
@@ -383,6 +409,7 @@ class SettingsViewModelTest {
             observeSettings = observeSettingsUseCase,
             observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
+            setMapStyle = setMapStyleUseCase,
             healthConnectPermissionGateway = permissionGateway,
             healthConnectAvailabilityRepository = availabilityRepository,
             healthSyncCheckpointRepository = checkpointRepository,
@@ -393,6 +420,7 @@ class SettingsViewModelTest {
         return Fixture(
             vm = vm,
             setDistanceUnitUseCase = setDistanceUnitUseCase,
+            setMapStyleUseCase = setMapStyleUseCase,
             syncHealthData = syncHealthData,
             healthSyncCheckpointRepository = checkpointRepository,
         )
@@ -401,6 +429,7 @@ class SettingsViewModelTest {
     private data class Fixture(
         val vm: SettingsViewModel,
         val setDistanceUnitUseCase: SetDistanceUnitUseCase,
+        val setMapStyleUseCase: SetMapStyleUseCase,
         val syncHealthData: SyncHealthDataUseCase,
         val healthSyncCheckpointRepository: HealthSyncCheckpointRepository,
     )

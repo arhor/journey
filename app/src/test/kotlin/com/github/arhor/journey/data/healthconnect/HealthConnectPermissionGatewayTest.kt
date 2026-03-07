@@ -16,9 +16,9 @@ import org.junit.Test
 class HealthConnectPermissionGatewayTest {
 
     @Test
-    fun `required permissions should include only exercise session read permission`() {
+    fun `required permissions should include all declared health data read permissions when gateway is initialized`() {
         // Given
-        val context = mockContext(requestedPermissions = arrayOf("android.permission.health.READ_EXERCISE"))
+        val context = mockContext(requestedPermissions = expectedRequiredPermissions.toTypedArray())
         val permissionController = mockk<PermissionController>()
         val healthConnectClient = mockk<HealthConnectClient>()
         val lazyHealthConnectClient = mockk<Lazy<HealthConnectClient>>()
@@ -29,19 +29,19 @@ class HealthConnectPermissionGatewayTest {
         val gateway = HealthConnectPermissionGateway(context, lazyHealthConnectClient)
 
         // Then
-        gateway.requiredPermissions shouldBe setOf("android.permission.health.READ_EXERCISE")
+        gateway.requiredPermissions shouldBe expectedRequiredPermissions
     }
 
     @Test
-    fun `get missing permissions should return only permissions that are not granted`() = runTest {
+    fun `get missing permissions should return only permissions that are not granted when permissions are partially granted`() = runTest {
         // Given
-        val context = mockContext(requestedPermissions = arrayOf("android.permission.health.READ_EXERCISE"))
+        val context = mockContext(requestedPermissions = expectedRequiredPermissions.toTypedArray())
         val permissionController = mockk<PermissionController>()
         val healthConnectClient = mockk<HealthConnectClient>()
         val lazyHealthConnectClient = mockk<Lazy<HealthConnectClient>>()
         every { healthConnectClient.permissionController } returns permissionController
         every { lazyHealthConnectClient.get() } returns healthConnectClient
-        coEvery { permissionController.getGrantedPermissions() } returns emptySet()
+        coEvery { permissionController.getGrantedPermissions() } returns setOf(permissionReadExercise)
 
         val gateway = HealthConnectPermissionGateway(context, lazyHealthConnectClient)
 
@@ -49,7 +49,7 @@ class HealthConnectPermissionGatewayTest {
         val missingPermissions = gateway.getMissingPermissions()
 
         // Then
-        missingPermissions shouldBe setOf("android.permission.health.READ_EXERCISE")
+        missingPermissions shouldBe expectedRequiredPermissions - permissionReadExercise
     }
 
     @Test
@@ -66,7 +66,11 @@ class HealthConnectPermissionGatewayTest {
 
         // Then
         (error is IllegalStateException) shouldBe true
-        error?.message shouldBe "The installed app manifest is missing Health Connect permissions: android.permission.health.READ_EXERCISE."
+        error?.message shouldBe "The installed app manifest is missing Health Connect permissions: " +
+            "android.permission.health.READ_EXERCISE, " +
+            "android.permission.health.READ_STEPS, " +
+            "android.permission.health.READ_DISTANCE, " +
+            "android.permission.health.READ_SLEEP."
     }
 
     private fun mockContext(requestedPermissions: Array<String>): Context {
@@ -84,5 +88,19 @@ class HealthConnectPermissionGatewayTest {
             )
         } returns packageInfo
         return context
+    }
+
+    private companion object {
+        const val permissionReadExercise = "android.permission.health.READ_EXERCISE"
+        const val permissionReadSteps = "android.permission.health.READ_STEPS"
+        const val permissionReadDistance = "android.permission.health.READ_DISTANCE"
+        const val permissionReadSleep = "android.permission.health.READ_SLEEP"
+
+        val expectedRequiredPermissions = setOf(
+            permissionReadExercise,
+            permissionReadSteps,
+            permissionReadDistance,
+            permissionReadSleep,
+        )
     }
 }

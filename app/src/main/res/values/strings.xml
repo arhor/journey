@@ -34,6 +34,12 @@
     <string name="settings_distance_unit_title">Distance Unit</string>
     <string name="settings_distance_unit_metric">Metric (km, m)</string>
     <string name="settings_distance_unit_imperial">Imperial (mi, ft)</string>
+    <string name="settings_map_style_title">Map Style</string>
+    <string name="settings_map_style_default">Default</string>
+    <string name="settings_map_style_classic">Classic</string>
+    <string name="settings_map_style_dark">Dark</string>
+    <string name="settings_map_style_satellite">Satellite</string>
+    <string name="settings_map_style_terrain">Terrain</string>
     <string name="settings_updating">Updating...</string>
     <string name="settings_health_connect_title">Health Connect</string>
     <string name="settings_health_connect_data_usage">Journey requests read access to your Health Connect exercise sessions so it can enrich your activity progression.</string>

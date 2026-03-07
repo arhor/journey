@@ -1,0 +1,21 @@
+{
+  "version": 8,
+  "name": "Journey Terrain",
+  "sources": {
+    "open-topo-map": {
+      "type": "raster",
+      "tiles": [
+        "https://tile.opentopomap.org/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "attribution": "Map data © OpenStreetMap contributors, SRTM | Style © OpenTopoMap"
+    }
+  },
+  "layers": [
+    {
+      "id": "terrain-raster",
+      "type": "raster",
+      "source": "open-topo-map"
+    }
+  ]
+}
