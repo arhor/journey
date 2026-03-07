@@ -5,4 +5,6 @@ import com.github.arhor.journey.domain.model.HealthDataType
 interface HealthPermissionRepository {
 
     suspend fun hasReadPermissions(selectedDataTypes: Set<HealthDataType>): Boolean
+
+    suspend fun getMissingPermissions(): Set<String>
 }

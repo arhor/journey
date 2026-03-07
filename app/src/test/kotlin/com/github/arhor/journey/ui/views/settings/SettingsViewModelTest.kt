@@ -1,6 +1,5 @@
 package com.github.arhor.journey.ui.views.settings
 
-import com.github.arhor.journey.data.healthconnect.HealthConnectPermissionGateway
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
@@ -9,6 +8,7 @@ import com.github.arhor.journey.domain.model.HealthDataSyncPayload
 import com.github.arhor.journey.domain.model.HealthDataSyncSummary
 import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
+import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
@@ -223,15 +223,14 @@ class SettingsViewModelTest {
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val setMapStyleUseCase = mockk<SetMapStyleUseCase>()
-        val permissionGateway = mockk<HealthConnectPermissionGateway>()
+        val healthPermissionRepository = mockk<HealthPermissionRepository>()
         val availabilityRepository = mockk<HealthConnectAvailabilityRepository>()
         val checkpointRepository = mockk<HealthSyncCheckpointRepository>()
         val syncHealthData = mockk<SyncHealthDataUseCase>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
         every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         every { availabilityRepository.checkAvailability() } returns HealthConnectAvailability.AVAILABLE
-        every { permissionGateway.requiredPermissions } returns setOf(permissionExercise)
-        coEvery { permissionGateway.getMissingPermissions() } returnsMany listOf(
+        coEvery { healthPermissionRepository.getMissingPermissions() } returnsMany listOf(
             setOf(permissionExercise),
             setOf(permissionExercise),
             emptySet(),
@@ -255,7 +254,7 @@ class SettingsViewModelTest {
             observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             setMapStyle = setMapStyleUseCase,
-            healthConnectPermissionGateway = permissionGateway,
+            healthPermissionRepository = healthPermissionRepository,
             healthConnectAvailabilityRepository = availabilityRepository,
             healthSyncCheckpointRepository = checkpointRepository,
             syncHealthData = syncHealthData,
@@ -269,7 +268,7 @@ class SettingsViewModelTest {
         // When
         vm.dispatch(SettingsIntent.ManualSyncHealthData)
         advanceUntilIdle()
-        vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult(emptySet()))
+        vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult)
         advanceUntilIdle()
 
         // Then
@@ -297,15 +296,14 @@ class SettingsViewModelTest {
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val setMapStyleUseCase = mockk<SetMapStyleUseCase>()
-        val permissionGateway = mockk<HealthConnectPermissionGateway>()
+        val healthPermissionRepository = mockk<HealthPermissionRepository>()
         val availabilityRepository = mockk<HealthConnectAvailabilityRepository>()
         val checkpointRepository = mockk<HealthSyncCheckpointRepository>()
         val syncHealthData = mockk<SyncHealthDataUseCase>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
         every { observeActivityLogUseCase.invoke() } returns flowOf(emptyList())
         every { availabilityRepository.checkAvailability() } returns HealthConnectAvailability.AVAILABLE
-        every { permissionGateway.requiredPermissions } returns setOf(permissionExercise)
-        coEvery { permissionGateway.getMissingPermissions() } returnsMany listOf(
+        coEvery { healthPermissionRepository.getMissingPermissions() } returnsMany listOf(
             setOf(permissionExercise),
             setOf(permissionExercise),
             setOf(permissionExercise),
@@ -319,7 +317,7 @@ class SettingsViewModelTest {
             observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             setMapStyle = setMapStyleUseCase,
-            healthConnectPermissionGateway = permissionGateway,
+            healthPermissionRepository = healthPermissionRepository,
             healthConnectAvailabilityRepository = availabilityRepository,
             healthSyncCheckpointRepository = checkpointRepository,
             syncHealthData = syncHealthData,
@@ -333,11 +331,11 @@ class SettingsViewModelTest {
         // When
         vm.dispatch(SettingsIntent.ConnectHealthConnect)
         advanceUntilIdle()
-        vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult(emptySet()))
+        vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult)
         advanceUntilIdle()
         vm.dispatch(SettingsIntent.ConnectHealthConnect)
         advanceUntilIdle()
-        vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult(emptySet()))
+        vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult)
         advanceUntilIdle()
 
         // Then
@@ -392,15 +390,14 @@ class SettingsViewModelTest {
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
         val setDistanceUnitUseCase = mockk<SetDistanceUnitUseCase>()
         val setMapStyleUseCase = mockk<SetMapStyleUseCase>()
-        val permissionGateway = mockk<HealthConnectPermissionGateway>()
+        val healthPermissionRepository = mockk<HealthPermissionRepository>()
         val availabilityRepository = mockk<HealthConnectAvailabilityRepository>()
         val checkpointRepository = mockk<HealthSyncCheckpointRepository>()
         val syncHealthData = mockk<SyncHealthDataUseCase>()
         every { observeSettingsUseCase.invoke() } returns settingsFlow
         every { observeActivityLogUseCase.invoke() } returns flowOf(activityLog)
         every { availabilityRepository.checkAvailability() } returns availability
-        every { permissionGateway.requiredPermissions } returns setOf(permissionExercise)
-        coEvery { permissionGateway.getMissingPermissions() } returns missingPermissions
+        coEvery { healthPermissionRepository.getMissingPermissions() } returns missingPermissions
         coEvery { checkpointRepository.getLastSuccessfulSyncAt() } returns lastSuccessfulSyncAt
         coEvery { checkpointRepository.setLastSuccessfulSyncAt(any()) } returns Unit
         coEvery { syncHealthData.invoke(any(), any(), any()) } returns syncResult
@@ -410,7 +407,7 @@ class SettingsViewModelTest {
             observeActivityLog = observeActivityLogUseCase,
             setDistanceUnit = setDistanceUnitUseCase,
             setMapStyle = setMapStyleUseCase,
-            healthConnectPermissionGateway = permissionGateway,
+            healthPermissionRepository = healthPermissionRepository,
             healthConnectAvailabilityRepository = availabilityRepository,
             healthSyncCheckpointRepository = checkpointRepository,
             syncHealthData = syncHealthData,

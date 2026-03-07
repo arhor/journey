@@ -5,7 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.logging.LoggerFactory
 import com.github.arhor.journey.core.logging.NoOpLoggerFactory
-import com.github.arhor.journey.data.healthconnect.HealthConnectPermissionGateway
 import com.github.arhor.journey.domain.model.ActivityLogEntry
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.AppSettings
@@ -16,6 +15,7 @@ import com.github.arhor.journey.domain.model.HealthDataTimeRange
 import com.github.arhor.journey.domain.model.HealthDataType
 import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
+import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
@@ -62,7 +62,7 @@ class SettingsViewModel @Inject constructor(
     private val observeActivityLog: ObserveActivityLogUseCase,
     private val setDistanceUnit: SetDistanceUnitUseCase,
     private val setMapStyle: SetMapStyleUseCase,
-    private val healthConnectPermissionGateway: HealthConnectPermissionGateway,
+    private val healthPermissionRepository: HealthPermissionRepository,
     private val healthConnectAvailabilityRepository: HealthConnectAvailabilityRepository,
     private val healthSyncCheckpointRepository: HealthSyncCheckpointRepository,
     private val syncHealthData: SyncHealthDataUseCase,
@@ -312,7 +312,7 @@ class SettingsViewModel @Inject constructor(
         }
 
         val missingPermissions = runCatching {
-            healthConnectPermissionGateway.getMissingPermissions()
+            healthPermissionRepository.getMissingPermissions()
         }.getOrElse {
             _state.update {
                 it.copy(
@@ -360,7 +360,7 @@ class SettingsViewModel @Inject constructor(
         }
 
         _state.update { it.copy(healthConnectAvailability = availability) }
-        return healthConnectPermissionGateway.getMissingPermissions()
+        return healthPermissionRepository.getMissingPermissions()
     }
 
     private fun updateUnavailableHealthConnectState(availability: HealthConnectAvailability) {
