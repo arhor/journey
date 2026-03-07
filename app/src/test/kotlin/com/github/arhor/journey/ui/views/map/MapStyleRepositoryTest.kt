@@ -1,9 +1,26 @@
 package com.github.arhor.journey.ui.views.map
 
+import com.github.arhor.journey.domain.model.MapStyle
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 
 class MapStyleRepositoryTest {
+    @Test
+    fun `resolveRemoteStyleUri should return expected uri when each style is selected`() {
+        // Given
+        val styles = MapStyle.entries
+
+        // When
+        val resolved = styles.associateWith(::resolveRemoteStyleUri)
+
+        // Then
+        resolved[MapStyle.DEFAULT] shouldBe MapStyleRepository.defaultStyleFallbackUri
+        resolved[MapStyle.CLASSIC] shouldBe MapStyleRepository.CLASSIC_STYLE_URI
+        resolved[MapStyle.DARK] shouldBe MapStyleRepository.DARK_STYLE_URI
+        resolved[MapStyle.SATELLITE] shouldBe MapStyleRepository.SATELLITE_STYLE_URI
+        resolved[MapStyle.TERRAIN] shouldBe MapStyleRepository.TERRAIN_STYLE_URI
+    }
+
     @Test
     fun `isRenderableMapStyle should return false when style contains only background layer`() {
         // Given
