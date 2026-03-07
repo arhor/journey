@@ -13,7 +13,7 @@ import javax.inject.Inject
 
 class SyncHealthDataUseCase @Inject constructor(
     private val healthDataSyncRepository: HealthDataSyncRepository,
-    private val healthPermissionRepository: HealthPermissionRepository? = null,
+    private val healthPermissionRepository: HealthPermissionRepository,
 ) {
 
     suspend operator fun invoke(
@@ -26,8 +26,7 @@ class SyncHealthDataUseCase @Inject constructor(
         }
 
         val hasReadPermissions = healthPermissionRepository
-            ?.hasReadPermissions(selectedDataTypes = selectedDataTypes)
-            ?: true
+            .hasReadPermissions(selectedDataTypes = selectedDataTypes)
 
         if (!hasReadPermissions) {
             return SyncHealthDataUseCaseResult.Failure(HealthDataSyncFailure.PermissionMissing)

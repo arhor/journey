@@ -16,6 +16,8 @@ class HealthConnectPermissionRepositoryImpl @Inject constructor(
             return false
         }
 
-        return gateway.hasAllRequiredPermissions()
+        return getMissingPermissions().isEmpty()
     }
+
+    override suspend fun getMissingPermissions(): Set<String> = gateway.getMissingPermissions()
 }

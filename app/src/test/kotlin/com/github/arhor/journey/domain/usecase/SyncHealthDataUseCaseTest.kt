@@ -41,7 +41,7 @@ class SyncHealthDataUseCaseTest {
     fun `invoke should return empty data failure when selected data types are empty`() = runTest {
         // Given
         val repository = FakeHealthDataSyncRepository()
-        val useCase = SyncHealthDataUseCase(repository)
+        val useCase = SyncHealthDataUseCase(repository, FakeHealthPermissionRepository(hasPermission = true))
 
         // When
         val result = useCase(
@@ -60,7 +60,7 @@ class SyncHealthDataUseCaseTest {
         val repository = FakeHealthDataSyncRepository(
             result = HealthDataSyncResult.Failure(HealthDataSyncFailure.UnavailableProvider),
         )
-        val useCase = SyncHealthDataUseCase(repository)
+        val useCase = SyncHealthDataUseCase(repository, FakeHealthPermissionRepository(hasPermission = true))
 
         // When
         val result = useCase(
@@ -79,7 +79,7 @@ class SyncHealthDataUseCaseTest {
         val repository = FakeHealthDataSyncRepository(
             result = HealthDataSyncResult.Failure(HealthDataSyncFailure.TransientError("sessions read failed")),
         )
-        val useCase = SyncHealthDataUseCase(repository)
+        val useCase = SyncHealthDataUseCase(repository, FakeHealthPermissionRepository(hasPermission = true))
 
         // When
         val result = useCase(
@@ -156,6 +156,8 @@ class SyncHealthDataUseCaseTest {
     ) : HealthPermissionRepository {
 
         override suspend fun hasReadPermissions(selectedDataTypes: Set<HealthDataType>): Boolean = hasPermission
+
+        override suspend fun getMissingPermissions(): Set<String> = emptySet()
     }
 
     private companion object {

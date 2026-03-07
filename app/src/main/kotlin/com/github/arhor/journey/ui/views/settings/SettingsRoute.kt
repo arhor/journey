@@ -24,8 +24,8 @@ fun SettingsRoute(
     val context = LocalContext.current
     val requestPermissions = rememberLauncherForActivityResult(
         contract = PermissionController.createRequestPermissionResultContract(),
-        onResult = { grantedPermissions ->
-            vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult(grantedPermissions))
+        onResult = { _ ->
+            vm.dispatch(SettingsIntent.HandleHealthConnectPermissionResult)
         },
     )
 
