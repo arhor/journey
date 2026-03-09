@@ -46,7 +46,7 @@ class LogActivityUseCase @Inject constructor(
             if (!insertResult.shouldApplyReward) {
                 return@runInTransaction LogActivityResult(
                     logEntryId = insertResult.logEntryId,
-                    reward = Reward(xp = 0L),
+                    reward = Reward(xp = 0L, energyDelta = 0),
                     heroBefore = heroBefore,
                     heroAfter = heroBefore,
                     levelUps = 0,

@@ -20,7 +20,7 @@ import com.github.arhor.journey.data.local.db.entity.PoiEntity
         PoiEntity::class,
         DiscoveredPoiEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class JourneyDatabase : RoomDatabase() {
@@ -57,6 +57,13 @@ abstract class JourneyDatabase : RoomDatabase() {
                     END
                     """.trimIndent(),
                 )
+            }
+        }
+
+
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE activity_log ADD COLUMN reward_energy_delta INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

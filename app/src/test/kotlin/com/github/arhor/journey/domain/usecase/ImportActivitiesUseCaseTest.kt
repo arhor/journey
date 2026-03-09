@@ -60,6 +60,7 @@ class ImportActivitiesUseCaseTest {
         result.rewardedCount shouldBe 2
         result.skippedRewardCount shouldBe 1
         result.totalReward.xp shouldBe 40L
+        result.totalReward.energyDelta shouldBe 4
         result.totalLevelUps shouldBe 1
         result.heroAfter.progression.level shouldBe 2
         heroRepo.current.value shouldBe result.heroAfter
@@ -88,8 +89,10 @@ class ImportActivitiesUseCaseTest {
         result.rewardedCount shouldBe 0
         result.skippedRewardCount shouldBe 1
         result.totalReward.xp shouldBe 0L
+        result.totalReward.energyDelta shouldBe 0
         result.heroAfter shouldBe initialHero
         activityRepo.entries.single().reward.xp shouldBe 0L
+        activityRepo.entries.single().reward.energyDelta shouldBe 0
     }
 
 
@@ -120,9 +123,11 @@ class ImportActivitiesUseCaseTest {
         // Then
         first.rewardedCount shouldBe 2
         first.totalReward.xp shouldBe 40L
+        first.totalReward.energyDelta shouldBe 4
         second.rewardedCount shouldBe 0
         second.skippedRewardCount shouldBe 2
         second.totalReward.xp shouldBe 0L
+        second.totalReward.energyDelta shouldBe 0
         second.heroAfter shouldBe first.heroAfter
     }
 
@@ -141,7 +146,7 @@ class ImportActivitiesUseCaseTest {
         startedAt = Instant.parse("2026-01-01T00:08:00Z"),
         duration = Duration.ofMinutes(2),
         distanceMeters = 200,
-        steps = 300,
+        steps = 1000,
         note = "Imported walk",
         importMetadata = importId?.let {
             ImportedActivityMetadata(

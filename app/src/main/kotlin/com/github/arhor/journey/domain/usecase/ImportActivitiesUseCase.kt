@@ -52,12 +52,13 @@ class ImportActivitiesUseCase @Inject constructor(
                 importedCount = 0,
                 rewardedCount = 0,
                 skippedRewardCount = 0,
-                totalReward = Reward(xp = 0L),
+                totalReward = Reward(xp = 0L, energyDelta = 0),
                 totalLevelUps = 0,
             )
         }
 
         var totalRewardXp = 0L
+        var totalRewardEnergy = 0
         var totalLevelUps = 0
         var rewardedCount = 0
         var skippedRewardCount = 0
@@ -70,7 +71,7 @@ class ImportActivitiesUseCase @Inject constructor(
                 batch.forEach { recorded ->
                     val reward = rewardCalculator.calculate(recorded)
                     val hasIdempotentImportKey = recorded.importMetadata != null
-                    val persistedReward = if (hasIdempotentImportKey) reward else Reward(xp = 0L)
+                    val persistedReward = if (hasIdempotentImportKey) reward else Reward(xp = 0L, energyDelta = 0)
 
                     val insertResult = activityLogRepository.insert(
                         recorded = recorded,
@@ -90,6 +91,7 @@ class ImportActivitiesUseCase @Inject constructor(
                     currentHero = applied.hero
                     rewardedCount += 1
                     totalRewardXp += reward.xp
+                    totalRewardEnergy += reward.energyDelta
                     totalLevelUps += applied.levelUps
                 }
 
@@ -104,7 +106,7 @@ class ImportActivitiesUseCase @Inject constructor(
             importedCount = records.size,
             rewardedCount = rewardedCount,
             skippedRewardCount = skippedRewardCount,
-            totalReward = Reward(xp = totalRewardXp),
+            totalReward = Reward(xp = totalRewardXp, energyDelta = totalRewardEnergy),
             totalLevelUps = totalLevelUps,
         )
     }

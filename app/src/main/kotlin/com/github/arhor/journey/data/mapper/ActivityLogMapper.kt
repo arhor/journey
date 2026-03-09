@@ -38,7 +38,7 @@ fun ActivityLogEntity.toDomain(): ActivityLogEntry {
                 null
             },
         ),
-        reward = Reward(xp = rewardXp),
+        reward = Reward(xp = rewardXp, energyDelta = rewardEnergyDelta),
     )
 }
 
@@ -52,6 +52,7 @@ fun RecordedActivity.toEntity(reward: Reward): ActivityLogEntity =
         steps = steps,
         note = note,
         rewardXp = reward.xp.coerceAtLeast(0L),
+        rewardEnergyDelta = reward.energyDelta,
         externalRecordId = importMetadata?.externalRecordId,
         originPackageName = importMetadata?.originPackageName,
         timeBoundsHash = importMetadata?.timeBoundsHash,
