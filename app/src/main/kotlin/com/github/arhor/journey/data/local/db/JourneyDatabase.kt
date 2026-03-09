@@ -20,7 +20,7 @@ import com.github.arhor.journey.data.local.db.entity.PoiEntity
         PoiEntity::class,
         DiscoveredPoiEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class JourneyDatabase : RoomDatabase() {
@@ -39,6 +39,24 @@ abstract class JourneyDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE activity_log ADD COLUMN external_record_id TEXT")
                 db.execSQL("ALTER TABLE activity_log ADD COLUMN origin_package_name TEXT")
                 db.execSQL("ALTER TABLE activity_log ADD COLUMN time_bounds_hash TEXT")
+            }
+        }
+
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE hero ADD COLUMN energy_current INTEGER NOT NULL DEFAULT 100")
+                db.execSQL("ALTER TABLE hero ADD COLUMN energy_max INTEGER NOT NULL DEFAULT 100")
+                db.execSQL("UPDATE hero SET energy_max = CASE WHEN energy_max < 1 THEN 1 ELSE energy_max END")
+                db.execSQL(
+                    """
+                    UPDATE hero
+                    SET energy_current = CASE
+                        WHEN energy_current < 0 THEN 0
+                        WHEN energy_current > energy_max THEN energy_max
+                        ELSE energy_current
+                    END
+                    """.trimIndent(),
+                )
             }
         }
     }
