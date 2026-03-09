@@ -6,13 +6,16 @@ import com.github.arhor.journey.core.logging.LoggerFactory
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
-import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.ui.MviViewModel
+import com.github.arhor.journey.ui.views.map.model.CameraPositionState
+import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
+import com.github.arhor.journey.ui.views.map.model.LatLng
+import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

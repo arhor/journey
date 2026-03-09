@@ -3,7 +3,6 @@ package com.github.arhor.journey.ui.views.map
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
@@ -14,12 +13,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.github.arhor.journey.ui.LocalSnackbarHostState
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
+import com.github.arhor.journey.ui.views.map.model.CameraPositionState
+import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
+import com.github.arhor.journey.ui.views.map.model.LatLng
+import com.github.arhor.journey.ui.views.map.model.MapResolvedStyle
 import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -34,30 +34,7 @@ import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.absoluteValue
 
-@Composable
-fun MapRoute(
-    vm: MapViewModel = hiltViewModel(),
-    snackbarHostState: SnackbarHostState = LocalSnackbarHostState.current,
-) {
-    val state by vm.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        vm.effects.collectLatest { effect ->
-            when (effect) {
-                is MapEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
-                MapEffect.RequestLocationPermission -> {
-                    snackbarHostState.showSnackbar("Location permission is not implemented yet.")
-                }
-                is MapEffect.OpenObjectDetails -> snackbarHostState.showSnackbar("Open details for ${effect.objectId}")
-            }
-        }
-    }
-
-    MapScreen(
-        state = state,
-        dispatch = vm::dispatch,
-    )
-}
 
 @Composable
 fun MapScreen(

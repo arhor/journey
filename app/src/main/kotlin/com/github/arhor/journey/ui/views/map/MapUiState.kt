@@ -2,33 +2,10 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.MapStyle
-
-@Immutable
-data class LatLng(
-    val latitude: Double,
-    val longitude: Double,
-)
-
-@Immutable
-data class CameraPositionState(
-    val target: LatLng,
-    val zoom: Double,
-)
-
-enum class CameraUpdateOrigin {
-    USER,
-    PROGRAMMATIC,
-}
-
-@Immutable
-data class MapObjectUiModel(
-    val id: String,
-    val title: String,
-    val description: String?,
-    val position: LatLng,
-    val radiusMeters: Int,
-    val isDiscovered: Boolean,
-)
+import com.github.arhor.journey.ui.views.map.model.CameraPositionState
+import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
+import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
+import com.github.arhor.journey.ui.views.map.model.MapResolvedStyle
 
 sealed interface MapUiState {
 

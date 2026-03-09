@@ -1,12 +1,11 @@
 package com.github.arhor.journey.ui.views.map.renderer
 
-import com.github.arhor.journey.ui.views.map.LatLng
-import com.github.arhor.journey.ui.views.map.MapObjectUiModel
+import com.github.arhor.journey.ui.views.map.model.LatLng
+import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.put
 import org.junit.Test
 import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.spatialk.geojson.Feature

@@ -2,6 +2,8 @@ package com.github.arhor.journey.ui.views.map
 
 import android.content.Context
 import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.ui.views.map.model.MapResolvedStyle
+import com.github.arhor.journey.ui.views.map.model.MapStyleDefinition
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
@@ -9,20 +11,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
-
-sealed interface MapResolvedStyle {
-    data class Uri(val value: String) : MapResolvedStyle
-    data class Json(val value: String) : MapResolvedStyle
-}
-
-internal sealed interface MapStyleDefinition {
-    data class Remote(val uri: String) : MapStyleDefinition
-
-    data class Asset(
-        val path: String,
-        val fallbackUri: String,
-    ) : MapStyleDefinition
-}
 
 internal fun resolveMapStyleDefinition(style: MapStyle): MapStyleDefinition =
     when (style) {

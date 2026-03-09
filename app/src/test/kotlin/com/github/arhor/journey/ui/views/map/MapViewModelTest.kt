@@ -13,6 +13,7 @@ import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.test.MainDispatcherRule
+import com.github.arhor.journey.ui.views.map.model.MapResolvedStyle
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
