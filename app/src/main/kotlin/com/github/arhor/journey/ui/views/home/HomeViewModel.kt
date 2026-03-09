@@ -41,9 +41,7 @@ class HomeViewModel @Inject constructor(
     private val logActivity: LogActivityUseCase,
     private val progressionPolicy: ProgressionPolicy,
     private val clock: Clock,
-    loggerFactory: LoggerFactory,
 ) : MviViewModel<HomeUiState, HomeEffect, HomeIntent>(
-    loggerFactory = loggerFactory,
     initialState = HomeUiState.Loading,
 ) {
     private val _state = MutableStateFlow(State())

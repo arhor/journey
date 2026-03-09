@@ -70,9 +70,7 @@ class SettingsViewModel @Inject constructor(
     private val healthSyncCheckpointRepository: HealthSyncCheckpointRepository,
     private val syncHealthData: SyncHealthDataUseCase,
     private val clock: Clock,
-    loggerFactory: LoggerFactory = NoOpLoggerFactory,
 ) : MviViewModel<SettingsUiState, SettingsEffect, SettingsIntent>(
-    loggerFactory = loggerFactory,
     initialState = SettingsUiState.Loading,
 ) {
     private val _state = MutableStateFlow(

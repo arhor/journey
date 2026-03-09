@@ -50,9 +50,7 @@ class MapViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
     private val mapStyleRepository: MapStyleRepository,
-    loggerFactory: LoggerFactory,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
-    loggerFactory = loggerFactory,
     initialState = MapUiState.Loading,
 ) {
     private val _state = MutableStateFlow(State())
