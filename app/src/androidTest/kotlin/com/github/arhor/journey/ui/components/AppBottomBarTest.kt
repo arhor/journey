@@ -6,7 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.github.arhor.journey.MainActivity
+import com.github.arhor.journey.ui.MainActivity
 import com.github.arhor.journey.ui.navigation.BottomNavItem
 import org.junit.Rule
 import org.junit.Test
