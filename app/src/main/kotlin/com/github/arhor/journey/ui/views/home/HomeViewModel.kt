@@ -70,6 +70,8 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /* ------------------------------------------ Internal implementation ------------------------------------------- */
+
     private fun intoUiState(
         state: State,
         hero: Hero,

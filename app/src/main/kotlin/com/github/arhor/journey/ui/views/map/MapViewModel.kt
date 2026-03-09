@@ -66,7 +66,7 @@ class MapViewModel @Inject constructor(
             ::intoUiState,
         ).catch {
             emit(
-                failureUiState(
+                MapUiState.Failure(
                     errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
                 ),
             )
@@ -81,6 +81,8 @@ class MapViewModel @Inject constructor(
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
+
+    /* ------------------------------------------ Internal implementation ------------------------------------------- */
 
     private fun onMapLoadFailed(intent: MapIntent.MapLoadFailed) {
         _state.update {
@@ -171,12 +173,6 @@ class MapViewModel @Inject constructor(
             resolvedStyle = resolvedStyle,
             visibleObjects = visibleObjects,
         )
-    }
-
-    private fun failureUiState(
-        errorMessage: String,
-    ): MapUiState {
-        return MapUiState.Failure(errorMessage = errorMessage)
     }
 
     private fun mapObjects(
