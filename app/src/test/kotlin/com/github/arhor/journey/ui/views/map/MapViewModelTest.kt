@@ -72,14 +72,14 @@ class MapViewModelTest {
         advanceUntilIdle()
 
         // Then
-        val state = fixture.vm.uiState.first { !it.isLoading }
+        val state = fixture.vm.uiState.first { it is MapUiState.Content } as MapUiState.Content
         state.selectedStyle shouldBe MapStyle.DARK
         state.resolvedStyle shouldBe MapResolvedStyle.Uri("dark-style")
         state.visibleObjects.map { it.id to it.isDiscovered } shouldBe listOf("poi-1" to false, "poi-2" to true)
     }
 
     @Test
-    fun `initialize should fallback to default style when settings fail`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `initialize should expose failure state when settings fail`() = runTest(mainDispatcherRule.testDispatcher) {
         // Given
         val settingsFlow = flow<AppSettings> {
             throw IllegalStateException("Settings unavailable")
@@ -97,8 +97,7 @@ class MapViewModelTest {
         advanceUntilIdle()
 
         // Then
-        fixture.vm.uiState.value.selectedStyle shouldBe MapStyle.DEFAULT
-        fixture.vm.uiState.value.resolvedStyle shouldBe MapResolvedStyle.Uri(MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI)
+        fixture.vm.uiState.first { it is MapUiState.Failure } shouldBe MapUiState.Failure("Settings unavailable")
     }
 
     @Test
@@ -118,6 +117,7 @@ class MapViewModelTest {
         every { fixture.mapStyleRepository.resolve(MapStyle.DEFAULT) } returns MapResolvedStyle.Uri("default-style")
         backgroundScope.launch { fixture.vm.uiState.collect() }
         advanceUntilIdle()
+        fixture.vm.uiState.first { it is MapUiState.Content }
         val effect = async { fixture.vm.effects.first() }
 
         // When
@@ -130,7 +130,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `on map load failed should expose error and clear it when retry is dispatched`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `on map load failed should expose full screen failure`() = runTest(mainDispatcherRule.testDispatcher) {
         // Given
         val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
             tryEmit(AppSettings(mapStyle = MapStyle.DEFAULT))
@@ -151,15 +151,7 @@ class MapViewModelTest {
         advanceUntilIdle()
 
         // Then
-        fixture.vm.uiState.value.styleLoadErrorMessage shouldBe "Failed to load map style."
-
-        // When
-        fixture.vm.dispatch(MapIntent.RetryStyleLoad)
-        advanceUntilIdle()
-
-        // Then
-        fixture.vm.uiState.value.styleLoadErrorMessage shouldBe null
-        fixture.vm.uiState.value.styleReloadToken shouldBe 1
+        fixture.vm.uiState.value shouldBe MapUiState.Failure("Failed to load map style.")
     }
 
     private fun createFixture(

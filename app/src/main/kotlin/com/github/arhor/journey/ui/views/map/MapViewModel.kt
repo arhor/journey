@@ -36,8 +36,7 @@ private data class State(
         zoom = DEFAULT_ZOOM,
     ),
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
-    val styleLoadErrorMessage: String? = null,
-    val styleReloadToken: Int = 0,
+    val failureMessage: String? = null,
 )
 
 @Stable
@@ -65,8 +64,6 @@ class MapViewModel @Inject constructor(
         ).catch {
             emit(
                 failureUiState(
-                    state = _state.value,
-                    selectedStyle = MapStyle.DEFAULT,
                     errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
                 ),
             )
@@ -79,18 +76,12 @@ class MapViewModel @Inject constructor(
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
-            is MapIntent.RetryStyleLoad -> _state.update {
-                it.copy(
-                    styleLoadErrorMessage = null,
-                    styleReloadToken = it.styleReloadToken + 1,
-                )
-            }
         }
     }
 
     private fun onMapLoadFailed(intent: MapIntent.MapLoadFailed) {
         _state.update {
-            it.copy(styleLoadErrorMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
+            it.copy(failureMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
         }
     }
 
@@ -129,8 +120,10 @@ class MapViewModel @Inject constructor(
     }
 
     private suspend fun onObjectTapped(objectId: String) {
+        val contentState = uiState.value as? MapUiState.Content ?: return
+
         try {
-            uiState.value.visibleObjects
+            contentState.visibleObjects
                 .firstOrNull { it.id == objectId }
                 ?.let { objectUiModel ->
                     _state.update {
@@ -157,6 +150,10 @@ class MapViewModel @Inject constructor(
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
     ): MapUiState {
+        state.failureMessage?.let { errorMessage ->
+            return MapUiState.Failure(errorMessage = errorMessage)
+        }
+
         val selectedStyle = settings.mapStyle
         val resolvedStyle = mapStyleRepository.resolve(selectedStyle)
         val visibleObjects = mapObjects(
@@ -164,35 +161,19 @@ class MapViewModel @Inject constructor(
             explorationProgress = explorationProgress,
         )
 
-        return MapUiState(
+        return MapUiState.Content(
             cameraPosition = state.cameraPosition,
             cameraUpdateOrigin = state.cameraUpdateOrigin,
             selectedStyle = selectedStyle,
             resolvedStyle = resolvedStyle,
-            styleLoadErrorMessage = state.styleLoadErrorMessage,
-            styleReloadToken = state.styleReloadToken,
             visibleObjects = visibleObjects,
-            isLoading = false,
-            errorMessage = null,
         )
     }
 
     private fun failureUiState(
-        state: State,
-        selectedStyle: MapStyle,
         errorMessage: String,
     ): MapUiState {
-        return MapUiState(
-            cameraPosition = state.cameraPosition,
-            cameraUpdateOrigin = state.cameraUpdateOrigin,
-            selectedStyle = selectedStyle,
-            resolvedStyle = mapStyleRepository.resolve(selectedStyle),
-            styleLoadErrorMessage = state.styleLoadErrorMessage,
-            styleReloadToken = state.styleReloadToken,
-            visibleObjects = emptyList(),
-            isLoading = false,
-            errorMessage = errorMessage,
-        )
+        return MapUiState.Failure(errorMessage = errorMessage)
     }
 
     private fun mapObjects(
@@ -225,9 +206,6 @@ class MapViewModel @Inject constructor(
         )
 
     private companion object {
-        const val SETTINGS_LOADING_FAILED_MESSAGE = "Failed to load settings."
-        const val POINTS_LOADING_FAILED_MESSAGE = "Failed to load map objects."
-        const val EXPLORATION_LOADING_FAILED_MESSAGE = "Failed to load exploration progress."
         const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."

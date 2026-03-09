@@ -19,6 +19,4 @@ sealed interface MapIntent {
     data class MapLoadFailed(
         val message: String? = null,
     ) : MapIntent
-
-    data object RetryStyleLoad : MapIntent
 }

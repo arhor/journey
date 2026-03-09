@@ -30,35 +30,22 @@ data class MapObjectUiModel(
     val isDiscovered: Boolean,
 )
 
-@Immutable
-data class MapUiState(
-    val cameraPosition: CameraPositionState,
-    val cameraUpdateOrigin: CameraUpdateOrigin,
-    val selectedStyle: MapStyle,
-    val resolvedStyle: MapResolvedStyle,
-    val styleLoadErrorMessage: String?,
-    val styleReloadToken: Int,
-    val visibleObjects: List<MapObjectUiModel>,
-    val isLoading: Boolean,
-    val errorMessage: String?,
-) {
-    companion object {
-        val Loading = MapUiState(
-            cameraPosition = CameraPositionState(
-                target = LatLng(
-                    latitude = 0.0,
-                    longitude = 0.0,
-                ),
-                zoom = 12.0,
-            ),
-            cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
-            selectedStyle = MapStyle.DEFAULT,
-            resolvedStyle = MapResolvedStyle.Uri(MapStyleRepository.DEFAULT_STYLE_FALLBACK_URI),
-            styleLoadErrorMessage = null,
-            styleReloadToken = 0,
-            visibleObjects = emptyList(),
-            isLoading = true,
-            errorMessage = null,
-        )
-    }
+sealed interface MapUiState {
+
+    @Immutable
+    data object Loading : MapUiState
+
+    @Immutable
+    data class Failure(
+        val errorMessage: String,
+    ) : MapUiState
+
+    @Immutable
+    data class Content(
+        val cameraPosition: CameraPositionState,
+        val cameraUpdateOrigin: CameraUpdateOrigin,
+        val selectedStyle: MapStyle,
+        val resolvedStyle: MapResolvedStyle,
+        val visibleObjects: List<MapObjectUiModel>,
+    ) : MapUiState
 }
