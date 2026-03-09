@@ -7,5 +7,6 @@ package com.github.arhor.journey.domain.model
  */
 data class Reward(
     val xp: Long,
+    val energyDelta: Int = 0,
     val stats: StatsDelta = StatsDelta(),
 )

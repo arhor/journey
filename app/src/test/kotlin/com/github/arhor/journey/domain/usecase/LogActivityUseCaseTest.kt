@@ -55,13 +55,14 @@ class LogActivityUseCaseTest {
         // Then
         tx.calls shouldBe 1
         result.reward.xp shouldBe 20L
+        result.reward.energyDelta shouldBe 2
         result.levelUps shouldBe 1
         result.heroAfter.progression.level shouldBe 2
         result.heroAfter.progression.xpInLevel shouldBe 10L
 
         heroRepo.current.value shouldBe result.heroAfter
         activityRepo.entries shouldHaveSize 1
-        activityRepo.entries.single().reward shouldBe Reward(xp = 20L)
+        activityRepo.entries.single().reward shouldBe Reward(xp = 20L, energyDelta = 2)
     }
 
     @Test
@@ -86,6 +87,7 @@ class LogActivityUseCaseTest {
 
         // Then
         result.reward.xp shouldBe 0L
+        result.reward.energyDelta shouldBe 0
         result.levelUps shouldBe 0
         result.heroAfter shouldBe initialHero
         heroRepo.current.value shouldBe initialHero
@@ -106,7 +108,7 @@ class LogActivityUseCaseTest {
         startedAt = Instant.parse("2026-01-01T00:08:00Z"),
         duration = Duration.ofMinutes(2),
         distanceMeters = 200,
-        steps = 300,
+        steps = 1000,
         note = "Evening walk",
     )
 

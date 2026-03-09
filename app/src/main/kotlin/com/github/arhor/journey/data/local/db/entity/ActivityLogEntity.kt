@@ -20,6 +20,8 @@ data class ActivityLogEntity(
     val note: String?,
     @ColumnInfo(name = "reward_xp")
     val rewardXp: Long,
+    @ColumnInfo(name = "reward_energy_delta")
+    val rewardEnergyDelta: Int,
     @ColumnInfo(name = "external_record_id")
     val externalRecordId: String?,
     @ColumnInfo(name = "origin_package_name")
