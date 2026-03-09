@@ -121,7 +121,7 @@ class MapViewModelTest {
         val effect = async { fixture.vm.effects.first() }
 
         // When
-        fixture.vm.dispatch(MapIntent.OnObjectTapped("poi-1"))
+        fixture.vm.dispatch(MapIntent.ObjectTapped("poi-1"))
         advanceUntilIdle()
 
         // Then
@@ -147,7 +147,7 @@ class MapViewModelTest {
         advanceUntilIdle()
 
         // When
-        fixture.vm.dispatch(MapIntent.OnMapLoadFailed())
+        fixture.vm.dispatch(MapIntent.MapLoadFailed())
         advanceUntilIdle()
 
         // Then

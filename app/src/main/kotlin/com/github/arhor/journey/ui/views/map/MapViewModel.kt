@@ -62,52 +62,24 @@ class MapViewModel @Inject constructor(
             observePointsOfInterest(),
             observeExplorationProgress(),
             ::intoUiState,
-        ).catch { error ->
+        ).catch {
             emit(
                 failureUiState(
                     state = _state.value,
                     selectedStyle = MapStyle.DEFAULT,
-                    errorMessage = error.message ?: MAP_LOADING_FAILED_MESSAGE,
+                    errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
                 ),
             )
         }.distinctUntilChanged()
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
-            is MapIntent.OnCameraSettled -> _state.update {
-                it.copy(
-                    cameraPosition = intent.position,
-                    cameraUpdateOrigin = intent.origin,
-                )
-            }
-
-            is MapIntent.OnMapTapped -> _state.update {
-                it.copy(
-                    cameraPosition = CameraPositionState(
-                        target = intent.target,
-                        zoom = it.cameraPosition.zoom,
-                    ),
-                    cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
-                )
-            }
-
-            MapIntent.OnRecenterClicked -> {
-                _state.update {
-                    it.copy(
-                        cameraPosition = CameraPositionState(
-                            target = DEFAULT_CAMERA_TARGET,
-                            zoom = DEFAULT_ZOOM,
-                        ),
-                        cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
-                    )
-                }
-                emitEffect(MapEffect.RequestLocationPermission)
-            }
-            is MapIntent.OnObjectTapped -> handleObjectTapped(intent.objectId)
-            is MapIntent.OnMapLoadFailed -> _state.update {
-                it.copy(styleLoadErrorMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
-            }
-            MapIntent.RetryStyleLoad -> _state.update {
+            is MapIntent.CameraSettled -> onCameraSettled(intent)
+            is MapIntent.MapTapped -> onMapTapped(intent)
+            is MapIntent.RecenterClicked -> onRecenterClicked()
+            is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
+            is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
+            is MapIntent.RetryStyleLoad -> _state.update {
                 it.copy(
                     styleLoadErrorMessage = null,
                     styleReloadToken = it.styleReloadToken + 1,
@@ -116,7 +88,47 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private suspend fun handleObjectTapped(objectId: String) {
+    private fun onMapLoadFailed(intent: MapIntent.MapLoadFailed) {
+        _state.update {
+            it.copy(styleLoadErrorMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
+        }
+    }
+
+    private fun onRecenterClicked() {
+        _state.update {
+            it.copy(
+                cameraPosition = CameraPositionState(
+                    target = DEFAULT_CAMERA_TARGET,
+                    zoom = DEFAULT_ZOOM,
+                ),
+                cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+            )
+        }
+        emitEffect(MapEffect.RequestLocationPermission)
+    }
+
+    private fun onMapTapped(intent: MapIntent.MapTapped) {
+        _state.update {
+            it.copy(
+                cameraPosition = CameraPositionState(
+                    target = intent.target,
+                    zoom = it.cameraPosition.zoom,
+                ),
+                cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+            )
+        }
+    }
+
+    private fun onCameraSettled(intent: MapIntent.CameraSettled) {
+        _state.update {
+            it.copy(
+                cameraPosition = intent.position,
+                cameraUpdateOrigin = intent.origin,
+            )
+        }
+    }
+
+    private suspend fun onObjectTapped(objectId: String) {
         try {
             uiState.value.visibleObjects
                 .firstOrNull { it.id == objectId }

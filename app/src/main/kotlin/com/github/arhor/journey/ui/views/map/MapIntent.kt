@@ -1,22 +1,22 @@
 package com.github.arhor.journey.ui.views.map
 
 sealed interface MapIntent {
-    data class OnCameraSettled(
+    data class CameraSettled(
         val position: CameraPositionState,
         val origin: CameraUpdateOrigin,
     ) : MapIntent
 
-    data class OnMapTapped(
+    data class MapTapped(
         val target: LatLng,
     ) : MapIntent
 
-    data object OnRecenterClicked : MapIntent
+    data object RecenterClicked : MapIntent
 
-    data class OnObjectTapped(
+    data class ObjectTapped(
         val objectId: String,
     ) : MapIntent
 
-    data class OnMapLoadFailed(
+    data class MapLoadFailed(
         val message: String? = null,
     ) : MapIntent
 

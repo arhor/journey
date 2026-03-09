@@ -111,7 +111,7 @@ fun MapScreen(
             .distinctUntilChanged(::areCameraPositionsEquivalent)
             .collectLatest { position ->
                 dispatch(
-                    MapIntent.OnCameraSettled(
+                    MapIntent.CameraSettled(
                         position = CameraPositionState(
                             target = LatLng(
                                 latitude = position.target.latitude,
@@ -144,7 +144,7 @@ fun MapScreen(
                 ),
                 onMapClick = { position, _ ->
                     dispatch(
-                        MapIntent.OnMapTapped(
+                        MapIntent.MapTapped(
                             target = LatLng(
                                 latitude = position.latitude,
                                 longitude = position.longitude,
@@ -158,13 +158,13 @@ fun MapScreen(
                 },
                 onMapLoadFailed = { error ->
                     isMapLoaded = false
-                    dispatch(MapIntent.OnMapLoadFailed(error))
+                    dispatch(MapIntent.MapLoadFailed(error))
                 },
                 content = {
                     MapObjectsRendererAdapter(
                         objects = state.visibleObjects,
                         onObjectTapped = { objectId ->
-                            dispatch(MapIntent.OnObjectTapped(objectId))
+                            dispatch(MapIntent.ObjectTapped(objectId))
                         },
                     )
                 },
