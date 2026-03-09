@@ -2,7 +2,6 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.core.logging.LoggerFactory
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
@@ -12,9 +11,11 @@ import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.ui.MviViewModel
-import com.github.arhor.journey.ui.views.map.model.CameraPositionState
+import com.github.arhor.journey.domain.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
-import com.github.arhor.journey.ui.views.map.model.LatLng
+import com.github.arhor.journey.domain.model.LatLng
+import com.github.arhor.journey.domain.repository.MapStyleRepository
+import com.github.arhor.journey.domain.usecase.ResolveMapStyleUseCase
 import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -49,7 +50,7 @@ class MapViewModel @Inject constructor(
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val observeSettings: ObserveSettingsUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
-    private val mapStyleRepository: MapStyleRepository,
+    private val resolveMapStyle: ResolveMapStyleUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -158,7 +159,7 @@ class MapViewModel @Inject constructor(
         }
 
         val selectedStyle = settings.mapStyle
-        val resolvedStyle = mapStyleRepository.resolve(selectedStyle)
+        val resolvedStyle = resolveMapStyle(selectedStyle)
         val visibleObjects = mapObjects(
             pointsOfInterest = pointsOfInterest,
             explorationProgress = explorationProgress,

@@ -15,10 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
-import com.github.arhor.journey.ui.views.map.model.CameraPositionState
+import com.github.arhor.journey.domain.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
-import com.github.arhor.journey.ui.views.map.model.LatLng
-import com.github.arhor.journey.ui.views.map.model.MapResolvedStyle
+import com.github.arhor.journey.domain.model.LatLng
+import com.github.arhor.journey.domain.model.MapResolvedStyle
 import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce

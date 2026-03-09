@@ -1,8 +1,8 @@
 package com.github.arhor.journey.ui.views.map
 
-import com.github.arhor.journey.ui.views.map.model.CameraPositionState
+import com.github.arhor.journey.domain.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
-import com.github.arhor.journey.ui.views.map.model.LatLng
+import com.github.arhor.journey.domain.model.LatLng
 
 sealed interface MapIntent {
     data class CameraSettled(

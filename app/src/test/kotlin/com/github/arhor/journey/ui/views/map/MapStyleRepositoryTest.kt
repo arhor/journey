@@ -1,7 +1,7 @@
 package com.github.arhor.journey.ui.views.map
 
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.ui.views.map.model.MapStyleDefinition
+import com.github.arhor.journey.domain.model.MapStyleDefinition
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 

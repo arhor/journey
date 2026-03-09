@@ -1,4 +1,4 @@
-package com.github.arhor.journey.ui.views.map.model
+package com.github.arhor.journey.domain.model
 
 sealed interface MapResolvedStyle {
     data class Uri(val value: String) : MapResolvedStyle
