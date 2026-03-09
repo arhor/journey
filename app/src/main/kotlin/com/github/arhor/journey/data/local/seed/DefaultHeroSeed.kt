@@ -1,6 +1,7 @@
 package com.github.arhor.journey.data.local.seed
 
 import com.github.arhor.journey.domain.model.Hero
+import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import java.time.Instant
@@ -25,6 +26,7 @@ object DefaultHeroSeed {
                 level = 1,
                 xpInLevel = 0L,
             ),
+            energy = HeroEnergy(current = 100, max = 100),
             createdAt = now,
             updatedAt = now,
         )

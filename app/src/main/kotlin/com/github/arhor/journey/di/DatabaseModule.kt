@@ -30,7 +30,7 @@ object DatabaseModule {
             JourneyDatabase::class.java,
             "journey.db",
         )
-            .addMigrations(JourneyDatabase.MIGRATION_1_2)
+            .addMigrations(JourneyDatabase.MIGRATION_1_2, JourneyDatabase.MIGRATION_2_3)
             .build()
 
     @Provides

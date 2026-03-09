@@ -2,6 +2,7 @@ package com.github.arhor.journey.data.mapper
 
 import com.github.arhor.journey.data.local.db.entity.HeroEntity
 import com.github.arhor.journey.domain.model.Hero
+import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import java.time.Instant
@@ -20,6 +21,10 @@ fun HeroEntity.toDomain(): Hero =
             level = level,
             xpInLevel = xpInLevel,
         ),
+        energy = HeroEnergy(
+            current = energyCurrent,
+            max = energyMax,
+        ),
         createdAt = Instant.ofEpochMilli(createdAtMs),
         updatedAt = Instant.ofEpochMilli(updatedAtMs),
     )
@@ -34,6 +39,8 @@ fun Hero.toEntity(): HeroEntity =
         vitality = stats.vitality,
         dexterity = stats.dexterity,
         stamina = stats.stamina,
+        energyCurrent = energy.current,
+        energyMax = energy.max,
         createdAtMs = createdAt.toEpochMilli(),
         updatedAtMs = updatedAt.toEpochMilli(),
     )
