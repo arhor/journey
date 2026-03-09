@@ -66,7 +66,10 @@ class RoomActivityLogRepository @Inject constructor(
                 overlaps.forEach { dao.deleteById(it.id) }
                 val retainedXp = overlaps.maxOf { it.rewardXp }
                 val insertedId = dao.insert(incomingEntity.copy(rewardXp = retainedXp))
-                return ActivityLogInsertResult(logEntryId = insertedId, shouldApplyReward = false)
+                return ActivityLogInsertResult(
+                    logEntryId = insertedId,
+                    shouldApplyReward = false,
+                )
             }
         }
 

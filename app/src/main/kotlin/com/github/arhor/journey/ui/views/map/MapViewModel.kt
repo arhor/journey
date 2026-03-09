@@ -8,8 +8,6 @@ import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
-import com.github.arhor.journey.domain.model.Resource
-import com.github.arhor.journey.domain.model.asResourceFlow
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
@@ -18,6 +16,7 @@ import com.github.arhor.journey.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
@@ -60,10 +59,18 @@ class MapViewModel @Inject constructor(
         combine(
             _state,
             observeSettings(),
-            observePointsOfInterest().asResourceFlow(),
-            observeExplorationProgress().asResourceFlow(),
+            observePointsOfInterest(),
+            observeExplorationProgress(),
             ::intoUiState,
-        ).distinctUntilChanged()
+        ).catch { error ->
+            emit(
+                failureUiState(
+                    state = _state.value,
+                    selectedStyle = MapStyle.DEFAULT,
+                    errorMessage = error.message ?: MAP_LOADING_FAILED_MESSAGE,
+                ),
+            )
+        }.distinctUntilChanged()
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
@@ -134,60 +141,16 @@ class MapViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
-        settings: Resource<AppSettings>,
-        pointsOfInterest: Resource<List<PointOfInterest>>,
-        explorationProgress: Resource<ExplorationProgress>,
+        settings: AppSettings,
+        pointsOfInterest: List<PointOfInterest>,
+        explorationProgress: ExplorationProgress,
     ): MapUiState {
-        if (settings is Resource.Failure) {
-            return failureUiState(
-                state = state,
-                selectedStyle = MapStyle.DEFAULT,
-                errorMessage = settings.message ?: SETTINGS_LOADING_FAILED_MESSAGE,
-            )
-        }
-
-        val selectedStyle = (settings as? Resource.Success)?.value?.mapStyle ?: MapStyle.DEFAULT
+        val selectedStyle = settings.mapStyle
         val resolvedStyle = mapStyleRepository.resolve(selectedStyle)
-
-        if (pointsOfInterest is Resource.Failure) {
-            return MapUiState(
-                cameraPosition = state.cameraPosition,
-                cameraUpdateOrigin = state.cameraUpdateOrigin,
-                selectedStyle = selectedStyle,
-                resolvedStyle = resolvedStyle,
-                styleLoadErrorMessage = state.styleLoadErrorMessage,
-                styleReloadToken = state.styleReloadToken,
-                visibleObjects = emptyList(),
-                isLoading = false,
-                errorMessage = pointsOfInterest.message ?: POINTS_LOADING_FAILED_MESSAGE,
-            )
-        }
-
-        if (explorationProgress is Resource.Failure) {
-            return MapUiState(
-                cameraPosition = state.cameraPosition,
-                cameraUpdateOrigin = state.cameraUpdateOrigin,
-                selectedStyle = selectedStyle,
-                resolvedStyle = resolvedStyle,
-                styleLoadErrorMessage = state.styleLoadErrorMessage,
-                styleReloadToken = state.styleReloadToken,
-                visibleObjects = emptyList(),
-                isLoading = false,
-                errorMessage = explorationProgress.message ?: EXPLORATION_LOADING_FAILED_MESSAGE,
-            )
-        }
-
-        val visibleObjects = if (
-            pointsOfInterest is Resource.Success &&
-            explorationProgress is Resource.Success
-        ) {
-            mapObjects(
-                pointsOfInterest = pointsOfInterest.value,
-                explorationProgress = explorationProgress.value,
-            )
-        } else {
-            emptyList()
-        }
+        val visibleObjects = mapObjects(
+            pointsOfInterest = pointsOfInterest,
+            explorationProgress = explorationProgress,
+        )
 
         return MapUiState(
             cameraPosition = state.cameraPosition,
@@ -197,9 +160,7 @@ class MapViewModel @Inject constructor(
             styleLoadErrorMessage = state.styleLoadErrorMessage,
             styleReloadToken = state.styleReloadToken,
             visibleObjects = visibleObjects,
-            isLoading = settings is Resource.Loading ||
-                pointsOfInterest is Resource.Loading ||
-                explorationProgress is Resource.Loading,
+            isLoading = false,
             errorMessage = null,
         )
     }
@@ -255,6 +216,7 @@ class MapViewModel @Inject constructor(
         const val SETTINGS_LOADING_FAILED_MESSAGE = "Failed to load settings."
         const val POINTS_LOADING_FAILED_MESSAGE = "Failed to load map objects."
         const val EXPLORATION_LOADING_FAILED_MESSAGE = "Failed to load exploration progress."
+        const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
     }

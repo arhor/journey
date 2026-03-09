@@ -10,4 +10,3 @@ class ObserveActivityLogUseCase @Inject constructor(
 ) {
     operator fun invoke(): Flow<List<ActivityLogEntry>> = activityLogRepository.observeHistory()
 }
-

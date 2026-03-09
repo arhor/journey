@@ -10,4 +10,3 @@ class ObserveExplorationProgressUseCase @Inject constructor(
 ) {
     operator fun invoke(): Flow<ExplorationProgress> = repository.observeProgress()
 }
-

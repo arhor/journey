@@ -13,7 +13,6 @@ import com.github.arhor.journey.domain.model.HealthDataSyncFailure
 import com.github.arhor.journey.domain.model.HealthDataSyncMode
 import com.github.arhor.journey.domain.model.HealthDataTimeRange
 import com.github.arhor.journey.domain.model.HealthDataType
-import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
 import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
@@ -32,6 +31,7 @@ import java.time.ZoneOffset
 import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
@@ -74,7 +74,9 @@ class SettingsViewModel @Inject constructor(
 ) {
     private val _state = MutableStateFlow(
         State(
-            healthConnectAvailability = healthConnectAvailabilityRepository.checkAvailability(),
+            healthConnectAvailability = runCatching {
+                healthConnectAvailabilityRepository.checkAvailability()
+            }.getOrDefault(HealthConnectAvailability.AVAILABLE),
         ),
     )
 
@@ -86,6 +88,13 @@ class SettingsViewModel @Inject constructor(
 
     override fun buildUiState(): Flow<SettingsUiState> =
         combine(_state, observeSettings(), observeActivityLog(), ::intoUiState)
+            .catch { error ->
+                emit(
+                    SettingsUiState.Failure(
+                        errorMessage = error.message ?: SETTINGS_LOADING_FAILED_MESSAGE,
+                    ),
+                )
+            }
             .distinctUntilChanged()
 
     override suspend fun handleIntent(intent: SettingsIntent) {
@@ -305,7 +314,20 @@ class SettingsViewModel @Inject constructor(
         }.getOrNull()
         _state.update { it.copy(lastSyncTimestamp = lastSyncTimestamp) }
 
-        val availability = healthConnectAvailabilityRepository.checkAvailability()
+        val availability = runCatching {
+            healthConnectAvailabilityRepository.checkAvailability()
+        }.getOrElse {
+            _state.update {
+                it.copy(
+                    healthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
+                    healthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
+                    missingHealthConnectPermissions = emptySet(),
+                    pendingHealthConnectAction = null,
+                    isSyncInProgress = false,
+                )
+            }
+            return
+        }
         if (availability != HealthConnectAvailability.AVAILABLE) {
             updateUnavailableHealthConnectState(availability = availability)
             return
@@ -522,33 +544,25 @@ class SettingsViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
-        settings: Resource<AppSettings>,
+        settings: AppSettings,
         activityLog: List<ActivityLogEntry>,
     ): SettingsUiState {
-        return when (settings) {
-            is Resource.Loading -> SettingsUiState.Loading
-            is Resource.Failure -> SettingsUiState.Failure(
-                errorMessage = settings.message ?: "Can't load settings",
-            )
+        val importedTodaySummary = importedSummaryForDays(activityLog = activityLog, days = 1)
+        val importedWeekSummary = importedSummaryForDays(activityLog = activityLog, days = 7)
 
-            is Resource.Success -> {
-                val importedTodaySummary = importedSummaryForDays(activityLog = activityLog, days = 1)
-                val importedWeekSummary = importedSummaryForDays(activityLog = activityLog, days = 7)
-                SettingsUiState.Content(
-                    isUpdating = state.isUpdating,
-                    distanceUnit = settings.value.distanceUnit,
-                    mapStyle = settings.value.mapStyle,
-                    healthConnectAvailability = state.healthConnectAvailability,
-                    healthConnectConnectionStatus = state.healthConnectConnectionStatus,
-                    healthConnectPermissionStatus = state.healthConnectPermissionStatus,
-                    missingHealthConnectPermissions = state.missingHealthConnectPermissions,
-                    lastSyncTimestamp = state.lastSyncTimestamp,
-                    isSyncInProgress = state.isSyncInProgress,
-                    importedTodaySummary = importedTodaySummary,
-                    importedWeekSummary = importedWeekSummary,
-                )
-            }
-        }
+        return SettingsUiState.Content(
+            isUpdating = state.isUpdating,
+            distanceUnit = settings.distanceUnit,
+            mapStyle = settings.mapStyle,
+            healthConnectAvailability = state.healthConnectAvailability,
+            healthConnectConnectionStatus = state.healthConnectConnectionStatus,
+            healthConnectPermissionStatus = state.healthConnectPermissionStatus,
+            missingHealthConnectPermissions = state.missingHealthConnectPermissions,
+            lastSyncTimestamp = state.lastSyncTimestamp,
+            isSyncInProgress = state.isSyncInProgress,
+            importedTodaySummary = importedTodaySummary,
+            importedWeekSummary = importedWeekSummary,
+        )
     }
 
     private fun importedSummaryForDays(
@@ -569,6 +583,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private companion object {
+        const val SETTINGS_LOADING_FAILED_MESSAGE = "Can't load settings."
         val DEFAULT_INITIAL_LOOKBACK: Duration = Duration.ofDays(3)
         val MAX_INCREMENTAL_LOOKBACK: Duration = Duration.ofDays(14)
     }

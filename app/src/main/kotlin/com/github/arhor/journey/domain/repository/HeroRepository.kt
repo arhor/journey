@@ -20,4 +20,3 @@ interface HeroRepository {
 
     suspend fun upsert(hero: Hero)
 }
-

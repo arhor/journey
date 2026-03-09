@@ -29,7 +29,8 @@ class HealthSyncWorker @AssistedInject constructor(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        if (availabilityRepository.checkAvailability() != HealthConnectAvailability.AVAILABLE) {
+        val availability = availabilityRepository.checkAvailability()
+        if (availability != HealthConnectAvailability.AVAILABLE) {
             return Result.success()
         }
 

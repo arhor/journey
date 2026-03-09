@@ -6,7 +6,6 @@ import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.HealthDataSyncPayload
 import com.github.arhor.journey.domain.model.HealthDataSyncSummary
-import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
 import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
@@ -216,8 +215,8 @@ class SettingsViewModelTest {
     fun `handle health connect permission result should re-read permissions and continue pending sync when sync was waiting for approval`() =
         runTest(mainDispatcherRule.testDispatcher) {
         // Given
-        val settingsFlow = MutableSharedFlow<Resource<AppSettings>>(replay = 1).apply {
-            tryEmit(Resource.Success(AppSettings(distanceUnit = DistanceUnit.METRIC)))
+        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
+            tryEmit(AppSettings(distanceUnit = DistanceUnit.METRIC))
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
@@ -289,8 +288,8 @@ class SettingsViewModelTest {
     fun `handle health connect permission result should show recovery message when permissions remain missing twice`() =
         runTest(mainDispatcherRule.testDispatcher) {
         // Given
-        val settingsFlow = MutableSharedFlow<Resource<AppSettings>>(replay = 1).apply {
-            tryEmit(Resource.Success(AppSettings(distanceUnit = DistanceUnit.METRIC)))
+        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
+            tryEmit(AppSettings(distanceUnit = DistanceUnit.METRIC))
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()
@@ -383,8 +382,8 @@ class SettingsViewModelTest {
             ),
         ),
     ): Fixture {
-        val settingsFlow = MutableSharedFlow<Resource<AppSettings>>(replay = 1).apply {
-            tryEmit(Resource.Success(settings))
+        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
+            tryEmit(settings)
         }
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
         val observeActivityLogUseCase = mockk<ObserveActivityLogUseCase>()

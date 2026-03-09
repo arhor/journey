@@ -3,7 +3,6 @@ package com.github.arhor.journey.data.repository
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.model.Resource
 import io.kotest.matchers.shouldBe
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,10 +25,10 @@ class DataStoreSettingsRepositoryImplTest {
 
         // When
         repository.setMapStyle(MapStyle.TERRAIN)
-        val settings = repository.observeSettings().first { it is Resource.Success } as Resource.Success
+        val settings = repository.observeSettings().first()
 
         // Then
-        settings.value.mapStyle shouldBe MapStyle.TERRAIN
+        settings.mapStyle shouldBe MapStyle.TERRAIN
     }
 
     @Test
@@ -45,9 +44,9 @@ class DataStoreSettingsRepositoryImplTest {
         }
 
         // When
-        val settings = repository.observeSettings().first { it is Resource.Success } as Resource.Success
+        val settings = repository.observeSettings().first()
 
         // Then
-        settings.value.mapStyle shouldBe MapStyle.DEFAULT
+        settings.mapStyle shouldBe MapStyle.DEFAULT
     }
 }

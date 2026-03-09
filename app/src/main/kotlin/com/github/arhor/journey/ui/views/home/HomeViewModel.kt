@@ -8,8 +8,6 @@ import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.RecordedActivity
-import com.github.arhor.journey.domain.model.Resource
-import com.github.arhor.journey.domain.model.asResourceFlow
 import com.github.arhor.journey.domain.progression.ProgressionPolicy
 import com.github.arhor.journey.domain.usecase.LogActivityUseCase
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
@@ -18,10 +16,9 @@ import com.github.arhor.journey.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import java.time.Clock
 import java.time.Duration
@@ -54,33 +51,62 @@ class HomeViewModel @Inject constructor(
     override fun buildUiState(): Flow<HomeUiState> =
         combine(
             _state,
-            heroResourceFlow(),
+            observeCurrentHero(),
             observeActivityLog(),
             ::intoUiState,
-        ).distinctUntilChanged()
+        ).catch {
+            emit(
+                HomeUiState.Failure(
+                    errorMessage = it.message ?: HOME_LOADING_FAILED_MESSAGE,
+                ),
+            )
+        }.distinctUntilChanged()
 
     override suspend fun handleIntent(intent: HomeIntent) {
         when (intent) {
-            HomeIntent.RetryLoad -> retryLoad()
-            is HomeIntent.SelectActivityType -> _state.update {
-                it.copy(selectedActivityType = intent.type)
-            }
-
-            is HomeIntent.ChangeDurationMinutes -> _state.update {
-                it.copy(durationMinutesInput = intent.value)
-            }
-
-            HomeIntent.SubmitActivity -> submitActivity()
+            is HomeIntent.SelectActivityType -> onSelectActivityType(intent)
+            is HomeIntent.ChangeDurationMinutes -> onChangeDurationMinutes(intent)
+            is HomeIntent.SubmitActivity -> onSubmitActivity()
         }
     }
 
-    private fun retryLoad() {
+    private fun intoUiState(
+        state: State,
+        hero: Hero,
+        activityLog: List<ActivityLogEntry>,
+    ): HomeUiState {
+        val importedTodayEntries = importedTodayEntries(activityLog)
+
+        return HomeUiState.Content(
+            heroName = hero.name,
+            level = hero.progression.level,
+            xpInLevel = hero.progression.xpInLevel,
+            xpToNextLevel = progressionPolicy.xpToNextLevel(hero.progression.level),
+            strength = hero.stats.strength,
+            vitality = hero.stats.vitality,
+            dexterity = hero.stats.dexterity,
+            stamina = hero.stats.stamina,
+            selectedActivityType = state.selectedActivityType,
+            durationMinutesInput = state.durationMinutesInput,
+            isSubmitting = state.isSubmitting,
+            importedTodayActivities = importedTodayEntries.size,
+            importedTodaySteps = importedTodayEntries.sumOf { it.recorded.steps?.toLong() ?: 0L },
+        )
+    }
+
+    private fun onChangeDurationMinutes(intent: HomeIntent.ChangeDurationMinutes) {
         _state.update {
-            it.copy(refreshToken = it.refreshToken + 1)
+            it.copy(durationMinutesInput = intent.value)
         }
     }
 
-    private suspend fun submitActivity() {
+    private fun onSelectActivityType(intent: HomeIntent.SelectActivityType) {
+        _state.update {
+            it.copy(selectedActivityType = intent.type)
+        }
+    }
+
+    private suspend fun onSubmitActivity() {
         val state = _state.value
         if (state.isSubmitting) {
             return
@@ -125,45 +151,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun heroResourceFlow(): Flow<Resource<Hero>> =
-        _state
-            .map { it.refreshToken }
-            .distinctUntilChanged()
-            .flatMapLatest { observeCurrentHero().asResourceFlow() }
-
-    private fun intoUiState(
-        state: State,
-        hero: Resource<Hero>,
-        activityLog: List<ActivityLogEntry>,
-    ): HomeUiState {
-        return when (hero) {
-            is Resource.Loading -> HomeUiState.Loading
-
-            is Resource.Failure -> HomeUiState.Failure(
-                errorMessage = hero.message ?: HERO_LOADING_FAILED_MESSAGE,
-            )
-
-            is Resource.Success -> {
-                val importedTodayEntries = importedTodayEntries(activityLog)
-                HomeUiState.Content(
-                    heroName = hero.value.name,
-                    level = hero.value.progression.level,
-                    xpInLevel = hero.value.progression.xpInLevel,
-                    xpToNextLevel = progressionPolicy.xpToNextLevel(hero.value.progression.level),
-                    strength = hero.value.stats.strength,
-                    vitality = hero.value.stats.vitality,
-                    dexterity = hero.value.stats.dexterity,
-                    stamina = hero.value.stats.stamina,
-                    selectedActivityType = state.selectedActivityType,
-                    durationMinutesInput = state.durationMinutesInput,
-                    isSubmitting = state.isSubmitting,
-                    importedTodayActivities = importedTodayEntries.size,
-                    importedTodaySteps = importedTodayEntries.sumOf { it.recorded.steps?.toLong() ?: 0L },
-                )
-            }
-        }
-    }
-
     private fun importedTodayEntries(activityLog: List<ActivityLogEntry>): List<ActivityLogEntry> {
         val today = clock.instant().atZone(ZoneOffset.UTC).toLocalDate()
         return activityLog.filter { entry ->
@@ -194,7 +181,7 @@ class HomeViewModel @Inject constructor(
 
     private companion object {
         val VALID_DURATION_RANGE_MINUTES = 1..1440
-        const val HERO_LOADING_FAILED_MESSAGE = "Failed to load hero state."
+        const val HOME_LOADING_FAILED_MESSAGE = "Failed to load home state."
         const val INVALID_DURATION_MESSAGE = "Duration must be between 1 and 1440 minutes."
         const val ACTIVITY_LOGGING_FAILED_MESSAGE = "Failed to log activity."
     }

@@ -42,7 +42,7 @@ fun HomeScreen(
 ) {
     when (state) {
         is HomeUiState.Loading -> LoadingIndicator()
-        is HomeUiState.Failure -> HomeFailure(state = state, dispatch = dispatch)
+        is HomeUiState.Failure -> HomeFailure(state = state)
         is HomeUiState.Content -> HomeContent(state = state, dispatch = dispatch)
     }
 }
@@ -50,7 +50,6 @@ fun HomeScreen(
 @Composable
 internal fun HomeFailure(
     state: HomeUiState.Failure,
-    dispatch: (HomeIntent) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -63,12 +62,6 @@ internal fun HomeFailure(
             text = state.errorMessage,
             style = MaterialTheme.typography.bodyLarge,
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = { dispatch(HomeIntent.RetryLoad) },
-        ) {
-            Text(text = stringResource(R.string.common_retry))
-        }
     }
 }
 

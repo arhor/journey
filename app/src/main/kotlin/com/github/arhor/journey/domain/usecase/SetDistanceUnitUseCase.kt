@@ -13,4 +13,3 @@ class SetDistanceUnitUseCase @Inject constructor(
         settingsRepository.setDistanceUnit(unit)
     }
 }
-

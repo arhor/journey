@@ -8,7 +8,6 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
-import com.github.arhor.journey.domain.model.Resource
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
@@ -21,9 +20,11 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -40,8 +41,8 @@ class MapViewModelTest {
     @Test
     fun `initialize should expose mapped objects and selected style when all flows emit success`() = runTest(mainDispatcherRule.testDispatcher) {
         // Given
-        val settingsFlow = MutableSharedFlow<Resource<AppSettings>>(replay = 1).apply {
-            tryEmit(Resource.Success(AppSettings(mapStyle = MapStyle.DARK)))
+        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
+            tryEmit(AppSettings(mapStyle = MapStyle.DARK))
         }
         val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
             tryEmit(
@@ -78,12 +79,14 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `initialize should fallback to default style when settings are loading`() = runTest(mainDispatcherRule.testDispatcher) {
+    fun `initialize should fallback to default style when settings fail`() = runTest(mainDispatcherRule.testDispatcher) {
         // Given
-        val settingsFlow = MutableSharedFlow<Resource<AppSettings>>(replay = 1).apply {
-            tryEmit(Resource.Loading)
+        val settingsFlow = flow<AppSettings> {
+            throw IllegalStateException("Settings unavailable")
         }
-        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply { tryEmit(emptyList()) }
+        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
+            tryEmit(emptyList())
+        }
         val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
             tryEmit(ExplorationProgress(discovered = emptySet()))
         }
@@ -101,8 +104,8 @@ class MapViewModelTest {
     @Test
     fun `on object tapped should discover poi and open details when discovery succeeds`() = runTest(mainDispatcherRule.testDispatcher) {
         // Given
-        val settingsFlow = MutableSharedFlow<Resource<AppSettings>>(replay = 1).apply {
-            tryEmit(Resource.Success(AppSettings(mapStyle = MapStyle.DEFAULT)))
+        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
+            tryEmit(AppSettings(mapStyle = MapStyle.DEFAULT))
         }
         val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
             tryEmit(listOf(pointOfInterest(id = "poi-1", name = "Town Square")))
@@ -129,10 +132,12 @@ class MapViewModelTest {
     @Test
     fun `on map load failed should expose error and clear it when retry is dispatched`() = runTest(mainDispatcherRule.testDispatcher) {
         // Given
-        val settingsFlow = MutableSharedFlow<Resource<AppSettings>>(replay = 1).apply {
-            tryEmit(Resource.Success(AppSettings(mapStyle = MapStyle.DEFAULT)))
+        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
+            tryEmit(AppSettings(mapStyle = MapStyle.DEFAULT))
         }
-        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply { tryEmit(emptyList()) }
+        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
+            tryEmit(emptyList())
+        }
         val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
             tryEmit(ExplorationProgress(discovered = emptySet()))
         }
@@ -158,9 +163,9 @@ class MapViewModelTest {
     }
 
     private fun createFixture(
-        settingsFlow: MutableSharedFlow<Resource<AppSettings>>,
-        poiFlow: MutableSharedFlow<List<PointOfInterest>>,
-        explorationFlow: MutableSharedFlow<ExplorationProgress>,
+        settingsFlow: Flow<AppSettings>,
+        poiFlow: Flow<List<PointOfInterest>>,
+        explorationFlow: Flow<ExplorationProgress>,
     ): Fixture {
         val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
         val observePointsOfInterestUseCase = mockk<ObservePointsOfInterestUseCase>()

@@ -14,4 +14,3 @@ interface PointOfInterestRepository {
      */
     suspend fun ensureSeeded()
 }
-

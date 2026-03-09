@@ -26,4 +26,3 @@ class RoomPointOfInterestRepository @Inject constructor(
         }
     }
 }
-

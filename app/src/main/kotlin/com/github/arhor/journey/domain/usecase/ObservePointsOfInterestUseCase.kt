@@ -13,4 +13,3 @@ class ObservePointsOfInterestUseCase @Inject constructor(
         repository.observeAll()
             .onStart { repository.ensureSeeded() }
 }
-

@@ -10,4 +10,3 @@ class ObserveCurrentHeroUseCase @Inject constructor(
 ) {
     operator fun invoke(): Flow<Hero> = heroRepository.observeCurrentHero()
 }
-
