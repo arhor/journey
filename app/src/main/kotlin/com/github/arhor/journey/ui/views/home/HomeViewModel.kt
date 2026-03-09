@@ -30,7 +30,6 @@ private data class State(
     val selectedActivityType: ActivityType = ActivityType.WALK,
     val durationMinutesInput: String = "30",
     val isSubmitting: Boolean = false,
-    val refreshToken: Int = 0,
 )
 
 @Stable
