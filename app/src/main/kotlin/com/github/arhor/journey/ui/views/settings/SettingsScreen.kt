@@ -29,6 +29,9 @@ import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus
+import com.github.arhor.journey.ui.views.settings.model.ImportedActivitySummary
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 

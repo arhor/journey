@@ -16,6 +16,8 @@ import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCaseResult
 import com.github.arhor.journey.test.MainDispatcherRule
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify

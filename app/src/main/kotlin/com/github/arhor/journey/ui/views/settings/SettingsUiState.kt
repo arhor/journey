@@ -4,6 +4,9 @@ import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus
+import com.github.arhor.journey.ui.views.settings.model.ImportedActivitySummary
 import java.time.Instant
 
 sealed interface SettingsUiState {
@@ -28,23 +31,4 @@ sealed interface SettingsUiState {
         val importedTodaySummary: ImportedActivitySummary,
         val importedWeekSummary: ImportedActivitySummary,
     ) : SettingsUiState
-}
-
-@Immutable
-data class ImportedActivitySummary(
-    val importedActivities: Int = 0,
-    val importedSteps: Long = 0,
-)
-
-enum class HealthConnectConnectionStatus {
-    DISCONNECTED,
-    CONNECTING,
-    CONNECTED,
-}
-
-enum class HealthConnectPermissionStatus {
-    NOT_REQUESTED,
-    REQUESTING,
-    GRANTED,
-    DENIED,
 }

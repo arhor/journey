@@ -23,12 +23,10 @@ import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCaseResult
 import com.github.arhor.journey.ui.MviViewModel
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
+import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus
+import com.github.arhor.journey.ui.views.settings.model.ImportedActivitySummary
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Clock
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
-import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
@@ -36,14 +34,19 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneOffset
+import javax.inject.Inject
 
 @Immutable
 private data class State(
     val isUpdating: Boolean = false,
-    val healthConnectAvailability: HealthConnectAvailability = HealthConnectAvailability.AVAILABLE,
-    val healthConnectConnectionStatus: HealthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
-    val healthConnectPermissionStatus: HealthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
-    val missingHealthConnectPermissions: Set<String> = emptySet(),
+    val availability: HealthConnectAvailability = HealthConnectAvailability.AVAILABLE,
+    val connectionStatus: HealthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
+    val permissionStatus: HealthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
+    val permissions: Set<String> = emptySet(),
     val lastSyncTimestamp: Instant? = null,
     val isSyncInProgress: Boolean = false,
     val consecutivePermissionRequestFailures: Int = 0,
@@ -74,7 +77,7 @@ class SettingsViewModel @Inject constructor(
 ) {
     private val _state = MutableStateFlow(
         State(
-            healthConnectAvailability = runCatching {
+            availability = runCatching {
                 healthConnectAvailabilityRepository.checkAvailability()
             }.getOrDefault(HealthConnectAvailability.AVAILABLE),
         ),
@@ -82,37 +85,63 @@ class SettingsViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            refreshHealthConnectState()
+            onRefreshHealthConnectStatus()
         }
     }
 
     override fun buildUiState(): Flow<SettingsUiState> =
-        combine(_state, observeSettings(), observeActivityLog(), ::intoUiState)
-            .catch { error ->
-                emit(
-                    SettingsUiState.Failure(
-                        errorMessage = error.message ?: SETTINGS_LOADING_FAILED_MESSAGE,
-                    ),
+        combine(
+            _state,
+            observeSettings(),
+            observeActivityLog(),
+            ::intoUiState
+        ).catch {
+            emit(
+                SettingsUiState.Failure(
+                    errorMessage = it.message ?: SETTINGS_LOADING_FAILED_MESSAGE
                 )
-            }
-            .distinctUntilChanged()
+            )
+        }.distinctUntilChanged()
 
     override suspend fun handleIntent(intent: SettingsIntent) {
         when (intent) {
-            is SettingsIntent.SelectDistanceUnit -> handleSelectDistanceUnit(intent)
-            is SettingsIntent.SelectMapStyle -> handleSelectMapStyle(intent)
-            SettingsIntent.ConnectHealthConnect -> handleConnectHealthConnect()
-            SettingsIntent.ManageHealthConnectPermissions -> handleManageHealthConnectPermissions()
-            SettingsIntent.ManualSyncHealthData -> handleManualSyncHealthData()
-            SettingsIntent.RefreshHealthConnectStatus -> refreshHealthConnectState()
-            SettingsIntent.HealthConnectPermissionRequestLaunched -> handleHealthConnectPermissionRequestLaunched()
-            is SettingsIntent.HandleHealthConnectPermissionResult -> {
-                handleHealthConnectPermissionResult()
-            }
+            is SettingsIntent.SelectDistanceUnit -> onSelectDistanceUnit(intent)
+            is SettingsIntent.SelectMapStyle -> onSelectMapStyle(intent)
+            is SettingsIntent.ConnectHealthConnect -> onConnectHealthConnect()
+            is SettingsIntent.ManageHealthConnectPermissions -> onManageHealthConnectPermissions()
+            is SettingsIntent.ManualSyncHealthData -> onManualSyncHealthData()
+            is SettingsIntent.RefreshHealthConnectStatus -> onRefreshHealthConnectStatus()
+            is SettingsIntent.HealthConnectPermissionRequestLaunched -> onHealthConnectPermissionRequestLaunched()
+            is SettingsIntent.HandleHealthConnectPermissionResult -> onHandleHealthConnectPermissionResult()
         }
     }
 
-    private suspend fun handleSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
+    /* ------------------------------------------ Internal implementation ------------------------------------------- */
+
+    private fun intoUiState(
+        state: State,
+        settings: AppSettings,
+        activityLog: List<ActivityLogEntry>,
+    ): SettingsUiState {
+        val importedTodaySummary = importedSummaryForDays(activityLog = activityLog, days = 1)
+        val importedWeekSummary = importedSummaryForDays(activityLog = activityLog, days = 7)
+
+        return SettingsUiState.Content(
+            isUpdating = state.isUpdating,
+            distanceUnit = settings.distanceUnit,
+            mapStyle = settings.mapStyle,
+            healthConnectAvailability = state.availability,
+            healthConnectConnectionStatus = state.connectionStatus,
+            healthConnectPermissionStatus = state.permissionStatus,
+            missingHealthConnectPermissions = state.permissions,
+            lastSyncTimestamp = state.lastSyncTimestamp,
+            isSyncInProgress = state.isSyncInProgress,
+            importedTodaySummary = importedTodaySummary,
+            importedWeekSummary = importedWeekSummary,
+        )
+    }
+
+    private suspend fun onSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
         if (_state.value.isUpdating) {
             return
         }
@@ -127,7 +156,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun handleSelectMapStyle(intent: SettingsIntent.SelectMapStyle) {
+    private suspend fun onSelectMapStyle(intent: SettingsIntent.SelectMapStyle) {
         if (_state.value.isUpdating) {
             return
         }
@@ -142,10 +171,10 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun handleConnectHealthConnect() {
+    private suspend fun onConnectHealthConnect() {
         _state.update {
             it.copy(
-                healthConnectConnectionStatus = HealthConnectConnectionStatus.CONNECTING,
+                connectionStatus = HealthConnectConnectionStatus.CONNECTING,
                 pendingHealthConnectAction = null,
             )
         }
@@ -160,9 +189,9 @@ class SettingsViewModel @Inject constructor(
             if (missingPermissions.isEmpty()) {
                 _state.update {
                     it.copy(
-                        healthConnectConnectionStatus = HealthConnectConnectionStatus.CONNECTED,
-                        healthConnectPermissionStatus = HealthConnectPermissionStatus.GRANTED,
-                        missingHealthConnectPermissions = emptySet(),
+                        connectionStatus = HealthConnectConnectionStatus.CONNECTED,
+                        permissionStatus = HealthConnectPermissionStatus.GRANTED,
+                        permissions = emptySet(),
                         consecutivePermissionRequestFailures = 0,
                     )
                 }
@@ -176,8 +205,8 @@ class SettingsViewModel @Inject constructor(
         } catch (e: Throwable) {
             _state.update {
                 it.copy(
-                    healthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
-                    healthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
+                    connectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
+                    permissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
                     pendingHealthConnectAction = null,
                 )
             }
@@ -185,9 +214,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun handleManageHealthConnectPermissions() {
+    private suspend fun onManageHealthConnectPermissions() {
         val availability = healthConnectAvailabilityRepository.checkAvailability()
-        _state.update { it.copy(healthConnectAvailability = availability) }
+        _state.update { it.copy(availability = availability) }
 
         if (availability == HealthConnectAvailability.NOT_SUPPORTED) {
             updateUnavailableHealthConnectState(availability = availability)
@@ -198,7 +227,7 @@ class SettingsViewModel @Inject constructor(
         emitEffect(SettingsEffect.OpenHealthConnectManagement)
     }
 
-    private suspend fun handleManualSyncHealthData() {
+    private suspend fun onManualSyncHealthData() {
         if (_state.value.isSyncInProgress) {
             return
         }
@@ -237,15 +266,15 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private fun handleHealthConnectPermissionRequestLaunched() {
+    private fun onHealthConnectPermissionRequestLaunched() {
         _state.update {
             it.copy(
-                healthConnectPermissionStatus = HealthConnectPermissionStatus.REQUESTING,
+                permissionStatus = HealthConnectPermissionStatus.REQUESTING,
             )
         }
     }
 
-    private suspend fun handleHealthConnectPermissionResult() {
+    private suspend fun onHandleHealthConnectPermissionResult() {
         val pendingAction = _state.value.pendingHealthConnectAction
 
         try {
@@ -264,17 +293,17 @@ class SettingsViewModel @Inject constructor(
 
             _state.update {
                 it.copy(
-                    healthConnectConnectionStatus = if (hasAllRequiredPermissions) {
+                    connectionStatus = if (hasAllRequiredPermissions) {
                         HealthConnectConnectionStatus.CONNECTED
                     } else {
                         HealthConnectConnectionStatus.DISCONNECTED
                     },
-                    healthConnectPermissionStatus = if (hasAllRequiredPermissions) {
+                    permissionStatus = if (hasAllRequiredPermissions) {
                         HealthConnectPermissionStatus.GRANTED
                     } else {
                         HealthConnectPermissionStatus.DENIED
                     },
-                    missingHealthConnectPermissions = missingPermissions,
+                    permissions = missingPermissions,
                     consecutivePermissionRequestFailures = nextFailureCount,
                     pendingHealthConnectAction = null,
                     isSyncInProgress = false,
@@ -298,8 +327,8 @@ class SettingsViewModel @Inject constructor(
         } catch (e: Throwable) {
             _state.update {
                 it.copy(
-                    healthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
-                    healthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
+                    connectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
+                    permissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
                     pendingHealthConnectAction = null,
                     isSyncInProgress = false,
                 )
@@ -308,7 +337,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun refreshHealthConnectState() {
+    private suspend fun onRefreshHealthConnectStatus() {
         val lastSyncTimestamp = runCatching {
             healthSyncCheckpointRepository.getLastSuccessfulSyncAt()
         }.getOrNull()
@@ -319,9 +348,9 @@ class SettingsViewModel @Inject constructor(
         }.getOrElse {
             _state.update {
                 it.copy(
-                    healthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
-                    healthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
-                    missingHealthConnectPermissions = emptySet(),
+                    connectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
+                    permissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
+                    permissions = emptySet(),
                     pendingHealthConnectAction = null,
                     isSyncInProgress = false,
                 )
@@ -338,10 +367,10 @@ class SettingsViewModel @Inject constructor(
         }.getOrElse {
             _state.update {
                 it.copy(
-                    healthConnectAvailability = availability,
-                    healthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
-                    healthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
-                    missingHealthConnectPermissions = emptySet(),
+                    availability = availability,
+                    connectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
+                    permissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
+                    permissions = emptySet(),
                     pendingHealthConnectAction = null,
                     isSyncInProgress = false,
                 )
@@ -351,20 +380,20 @@ class SettingsViewModel @Inject constructor(
 
         _state.update {
             it.copy(
-                healthConnectAvailability = availability,
-                healthConnectConnectionStatus = if (missingPermissions.isEmpty()) {
+                availability = availability,
+                connectionStatus = if (missingPermissions.isEmpty()) {
                     HealthConnectConnectionStatus.CONNECTED
                 } else {
                     HealthConnectConnectionStatus.DISCONNECTED
                 },
-                healthConnectPermissionStatus = if (missingPermissions.isEmpty()) {
+                permissionStatus = if (missingPermissions.isEmpty()) {
                     HealthConnectPermissionStatus.GRANTED
-                } else if (it.healthConnectPermissionStatus == HealthConnectPermissionStatus.DENIED) {
+                } else if (it.permissionStatus == HealthConnectPermissionStatus.DENIED) {
                     HealthConnectPermissionStatus.DENIED
                 } else {
                     HealthConnectPermissionStatus.NOT_REQUESTED
                 },
-                missingHealthConnectPermissions = missingPermissions,
+                permissions = missingPermissions,
                 consecutivePermissionRequestFailures = if (missingPermissions.isEmpty()) 0 else {
                     it.consecutivePermissionRequestFailures
                 },
@@ -381,17 +410,17 @@ class SettingsViewModel @Inject constructor(
             return null
         }
 
-        _state.update { it.copy(healthConnectAvailability = availability) }
+        _state.update { it.copy(availability = availability) }
         return healthPermissionRepository.getMissingPermissions()
     }
 
     private fun updateUnavailableHealthConnectState(availability: HealthConnectAvailability) {
         _state.update {
             it.copy(
-                healthConnectAvailability = availability,
-                healthConnectConnectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
-                healthConnectPermissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
-                missingHealthConnectPermissions = emptySet(),
+                availability = availability,
+                connectionStatus = HealthConnectConnectionStatus.DISCONNECTED,
+                permissionStatus = HealthConnectPermissionStatus.NOT_REQUESTED,
+                permissions = emptySet(),
                 pendingHealthConnectAction = null,
                 isSyncInProgress = false,
                 consecutivePermissionRequestFailures = 0,
@@ -406,13 +435,13 @@ class SettingsViewModel @Inject constructor(
         _state.update {
             it.copy(
                 isSyncInProgress = false,
-                healthConnectConnectionStatus = if (pendingAction == PendingHealthConnectAction.CONNECT) {
+                connectionStatus = if (pendingAction == PendingHealthConnectAction.CONNECT) {
                     HealthConnectConnectionStatus.CONNECTING
                 } else {
                     HealthConnectConnectionStatus.DISCONNECTED
                 },
-                healthConnectPermissionStatus = HealthConnectPermissionStatus.REQUESTING,
-                missingHealthConnectPermissions = missingPermissions,
+                permissionStatus = HealthConnectPermissionStatus.REQUESTING,
+                permissions = missingPermissions,
                 pendingHealthConnectAction = pendingAction,
             )
         }
@@ -442,9 +471,9 @@ class SettingsViewModel @Inject constructor(
                     it.copy(
                         isSyncInProgress = false,
                         lastSyncTimestamp = syncFinishedAt,
-                        healthConnectConnectionStatus = HealthConnectConnectionStatus.CONNECTED,
-                        healthConnectPermissionStatus = HealthConnectPermissionStatus.GRANTED,
-                        missingHealthConnectPermissions = emptySet(),
+                        connectionStatus = HealthConnectConnectionStatus.CONNECTED,
+                        permissionStatus = HealthConnectPermissionStatus.GRANTED,
+                        permissions = emptySet(),
                         consecutivePermissionRequestFailures = 0,
                     )
                 }
@@ -524,7 +553,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun emitHealthConnectAvailabilityError(openManagement: Boolean) {
-        val availability = _state.value.healthConnectAvailability
+        val availability = _state.value.availability
 
         if (openManagement && availability == HealthConnectAvailability.NEEDS_UPDATE_OR_INSTALL) {
             emitEffect(SettingsEffect.OpenHealthConnectManagement)
@@ -535,34 +564,12 @@ class SettingsViewModel @Inject constructor(
             HealthConnectAvailability.NEEDS_UPDATE_OR_INSTALL -> {
                 "Install or update Health Connect to continue."
             }
+
             HealthConnectAvailability.NOT_SUPPORTED -> {
                 "Health Connect is not supported on this device."
             }
         }
         emitEffect(SettingsEffect.Error(message))
-    }
-
-    private fun intoUiState(
-        state: State,
-        settings: AppSettings,
-        activityLog: List<ActivityLogEntry>,
-    ): SettingsUiState {
-        val importedTodaySummary = importedSummaryForDays(activityLog = activityLog, days = 1)
-        val importedWeekSummary = importedSummaryForDays(activityLog = activityLog, days = 7)
-
-        return SettingsUiState.Content(
-            isUpdating = state.isUpdating,
-            distanceUnit = settings.distanceUnit,
-            mapStyle = settings.mapStyle,
-            healthConnectAvailability = state.healthConnectAvailability,
-            healthConnectConnectionStatus = state.healthConnectConnectionStatus,
-            healthConnectPermissionStatus = state.healthConnectPermissionStatus,
-            missingHealthConnectPermissions = state.missingHealthConnectPermissions,
-            lastSyncTimestamp = state.lastSyncTimestamp,
-            isSyncInProgress = state.isSyncInProgress,
-            importedTodaySummary = importedTodaySummary,
-            importedWeekSummary = importedWeekSummary,
-        )
     }
 
     private fun importedSummaryForDays(
