@@ -19,23 +19,27 @@ class MapStyleResolver @Inject constructor(
     fun resolve(style: MapStyleRecord): MapResolvedStyle {
         return when (style.source) {
             MapStyleRecord.Source.REMOTE -> MapResolvedStyle.Uri(style.uri.orEmpty())
-            MapStyleRecord.Source.BUNDLE -> resolveFromAssetOrFallback(
-                assetPath = requireNotNull(style.assetPath),
-                fallbackUri = style.fallbackUri.orEmpty(),
-            )
+            MapStyleRecord.Source.BUNDLE -> resolveFromBundleOrFallback(style)
         }
     }
 
-    private fun resolveFromAssetOrFallback(assetPath: String, fallbackUri: String): MapResolvedStyle {
-        val styleJson = runCatching {
-            context.assets.open(assetPath).bufferedReader().use { it.readText() }
-        }.getOrNull()
+    private fun resolveFromBundleOrFallback(style: MapStyleRecord): MapResolvedStyle {
+        val styleJson = style.rawStyleJson ?: readFromAsset(style.assetPath)
+        val fallbackUri = style.fallbackUri.orEmpty()
 
         return if (styleJson.isNullOrBlank() || !isRenderableMapStyle(styleJson)) {
             MapResolvedStyle.Uri(fallbackUri)
         } else {
             MapResolvedStyle.Json(styleJson)
         }
+    }
+
+    private fun readFromAsset(assetPath: String?): String? {
+        if (assetPath.isNullOrBlank()) return null
+
+        return runCatching {
+            context.assets.open(assetPath).bufferedReader().use { it.readText() }
+        }.getOrNull()
     }
 
     private fun isRenderableMapStyle(styleJson: String): Boolean {

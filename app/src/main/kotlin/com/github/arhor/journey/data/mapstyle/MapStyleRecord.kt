@@ -5,6 +5,7 @@ data class MapStyleRecord(
     val name: String,
     val source: Source,
     val assetPath: String? = null,
+    val rawStyleJson: String? = null,
     val uri: String? = null,
     val fallbackUri: String? = null,
 ) {
