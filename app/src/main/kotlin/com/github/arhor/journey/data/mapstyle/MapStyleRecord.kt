@@ -9,7 +9,7 @@ data class MapStyleRecord(
     val fallbackUri: String? = null,
 ) {
     enum class Source {
-        BUNDLED,
+        BUNDLE,
         REMOTE,
     }
 }

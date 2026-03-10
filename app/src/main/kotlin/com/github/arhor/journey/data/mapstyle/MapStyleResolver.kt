@@ -19,7 +19,7 @@ class MapStyleResolver @Inject constructor(
     fun resolve(style: MapStyleRecord): MapResolvedStyle {
         return when (style.source) {
             MapStyleRecord.Source.REMOTE -> MapResolvedStyle.Uri(style.uri.orEmpty())
-            MapStyleRecord.Source.BUNDLED -> resolveFromAssetOrFallback(
+            MapStyleRecord.Source.BUNDLE -> resolveFromAssetOrFallback(
                 assetPath = requireNotNull(style.assetPath),
                 fallbackUri = style.fallbackUri.orEmpty(),
             )

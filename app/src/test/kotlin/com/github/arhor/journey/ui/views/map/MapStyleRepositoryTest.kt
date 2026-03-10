@@ -32,7 +32,7 @@ class MapStyleRepositoryTest {
         val resolver = mockk<MapStyleResolver>()
 
         every { bundled.getStyles() } returns listOf(
-            MapStyleRecord("default", "Default", MapStyleRecord.Source.BUNDLED, assetPath = "default.json", fallbackUri = "fallback"),
+            MapStyleRecord("default", "Default", MapStyleRecord.Source.BUNDLE, assetPath = "default.json", fallbackUri = "fallback"),
         )
         every { remoteLocal.observeCachedStyles() } returns MutableStateFlow(
             listOf(
@@ -62,7 +62,7 @@ class MapStyleRepositoryTest {
         val resolver = mockk<MapStyleResolver>()
 
         every { bundled.getStyles() } returns listOf(
-            MapStyleRecord("default", "Default", MapStyleRecord.Source.BUNDLED, assetPath = "default.json", fallbackUri = "fallback"),
+            MapStyleRecord("default", "Default", MapStyleRecord.Source.BUNDLE, assetPath = "default.json", fallbackUri = "fallback"),
         )
         every { remoteLocal.observeCachedStyles() } returns MutableStateFlow(emptyList())
         every { selectionLocal.observeSelectedStyleId(any()) } returns MutableStateFlow("default")
@@ -88,7 +88,7 @@ class MapStyleRepositoryTest {
         val resolver = mockk<MapStyleResolver>()
 
         every { bundled.getStyles() } returns listOf(
-            MapStyleRecord("default", "Default", MapStyleRecord.Source.BUNDLED, assetPath = "default.json", fallbackUri = "fallback"),
+            MapStyleRecord("default", "Default", MapStyleRecord.Source.BUNDLE, assetPath = "default.json", fallbackUri = "fallback"),
         )
         every { remoteLocal.observeCachedStyles() } returns MutableStateFlow(
             listOf(MapStyleRecord("dark", "Dark", MapStyleRecord.Source.REMOTE, uri = "dark")),
