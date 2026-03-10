@@ -1,6 +1,5 @@
 package com.github.arhor.journey.ui.views.home
 
-import com.github.arhor.journey.core.logging.NoOpLoggerFactory
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
 import com.github.arhor.journey.domain.model.Hero
@@ -58,7 +57,6 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
-            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
 
@@ -101,7 +99,6 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
-            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()
@@ -155,7 +152,6 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
-            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()
@@ -193,7 +189,6 @@ class HomeViewModelTest {
             logActivity = logActivityUseCase,
             progressionPolicy = ProgressionPolicy(),
             clock = clock,
-            loggerFactory = NoOpLoggerFactory,
         )
         backgroundScope.launch { vm.uiState.collect() }
         advanceUntilIdle()

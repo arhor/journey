@@ -1,17 +1,10 @@
 package com.github.arhor.journey.domain.model
 
-enum class MapStyle {
-    DEFAULT,
-    CLASSIC,
-    DARK,
-    SATELLITE,
-    TERRAIN,
-    ;
-
+data class MapStyle(
+    val id: String,
+    val name: String,
+) {
     companion object {
-        fun fromName(value: String?): MapStyle =
-            value
-                ?.let { runCatching { valueOf(it) }.getOrNull() }
-                ?: DEFAULT
+        const val DEFAULT_ID = "default"
     }
 }

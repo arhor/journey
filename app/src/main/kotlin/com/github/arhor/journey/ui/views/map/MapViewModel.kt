@@ -2,20 +2,20 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.domain.model.AppSettings
+import com.github.arhor.journey.domain.model.CameraPositionState
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.LatLng
+import com.github.arhor.journey.domain.model.MapResolvedStyle
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
-import com.github.arhor.journey.ui.MviViewModel
-import com.github.arhor.journey.domain.model.CameraPositionState
-import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
-import com.github.arhor.journey.domain.model.LatLng
-import com.github.arhor.journey.domain.repository.MapStyleRepository
+import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ResolveMapStyleUseCase
+import com.github.arhor.journey.ui.MviViewModel
+import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -48,7 +48,7 @@ private data class State(
 class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
-    private val observeSettings: ObserveSettingsUseCase,
+    private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
     private val resolveMapStyle: ResolveMapStyleUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
@@ -59,7 +59,8 @@ class MapViewModel @Inject constructor(
     override fun buildUiState(): Flow<MapUiState> =
         combine(
             _state,
-            observeSettings(),
+            observeSelectedMapStyle(),
+            resolveMapStyle(),
             observePointsOfInterest(),
             observeExplorationProgress(),
             ::intoUiState,
@@ -80,8 +81,6 @@ class MapViewModel @Inject constructor(
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
-
-    /* ------------------------------------------ Internal implementation ------------------------------------------- */
 
     private fun onMapLoadFailed(intent: MapIntent.MapLoadFailed) {
         _state.update {
@@ -150,7 +149,8 @@ class MapViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
-        settings: AppSettings,
+        selectedStyle: MapStyle,
+        resolvedStyle: MapResolvedStyle,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
     ): MapUiState {
@@ -158,19 +158,12 @@ class MapViewModel @Inject constructor(
             return MapUiState.Failure(errorMessage = errorMessage)
         }
 
-        val selectedStyle = settings.mapStyle
-        val resolvedStyle = resolveMapStyle(selectedStyle)
-        val visibleObjects = mapObjects(
-            pointsOfInterest = pointsOfInterest,
-            explorationProgress = explorationProgress,
-        )
-
         return MapUiState.Content(
             cameraPosition = state.cameraPosition,
             cameraUpdateOrigin = state.cameraUpdateOrigin,
             selectedStyle = selectedStyle,
             resolvedStyle = resolvedStyle,
-            visibleObjects = visibleObjects,
+            visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
         )
     }
 

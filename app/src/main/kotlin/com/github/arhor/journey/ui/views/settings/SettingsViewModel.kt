@@ -8,6 +8,7 @@ import com.github.arhor.journey.core.logging.NoOpLoggerFactory
 import com.github.arhor.journey.domain.model.ActivityLogEntry
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.AppSettings
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.domain.model.HealthDataSyncFailure
 import com.github.arhor.journey.domain.model.HealthDataSyncMode
@@ -17,6 +18,8 @@ import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepos
 import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
+import com.github.arhor.journey.domain.usecase.ObserveAvailableMapStylesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
@@ -62,6 +65,8 @@ private enum class PendingHealthConnectAction {
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
+    private val observeAvailableMapStyles: ObserveAvailableMapStylesUseCase,
+    private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val observeActivityLog: ObserveActivityLogUseCase,
     private val setDistanceUnit: SetDistanceUnitUseCase,
     private val setMapStyle: SetMapStyleUseCase,
@@ -91,6 +96,8 @@ class SettingsViewModel @Inject constructor(
         combine(
             _state,
             observeSettings(),
+            observeAvailableMapStyles(),
+            observeSelectedMapStyle(),
             observeActivityLog(),
             ::intoUiState
         ).catch {
@@ -119,6 +126,8 @@ class SettingsViewModel @Inject constructor(
     private fun intoUiState(
         state: State,
         settings: AppSettings,
+        availableMapStyles: List<MapStyle>,
+        selectedMapStyle: MapStyle,
         activityLog: List<ActivityLogEntry>,
     ): SettingsUiState {
         val importedTodaySummary = importedSummaryForDays(activityLog = activityLog, days = 1)
@@ -127,7 +136,8 @@ class SettingsViewModel @Inject constructor(
         return SettingsUiState.Content(
             isUpdating = state.isUpdating,
             distanceUnit = settings.distanceUnit,
-            mapStyle = settings.mapStyle,
+            selectedMapStyleId = selectedMapStyle.id,
+            availableMapStyles = availableMapStyles,
             healthConnectAvailability = state.availability,
             healthConnectConnectionStatus = state.connectionStatus,
             healthConnectPermissionStatus = state.permissionStatus,
@@ -161,7 +171,7 @@ class SettingsViewModel @Inject constructor(
 
         _state.update { it.copy(isUpdating = true) }
         try {
-            setMapStyle(intent.style)
+            setMapStyle(intent.styleId)
         } catch (e: Throwable) {
             emitEffect(SettingsEffect.Error(message = e.message ?: "Failed to update map style."))
         } finally {
