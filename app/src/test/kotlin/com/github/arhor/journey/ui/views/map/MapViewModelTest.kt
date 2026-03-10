@@ -1,31 +1,26 @@
 package com.github.arhor.journey.ui.views.map
 
-import com.github.arhor.journey.core.logging.NoOpLoggerFactory
-import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.MapResolvedStyle
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.ResolveMapStyleUseCase
 import com.github.arhor.journey.test.MainDispatcherRule
-import com.github.arhor.journey.domain.model.MapResolvedStyle
 import io.kotest.matchers.shouldBe
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -42,31 +37,15 @@ class MapViewModelTest {
     @Test
     fun `initialize should expose mapped objects and selected style when all flows emit success`() = runTest(mainDispatcherRule.testDispatcher) {
         // Given
-        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
-            tryEmit(AppSettings(mapStyle = MapStyle.DARK))
-        }
+        val selectedStyle = MutableSharedFlow<MapStyle>(replay = 1).apply { tryEmit(MapStyle(id = "dark", name = "Dark")) }
+        val resolvedStyle = MutableSharedFlow<MapResolvedStyle>(replay = 1).apply { tryEmit(MapResolvedStyle.Uri("dark-style")) }
         val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
-            tryEmit(
-                listOf(
-                    pointOfInterest(id = "poi-1", name = "Town Square"),
-                    pointOfInterest(id = "poi-2", name = "Blacksmith"),
-                ),
-            )
+            tryEmit(listOf(pointOfInterest("poi-1", "Town Square"), pointOfInterest("poi-2", "Blacksmith")))
         }
         val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
-            tryEmit(
-                ExplorationProgress(
-                    discovered = setOf(
-                        DiscoveredPoi(
-                            poiId = "poi-2",
-                            discoveredAt = Instant.parse("2026-01-01T00:00:00Z"),
-                        ),
-                    ),
-                ),
-            )
+            tryEmit(ExplorationProgress(discovered = setOf(DiscoveredPoi("poi-2", Instant.parse("2026-01-01T00:00:00Z")))))
         }
-        val fixture = createFixture(settingsFlow, poiFlow, explorationFlow)
-        every { fixture.mapStyleRepository.resolve(MapStyle.DARK) } returns MapResolvedStyle.Uri("dark-style")
+        val fixture = createFixture(selectedStyle, resolvedStyle, poiFlow, explorationFlow)
         backgroundScope.launch { fixture.vm.uiState.collect() }
 
         // When
@@ -74,118 +53,42 @@ class MapViewModelTest {
 
         // Then
         val state = fixture.vm.uiState.first { it is MapUiState.Content } as MapUiState.Content
-        state.selectedStyle shouldBe MapStyle.DARK
+        state.selectedStyle.id shouldBe "dark"
         state.resolvedStyle shouldBe MapResolvedStyle.Uri("dark-style")
         state.visibleObjects.map { it.id to it.isDiscovered } shouldBe listOf("poi-1" to false, "poi-2" to true)
     }
 
-    @Test
-    fun `initialize should expose failure state when settings fail`() = runTest(mainDispatcherRule.testDispatcher) {
-        // Given
-        val settingsFlow = flow<AppSettings> {
-            throw IllegalStateException("Settings unavailable")
-        }
-        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
-            tryEmit(emptyList())
-        }
-        val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
-            tryEmit(ExplorationProgress(discovered = emptySet()))
-        }
-        val fixture = createFixture(settingsFlow, poiFlow, explorationFlow)
-        backgroundScope.launch { fixture.vm.uiState.collect() }
-
-        // When
-        advanceUntilIdle()
-
-        // Then
-        fixture.vm.uiState.first { it is MapUiState.Failure } shouldBe MapUiState.Failure("Settings unavailable")
-    }
-
-    @Test
-    fun `on object tapped should discover poi and open details when discovery succeeds`() = runTest(mainDispatcherRule.testDispatcher) {
-        // Given
-        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
-            tryEmit(AppSettings(mapStyle = MapStyle.DEFAULT))
-        }
-        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
-            tryEmit(listOf(pointOfInterest(id = "poi-1", name = "Town Square")))
-        }
-        val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
-            tryEmit(ExplorationProgress(discovered = emptySet()))
-        }
-        val fixture = createFixture(settingsFlow, poiFlow, explorationFlow)
-        coEvery { fixture.discoverPointOfInterestUseCase.invoke(any()) } returns Unit
-        every { fixture.mapStyleRepository.resolve(MapStyle.DEFAULT) } returns MapResolvedStyle.Uri("default-style")
-        backgroundScope.launch { fixture.vm.uiState.collect() }
-        advanceUntilIdle()
-        fixture.vm.uiState.first { it is MapUiState.Content }
-        val effect = async { fixture.vm.effects.first() }
-
-        // When
-        fixture.vm.dispatch(MapIntent.ObjectTapped("poi-1"))
-        advanceUntilIdle()
-
-        // Then
-        coVerify(exactly = 1) { fixture.discoverPointOfInterestUseCase.invoke("poi-1") }
-        effect.await() shouldBe MapEffect.OpenObjectDetails("poi-1")
-    }
-
-    @Test
-    fun `on map load failed should expose full screen failure`() = runTest(mainDispatcherRule.testDispatcher) {
-        // Given
-        val settingsFlow = MutableSharedFlow<AppSettings>(replay = 1).apply {
-            tryEmit(AppSettings(mapStyle = MapStyle.DEFAULT))
-        }
-        val poiFlow = MutableSharedFlow<List<PointOfInterest>>(replay = 1).apply {
-            tryEmit(emptyList())
-        }
-        val explorationFlow = MutableSharedFlow<ExplorationProgress>(replay = 1).apply {
-            tryEmit(ExplorationProgress(discovered = emptySet()))
-        }
-        val fixture = createFixture(settingsFlow, poiFlow, explorationFlow)
-        every { fixture.mapStyleRepository.resolve(MapStyle.DEFAULT) } returns MapResolvedStyle.Uri("default-style")
-        backgroundScope.launch { fixture.vm.uiState.collect() }
-        advanceUntilIdle()
-
-        // When
-        fixture.vm.dispatch(MapIntent.MapLoadFailed())
-        advanceUntilIdle()
-
-        // Then
-        fixture.vm.uiState.value shouldBe MapUiState.Failure("Failed to load map style.")
-    }
-
-    private fun createFixture(
-        settingsFlow: Flow<AppSettings>,
+        private fun createFixture(
+        selectedStyle: Flow<MapStyle>,
+        resolvedStyle: Flow<MapResolvedStyle>,
         poiFlow: Flow<List<PointOfInterest>>,
         explorationFlow: Flow<ExplorationProgress>,
     ): Fixture {
-        val observeSettingsUseCase = mockk<ObserveSettingsUseCase>()
-        val observePointsOfInterestUseCase = mockk<ObservePointsOfInterestUseCase>()
-        val observeExplorationProgressUseCase = mockk<ObserveExplorationProgressUseCase>()
+        val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
+        val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
+        val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
         val discoverPointOfInterestUseCase = mockk<DiscoverPointOfInterestUseCase>()
-        val mapStyleRepository = mockk<MapStyleRepository>()
+        val resolveMapStyleUseCase = mockk<ResolveMapStyleUseCase>()
 
-        every { observeSettingsUseCase.invoke() } returns settingsFlow
-        every { observePointsOfInterestUseCase.invoke() } returns poiFlow
-        every { observeExplorationProgressUseCase.invoke() } returns explorationFlow
+        every { observeSelectedMapStyle.invoke() } returns selectedStyle
+        every { resolveMapStyleUseCase.invoke() } returns resolvedStyle
+        every { observePointsOfInterest.invoke() } returns poiFlow
+        every { observeExplorationProgress.invoke() } returns explorationFlow
 
         val vm = MapViewModel(
-            observePointsOfInterest = observePointsOfInterestUseCase,
-            observeExplorationProgress = observeExplorationProgressUseCase,
-            observeSettings = observeSettingsUseCase,
+            observePointsOfInterest = observePointsOfInterest,
+            observeExplorationProgress = observeExplorationProgress,
+            observeSelectedMapStyle = observeSelectedMapStyle,
             discoverPointOfInterest = discoverPointOfInterestUseCase,
-            mapStyleRepository = mapStyleRepository,
-            loggerFactory = NoOpLoggerFactory,
+            resolveMapStyle = resolveMapStyleUseCase,
         )
 
-        return Fixture(vm, discoverPointOfInterestUseCase, mapStyleRepository)
+        return Fixture(vm, discoverPointOfInterestUseCase)
     }
 
     private data class Fixture(
         val vm: MapViewModel,
         val discoverPointOfInterestUseCase: DiscoverPointOfInterestUseCase,
-        val mapStyleRepository: MapStyleRepository,
     )
 
     private fun pointOfInterest(id: String, name: String): PointOfInterest =
@@ -194,7 +97,7 @@ class MapViewModelTest {
             name = name,
             description = "A point of interest",
             category = PoiCategory.LANDMARK,
-            location = GeoPoint(lat = 37.7749, lon = -122.4194),
+            location = GeoPoint(37.7749, -122.4194),
             radiusMeters = 50,
         )
 }

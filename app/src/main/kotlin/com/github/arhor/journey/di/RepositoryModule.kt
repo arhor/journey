@@ -8,6 +8,7 @@ import com.github.arhor.journey.data.repository.RoomPointOfInterestRepository
 import com.github.arhor.journey.data.repository.DataStoreHealthSyncCheckpointRepository
 import com.github.arhor.journey.data.repository.HealthConnectPermissionRepositoryImpl
 import com.github.arhor.journey.data.repository.HealthDataSyncRepositoryImpl
+import com.github.arhor.journey.data.repository.MapStyleRepositoryImpl
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import com.github.arhor.journey.domain.repository.ExplorationRepository
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
@@ -15,6 +16,7 @@ import com.github.arhor.journey.domain.repository.HealthDataSyncRepository
 import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
+import com.github.arhor.journey.domain.repository.MapStyleRepository
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import dagger.Binds
 import dagger.Module
@@ -65,5 +67,8 @@ abstract class RepositoryModule {
     abstract fun bindHealthSyncCheckpointRepository(
         impl: DataStoreHealthSyncCheckpointRepository,
     ): HealthSyncCheckpointRepository
-}
 
+    @Binds
+    @Singleton
+    abstract fun bindMapStyleRepository(impl: MapStyleRepositoryImpl): MapStyleRepository
+}

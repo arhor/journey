@@ -1,15 +1,14 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.repository.SettingsRepository
+import com.github.arhor.journey.domain.repository.MapStyleRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SetMapStyleUseCase @Inject constructor(
-    private val settingsRepository: SettingsRepository,
+    private val mapStyleRepository: MapStyleRepository,
 ) {
-    suspend operator fun invoke(style: MapStyle) {
-        settingsRepository.setMapStyle(style)
+    suspend operator fun invoke(styleId: String) {
+        mapStyleRepository.selectStyle(styleId)
     }
 }

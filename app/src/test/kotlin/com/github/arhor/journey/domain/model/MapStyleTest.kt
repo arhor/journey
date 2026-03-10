@@ -6,26 +6,14 @@ import org.junit.Test
 class MapStyleTest {
 
     @Test
-    fun `fromName should return matching enum when stored value is valid`() {
+    fun `default id should remain stable`() {
         // Given
-        val storedValue = "DARK"
+        val defaultId = MapStyle.DEFAULT_ID
 
         // When
-        val style = MapStyle.fromName(storedValue)
+        val style = MapStyle(id = defaultId, name = "Default")
 
         // Then
-        style shouldBe MapStyle.DARK
-    }
-
-    @Test
-    fun `fromName should return default when stored value is invalid`() {
-        // Given
-        val storedValue = "BROKEN_STYLE"
-
-        // When
-        val style = MapStyle.fromName(storedValue)
-
-        // Then
-        style shouldBe MapStyle.DEFAULT
+        style.id shouldBe "default"
     }
 }

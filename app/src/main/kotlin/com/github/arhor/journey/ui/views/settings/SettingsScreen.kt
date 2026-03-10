@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
-import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
 import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
@@ -103,25 +102,25 @@ internal fun SettingsContent(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            MapStyle.entries.forEach { style ->
+            state.availableMapStyles.forEach { style ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .selectable(
-                            selected = state.mapStyle == style,
+                            selected = state.selectedMapStyleId == style.id,
                             enabled = !state.isUpdating,
                             role = Role.RadioButton,
-                            onClick = { dispatch(SettingsIntent.SelectMapStyle(style)) },
+                            onClick = { dispatch(SettingsIntent.SelectMapStyle(style.id)) },
                         ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RadioButton(
-                        selected = state.mapStyle == style,
+                        selected = state.selectedMapStyleId == style.id,
                         onClick = null,
                         enabled = !state.isUpdating,
                     )
                     Text(
-                        text = mapStyleLabel(style),
+                        text = style.name,
                         style = MaterialTheme.typography.bodyLarge,
                     )
                 }
@@ -315,12 +314,3 @@ private fun healthConnectStatusLabel(state: SettingsUiState.Content): String =
     }
 
 
-@Composable
-private fun mapStyleLabel(style: MapStyle): String =
-    when (style) {
-        MapStyle.DEFAULT -> stringResource(R.string.settings_map_style_default)
-        MapStyle.CLASSIC -> stringResource(R.string.settings_map_style_classic)
-        MapStyle.DARK -> stringResource(R.string.settings_map_style_dark)
-        MapStyle.SATELLITE -> stringResource(R.string.settings_map_style_satellite)
-        MapStyle.TERRAIN -> stringResource(R.string.settings_map_style_terrain)
-    }
