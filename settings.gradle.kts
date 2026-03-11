@@ -25,3 +25,5 @@ dependencyResolutionManagement {
 rootProject.name = "journey"
 
 include(":app")
+
+include(":domain")

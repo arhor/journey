@@ -45,25 +45,12 @@ android {
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget = JvmTarget.JVM_17
-        languageVersion = KotlinVersion.KOTLIN_2_3
-        freeCompilerArgs.addAll(
-            "-XXLanguage:+ContextParameters",
-            "-XXLanguage:+PropertyParamAnnotationDefaultTargetMode",
-            "-opt-in=kotlin.contracts.ExperimentalContracts",
-            "-opt-in=kotlin.contracts.ExperimentalExtendedContracts",
-            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-            "-opt-in=kotlinx.coroutines.FlowPreview",
-        )
-    }
-}
-
 dependencies {
     ksp(libs.hilt.android.compiler)
     ksp(libs.androidx.hilt.compiler)
     ksp(libs.androidx.room.compiler)
+
+    implementation(project(":domain"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
