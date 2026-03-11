@@ -1,4 +1,6 @@
-package com.github.arhor.journey.domain.model
+package com.github.arhor.journey.domain.exploration.model
+
+import com.github.arhor.journey.domain.exploration.model.DiscoveredPoi
 
 /**
  * Lightweight exploration state.

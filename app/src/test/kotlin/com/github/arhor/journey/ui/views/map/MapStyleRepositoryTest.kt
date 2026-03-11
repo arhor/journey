@@ -7,7 +7,7 @@ import com.github.arhor.journey.data.mapstyle.MapStyleSelectionLocalDataSource
 import com.github.arhor.journey.data.mapstyle.RemoteMapStyleLocalDataSource
 import com.github.arhor.journey.data.mapstyle.RemoteMapStyleRemoteDataSource
 import com.github.arhor.journey.data.repository.MapStyleRepositoryImpl
-import com.github.arhor.journey.domain.model.MapResolvedStyle
+import com.github.arhor.journey.domain.map.model.MapResolvedStyle
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify

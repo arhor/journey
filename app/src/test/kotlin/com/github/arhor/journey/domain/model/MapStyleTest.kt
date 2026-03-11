@@ -1,5 +1,6 @@
 package com.github.arhor.journey.domain.model
 
+import com.github.arhor.journey.domain.map.model.MapStyle
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 

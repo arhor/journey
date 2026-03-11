@@ -1,12 +1,12 @@
 package com.github.arhor.journey.ui.views.map
 
-import com.github.arhor.journey.domain.model.DiscoveredPoi
-import com.github.arhor.journey.domain.model.ExplorationProgress
-import com.github.arhor.journey.domain.model.GeoPoint
-import com.github.arhor.journey.domain.model.MapResolvedStyle
-import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.model.PoiCategory
-import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.exploration.model.DiscoveredPoi
+import com.github.arhor.journey.domain.exploration.model.ExplorationProgress
+import com.github.arhor.journey.domain.exploration.model.GeoPoint
+import com.github.arhor.journey.domain.map.model.MapResolvedStyle
+import com.github.arhor.journey.domain.map.model.MapStyle
+import com.github.arhor.journey.domain.exploration.model.PoiCategory
+import com.github.arhor.journey.domain.exploration.model.PointOfInterest
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase

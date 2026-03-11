@@ -1,10 +1,10 @@
 package com.github.arhor.journey.ui.views.settings
 
-import com.github.arhor.journey.domain.model.ActivityLogEntry
-import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.activity.model.ActivityLogEntry
+import com.github.arhor.journey.domain.settings.model.AppSettings
+import com.github.arhor.journey.domain.settings.model.DistanceUnit
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
-import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
 import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository

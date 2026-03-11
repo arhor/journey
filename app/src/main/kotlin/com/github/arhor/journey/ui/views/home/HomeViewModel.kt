@@ -2,11 +2,11 @@ package com.github.arhor.journey.ui.views.home
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.domain.model.ActivityLogEntry
-import com.github.arhor.journey.domain.model.ActivitySource
-import com.github.arhor.journey.domain.model.ActivityType
-import com.github.arhor.journey.domain.model.Hero
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.ActivityLogEntry
+import com.github.arhor.journey.domain.activity.model.ActivitySource
+import com.github.arhor.journey.domain.activity.model.ActivityType
+import com.github.arhor.journey.domain.player.model.Hero
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import com.github.arhor.journey.domain.progression.ProgressionPolicy
 import com.github.arhor.journey.domain.usecase.LogActivityUseCase
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase

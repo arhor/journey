@@ -1,9 +1,9 @@
 package com.github.arhor.journey.ui.views.settings
 
 import androidx.compose.runtime.Immutable
-import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.settings.model.DistanceUnit
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
-import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
 import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus
 import com.github.arhor.journey.ui.views.settings.model.ImportedActivitySummary

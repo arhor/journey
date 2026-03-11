@@ -1,4 +1,4 @@
-package com.github.arhor.journey.domain.model
+package com.github.arhor.journey.domain.player.model
 
 /**
  * A change applied to [HeroStats].

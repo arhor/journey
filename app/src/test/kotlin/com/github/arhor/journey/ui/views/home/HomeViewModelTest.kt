@@ -1,13 +1,13 @@
 package com.github.arhor.journey.ui.views.home
 
-import com.github.arhor.journey.domain.model.ActivitySource
-import com.github.arhor.journey.domain.model.ActivityType
-import com.github.arhor.journey.domain.model.Hero
-import com.github.arhor.journey.domain.model.HeroStats
+import com.github.arhor.journey.domain.activity.model.ActivitySource
+import com.github.arhor.journey.domain.activity.model.ActivityType
+import com.github.arhor.journey.domain.player.model.Hero
+import com.github.arhor.journey.domain.player.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.progression.ProgressionPolicy
-import com.github.arhor.journey.domain.model.LogActivityResult
+import com.github.arhor.journey.domain.activity.model.LogActivityResult
 import com.github.arhor.journey.domain.usecase.LogActivityUseCase
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCurrentHeroUseCase

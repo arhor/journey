@@ -1,5 +1,7 @@
 package com.github.arhor.journey.domain.model
 
+import com.github.arhor.journey.domain.player.model.StatsDelta
+
 /**
  * A deterministic outcome of some user action (for example logging an activity).
  *

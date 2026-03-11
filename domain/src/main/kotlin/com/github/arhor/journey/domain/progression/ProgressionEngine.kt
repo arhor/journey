@@ -1,10 +1,10 @@
 package com.github.arhor.journey.domain.progression
 
-import com.github.arhor.journey.domain.model.Hero
+import com.github.arhor.journey.domain.player.model.Hero
 import com.github.arhor.journey.domain.model.Progression
 import com.github.arhor.journey.domain.model.ProgressionApplicationResult
 import com.github.arhor.journey.domain.model.Reward
-import com.github.arhor.journey.domain.model.StatsDelta
+import com.github.arhor.journey.domain.player.model.StatsDelta
 import java.time.Instant
 import javax.inject.Inject
 

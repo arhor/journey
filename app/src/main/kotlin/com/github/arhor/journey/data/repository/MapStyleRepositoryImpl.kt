@@ -6,8 +6,8 @@ import com.github.arhor.journey.data.mapstyle.MapStyleResolver
 import com.github.arhor.journey.data.mapstyle.MapStyleSelectionLocalDataSource
 import com.github.arhor.journey.data.mapstyle.RemoteMapStyleLocalDataSource
 import com.github.arhor.journey.data.mapstyle.RemoteMapStyleRemoteDataSource
-import com.github.arhor.journey.domain.model.MapResolvedStyle
-import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.map.model.MapResolvedStyle
+import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStyleRepository
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.Flow

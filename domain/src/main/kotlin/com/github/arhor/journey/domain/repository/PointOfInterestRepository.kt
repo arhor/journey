@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.repository
 
-import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.exploration.model.PointOfInterest
 import kotlinx.coroutines.flow.Flow
 
 interface PointOfInterestRepository {

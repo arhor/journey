@@ -1,8 +1,8 @@
 package com.github.arhor.journey.domain.repository
 
-import com.github.arhor.journey.domain.model.ActivityLogEntry
-import com.github.arhor.journey.domain.model.ActivityLogInsertResult
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.ActivityLogEntry
+import com.github.arhor.journey.domain.activity.model.ActivityLogInsertResult
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import com.github.arhor.journey.domain.model.Reward
 import kotlinx.coroutines.flow.Flow
 

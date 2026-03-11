@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.exploration.model.PointOfInterest
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart

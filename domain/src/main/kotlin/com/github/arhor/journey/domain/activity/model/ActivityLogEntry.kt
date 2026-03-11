@@ -1,4 +1,7 @@
-package com.github.arhor.journey.domain.model
+package com.github.arhor.journey.domain.activity.model
+
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
+import com.github.arhor.journey.domain.model.Reward
 
 /**
  * A single, persisted activity log entry.

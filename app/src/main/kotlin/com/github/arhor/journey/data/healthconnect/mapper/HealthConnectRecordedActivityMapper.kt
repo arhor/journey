@@ -1,9 +1,9 @@
 package com.github.arhor.journey.data.healthconnect.mapper
 
-import com.github.arhor.journey.domain.model.ActivitySource
-import com.github.arhor.journey.domain.model.ActivityType
-import com.github.arhor.journey.domain.model.ImportedActivityMetadata
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.ActivitySource
+import com.github.arhor.journey.domain.activity.model.ActivityType
+import com.github.arhor.journey.domain.activity.model.ImportedActivityMetadata
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import java.security.MessageDigest
 import java.time.Duration
 import java.time.Instant

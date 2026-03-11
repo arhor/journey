@@ -1,4 +1,6 @@
-package com.github.arhor.journey.domain.model
+package com.github.arhor.journey.domain.player.model
+
+import com.github.arhor.journey.domain.player.model.StatsDelta
 
 /**
  * Base, persistent stats for the hero.

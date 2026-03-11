@@ -10,7 +10,7 @@ import com.github.arhor.journey.data.healthconnect.mapper.HealthConnectRecordedA
 import com.github.arhor.journey.data.healthconnect.mapper.HealthConnectSessionInput
 import com.github.arhor.journey.data.healthconnect.mapper.HealthConnectSourceType
 import com.github.arhor.journey.domain.model.HealthDataTimeRange
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import dagger.Lazy
 import javax.inject.Inject
 

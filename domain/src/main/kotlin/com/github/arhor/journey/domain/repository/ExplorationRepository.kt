@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.repository
 
-import com.github.arhor.journey.domain.model.ExplorationProgress
+import com.github.arhor.journey.domain.exploration.model.ExplorationProgress
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 

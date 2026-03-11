@@ -1,9 +1,9 @@
 package com.github.arhor.journey.data.mapper
 
 import com.github.arhor.journey.data.local.db.entity.HeroEntity
-import com.github.arhor.journey.domain.model.Hero
-import com.github.arhor.journey.domain.model.HeroEnergy
-import com.github.arhor.journey.domain.model.HeroStats
+import com.github.arhor.journey.domain.player.model.Hero
+import com.github.arhor.journey.domain.player.model.HeroEnergy
+import com.github.arhor.journey.domain.player.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import java.time.Instant
 

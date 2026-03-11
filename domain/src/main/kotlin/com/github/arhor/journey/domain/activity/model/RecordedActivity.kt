@@ -1,4 +1,4 @@
-package com.github.arhor.journey.domain.model
+package com.github.arhor.journey.domain.activity.model
 
 import java.time.Duration
 import java.time.Instant
@@ -18,4 +18,3 @@ data class RecordedActivity(
     val note: String?,
     val importMetadata: ImportedActivityMetadata? = null,
 )
-

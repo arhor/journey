@@ -10,7 +10,7 @@ import com.github.arhor.journey.domain.model.HealthDataSyncSummary
 import com.github.arhor.journey.domain.model.HealthDataTimeRange
 import com.github.arhor.journey.domain.model.HealthDataType
 import com.github.arhor.journey.domain.model.ImportedHealthEntry
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
 import com.github.arhor.journey.domain.repository.HealthDataSyncRepository
 import com.github.arhor.journey.domain.usecase.ImportActivitiesUseCase

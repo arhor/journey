@@ -1,7 +1,7 @@
 package com.github.arhor.journey.data.mapstyle
 
 import android.content.Context
-import com.github.arhor.journey.domain.model.MapResolvedStyle
+import com.github.arhor.journey.domain.map.model.MapResolvedStyle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import jakarta.inject.Inject
 import kotlinx.serialization.json.Json

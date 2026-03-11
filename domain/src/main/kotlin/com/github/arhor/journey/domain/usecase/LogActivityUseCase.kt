@@ -1,7 +1,7 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.LogActivityResult
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.LogActivityResult
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.progression.ActivityRewardCalculator
 import com.github.arhor.journey.domain.progression.ProgressionEngine

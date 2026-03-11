@@ -1,7 +1,7 @@
 package com.github.arhor.journey.data.healthconnect.mapper
 
-import com.github.arhor.journey.domain.model.ActivitySource
-import com.github.arhor.journey.domain.model.ActivityType
+import com.github.arhor.journey.domain.activity.model.ActivitySource
+import com.github.arhor.journey.domain.activity.model.ActivityType
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.junit.Test

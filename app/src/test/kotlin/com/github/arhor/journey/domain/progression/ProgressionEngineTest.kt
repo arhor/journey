@@ -1,7 +1,7 @@
 package com.github.arhor.journey.domain.progression
 
-import com.github.arhor.journey.domain.model.Hero
-import com.github.arhor.journey.domain.model.HeroStats
+import com.github.arhor.journey.domain.player.model.Hero
+import com.github.arhor.journey.domain.player.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import com.github.arhor.journey.domain.model.Reward
 import io.kotest.matchers.shouldBe

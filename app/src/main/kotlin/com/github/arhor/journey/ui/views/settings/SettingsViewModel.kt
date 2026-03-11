@@ -3,10 +3,10 @@ package com.github.arhor.journey.ui.views.settings
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.viewModelScope
-import com.github.arhor.journey.domain.model.ActivityLogEntry
-import com.github.arhor.journey.domain.model.ActivitySource
-import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.activity.model.ActivityLogEntry
+import com.github.arhor.journey.domain.activity.model.ActivitySource
+import com.github.arhor.journey.domain.settings.model.AppSettings
+import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.domain.model.HealthDataSyncFailure
 import com.github.arhor.journey.domain.model.HealthDataSyncMode

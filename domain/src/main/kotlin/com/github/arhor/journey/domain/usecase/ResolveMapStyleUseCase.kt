@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.MapResolvedStyle
+import com.github.arhor.journey.domain.map.model.MapResolvedStyle
 import com.github.arhor.journey.domain.repository.MapStyleRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject

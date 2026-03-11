@@ -1,7 +1,7 @@
 package com.github.arhor.journey.domain.repository
 
-import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.settings.model.AppSettings
+import com.github.arhor.journey.domain.settings.model.DistanceUnit
 import kotlinx.coroutines.flow.Flow
 
 interface SettingsRepository {

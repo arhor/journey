@@ -8,7 +8,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.arhor.journey.R
-import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.settings.model.DistanceUnit
 import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
 import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus

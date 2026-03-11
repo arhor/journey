@@ -1,6 +1,6 @@
 package com.github.arhor.journey.ui.views.map.renderer
 
-import com.github.arhor.journey.domain.model.LatLng
+import com.github.arhor.journey.ui.views.map.model.LatLng
 import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull

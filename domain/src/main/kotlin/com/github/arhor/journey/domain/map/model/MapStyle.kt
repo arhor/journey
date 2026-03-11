@@ -1,4 +1,4 @@
-package com.github.arhor.journey.domain.model
+package com.github.arhor.journey.domain.map.model
 
 data class MapStyle(
     val id: String,

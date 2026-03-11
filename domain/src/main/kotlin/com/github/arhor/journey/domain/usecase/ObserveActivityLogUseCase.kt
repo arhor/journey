@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.ActivityLogEntry
+import com.github.arhor.journey.domain.activity.model.ActivityLogEntry
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject

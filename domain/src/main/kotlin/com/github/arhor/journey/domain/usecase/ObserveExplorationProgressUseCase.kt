@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.ExplorationProgress
+import com.github.arhor.journey.domain.exploration.model.ExplorationProgress
 import com.github.arhor.journey.domain.repository.ExplorationRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject

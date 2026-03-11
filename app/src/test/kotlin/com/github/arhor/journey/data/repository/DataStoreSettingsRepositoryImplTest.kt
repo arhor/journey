@@ -2,7 +2,7 @@ package com.github.arhor.journey.data.repository
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
-import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.settings.model.DistanceUnit
 import io.kotest.matchers.shouldBe
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi

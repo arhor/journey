@@ -1,7 +1,7 @@
 package com.github.arhor.journey.domain.progression
 
-import com.github.arhor.journey.domain.model.ActivityType
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.ActivityType
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import com.github.arhor.journey.domain.model.Reward
 import javax.inject.Inject
 

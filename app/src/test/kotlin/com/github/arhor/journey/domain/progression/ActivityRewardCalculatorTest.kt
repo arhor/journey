@@ -1,8 +1,8 @@
 package com.github.arhor.journey.domain.progression
 
-import com.github.arhor.journey.domain.model.ActivitySource
-import com.github.arhor.journey.domain.model.ActivityType
-import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.activity.model.ActivitySource
+import com.github.arhor.journey.domain.activity.model.ActivityType
+import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 import java.time.Duration
