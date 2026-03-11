@@ -5,16 +5,18 @@ import androidx.compose.runtime.Stable
 import com.github.arhor.journey.ui.views.map.model.CameraPositionState
 import com.github.arhor.journey.domain.exploration.model.ExplorationProgress
 import com.github.arhor.journey.domain.exploration.model.GeoPoint
-import com.github.arhor.journey.ui.views.map.model.LatLng
-import com.github.arhor.journey.domain.map.model.MapResolvedStyle
+import com.github.arhor.journey.domain.map.model.ResolvedMapStyle
 import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.domain.exploration.model.PointOfInterest
+import com.github.arhor.journey.domain.settings.model.AppSettings
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
-import com.github.arhor.journey.domain.usecase.ResolveMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSelectedStyleUseCase
 import com.github.arhor.journey.ui.MviViewModel
+import com.github.arhor.journey.ui.views.map.model.LatLng
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -48,23 +50,57 @@ private data class State(
 class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
-    private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
+    private val observeSettings: ObserveSettingsUseCase,
+    private val observeAvailableMapStyles: ObserveMapStylesUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
-    private val resolveMapStyle: ResolveMapStyleUseCase,
+    private val observeSelectedStyle: ObserveSelectedStyleUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
     private val _state = MutableStateFlow(State())
 
+    private data class SelectionState(
+        val state: State,
+        val settings: AppSettings,
+        val availableStyles: List<MapStyle>,
+    )
+
+    private data class MapContentState(
+        val resolvedStyle: ResolvedMapStyle,
+        val pointsOfInterest: List<PointOfInterest>,
+        val explorationProgress: ExplorationProgress,
+    )
+
     override fun buildUiState(): Flow<MapUiState> =
         combine(
-            _state,
-            observeSelectedMapStyle(),
-            resolveMapStyle(),
-            observePointsOfInterest(),
-            observeExplorationProgress(),
-            ::intoUiState,
-        ).catch {
+            combine(_state, observeSettings(), observeAvailableMapStyles()) { state, settings, availableStyles ->
+                SelectionState(
+                    state = state,
+                    settings = settings,
+                    availableStyles = availableStyles,
+                )
+            },
+            combine(observeSelectedStyle(), observePointsOfInterest(), observeExplorationProgress()) {
+                    resolvedStyle,
+                    pointsOfInterest,
+                    explorationProgress,
+                ->
+                MapContentState(
+                    resolvedStyle = resolvedStyle,
+                    pointsOfInterest = pointsOfInterest,
+                    explorationProgress = explorationProgress,
+                )
+            },
+        ) { selectionState, mapContentState ->
+            intoUiState(
+                state = selectionState.state,
+                settings = selectionState.settings,
+                availableStyles = selectionState.availableStyles,
+                resolvedStyle = mapContentState.resolvedStyle,
+                pointsOfInterest = mapContentState.pointsOfInterest,
+                explorationProgress = mapContentState.explorationProgress,
+            )
+        }.catch {
             emit(
                 MapUiState.Failure(
                     errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
@@ -149,8 +185,9 @@ class MapViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
-        selectedStyle: MapStyle,
-        resolvedStyle: MapResolvedStyle,
+        settings: AppSettings,
+        availableStyles: List<MapStyle>,
+        resolvedStyle: ResolvedMapStyle,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
     ): MapUiState {
@@ -161,11 +198,14 @@ class MapViewModel @Inject constructor(
         return MapUiState.Content(
             cameraPosition = state.cameraPosition,
             cameraUpdateOrigin = state.cameraUpdateOrigin,
-            selectedStyle = selectedStyle,
+            selectedStyle = availableStyles.resolveSelectedStyle(settings.selectedMapStyleId),
             resolvedStyle = resolvedStyle,
             visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
         )
     }
+
+    private fun List<MapStyle>.resolveSelectedStyle(selectedMapStyleId: String): MapStyle =
+        firstOrNull { it.id == selectedMapStyleId } ?: first { it.id == MapStyle.DEFAULT_ID }
 
     private fun mapObjects(
         pointsOfInterest: List<PointOfInterest>,

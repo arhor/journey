@@ -4,8 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.domain.settings.model.AppSettings
-import com.github.arhor.journey.domain.usecase.ObserveAvailableMapStylesUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
@@ -28,8 +27,7 @@ private data class State(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
-    private val observeAvailableMapStyles: ObserveAvailableMapStylesUseCase,
-    private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
+    private val observeMapStyles: ObserveMapStylesUseCase,
     private val setDistanceUnit: SetDistanceUnitUseCase,
     private val setMapStyle: SetMapStyleUseCase,
 ) : MviViewModel<SettingsUiState, SettingsEffect, SettingsIntent>(
@@ -41,8 +39,7 @@ class SettingsViewModel @Inject constructor(
         combine(
             _state,
             observeSettings(),
-            observeAvailableMapStyles(),
-            observeSelectedMapStyle(),
+            observeMapStyles(),
             ::intoUiState
         ).catch {
             emit(
@@ -65,13 +62,15 @@ class SettingsViewModel @Inject constructor(
         state: State,
         settings: AppSettings,
         availableMapStyles: List<MapStyle>,
-        selectedMapStyle: MapStyle,
     ): SettingsUiState = SettingsUiState.Content(
         isUpdating = state.isUpdating,
         distanceUnit = settings.distanceUnit,
-        selectedMapStyleId = selectedMapStyle.id,
+        selectedMapStyleId = availableMapStyles.resolveSelectedStyleId(settings.selectedMapStyleId),
         availableMapStyles = availableMapStyles,
     )
+
+    private fun List<MapStyle>.resolveSelectedStyleId(selectedMapStyleId: String): String =
+        firstOrNull { it.id == selectedMapStyleId }?.id ?: MapStyle.DEFAULT_ID
 
     private suspend fun onSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
         if (_state.value.isUpdating) {

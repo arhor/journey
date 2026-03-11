@@ -9,4 +9,6 @@ interface SettingsRepository {
     fun observeSettings(): Flow<AppSettings>
 
     suspend fun setDistanceUnit(unit: DistanceUnit)
+
+    suspend fun setSelectedMapStyleId(styleId: String)
 }

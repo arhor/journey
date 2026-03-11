@@ -1,6 +1,6 @@
 package com.github.arhor.journey.di
 
-import com.github.arhor.journey.data.repository.MapStyleRepositoryImpl
+import com.github.arhor.journey.data.repository.MapStylesRepositoryImpl
 import com.github.arhor.journey.data.repository.RoomActivityLogRepository
 import com.github.arhor.journey.data.repository.RoomExplorationRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
@@ -8,7 +8,7 @@ import com.github.arhor.journey.data.repository.RoomPointOfInterestRepository
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import com.github.arhor.journey.domain.repository.ExplorationRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
-import com.github.arhor.journey.domain.repository.MapStyleRepository
+import com.github.arhor.journey.domain.repository.MapStylesRepository
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import dagger.Binds
 import dagger.Module
@@ -38,5 +38,5 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindMapStyleRepository(impl: MapStyleRepositoryImpl): MapStyleRepository
+    abstract fun bindMapStylesRepository(impl: MapStylesRepositoryImpl): MapStylesRepository
 }

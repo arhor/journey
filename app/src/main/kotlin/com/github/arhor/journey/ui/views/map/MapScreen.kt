@@ -18,7 +18,7 @@ import com.github.arhor.journey.ui.components.LoadingIndicator
 import com.github.arhor.journey.ui.views.map.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.ui.views.map.model.LatLng
-import com.github.arhor.journey.domain.map.model.MapResolvedStyle
+import com.github.arhor.journey.domain.map.model.ResolvedMapStyle
 import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
@@ -156,9 +156,9 @@ internal fun MapContent(
     }
 }
 
-private fun MapResolvedStyle.toBaseStyle(): BaseStyle = when (this) {
-    is MapResolvedStyle.Json -> BaseStyle.Json(value)
-    is MapResolvedStyle.Uri -> BaseStyle.Uri(value)
+private fun ResolvedMapStyle.toBaseStyle(): BaseStyle = when (this) {
+    is ResolvedMapStyle.Json -> BaseStyle.Json(value)
+    is ResolvedMapStyle.Uri -> BaseStyle.Uri(value)
 }
 
 private const val CAMERA_SETTLE_DEBOUNCE_MS = 300L
