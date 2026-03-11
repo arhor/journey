@@ -1,13 +1,8 @@
 package com.github.arhor.journey.ui.views.settings
 
 import androidx.compose.runtime.Immutable
-import com.github.arhor.journey.domain.settings.model.DistanceUnit
-import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.domain.map.model.MapStyle
-import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
-import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus
-import com.github.arhor.journey.ui.views.settings.model.ImportedActivitySummary
-import java.time.Instant
+import com.github.arhor.journey.domain.settings.model.DistanceUnit
 
 sealed interface SettingsUiState {
 
@@ -23,13 +18,5 @@ sealed interface SettingsUiState {
         val distanceUnit: DistanceUnit,
         val selectedMapStyleId: String,
         val availableMapStyles: List<MapStyle>,
-        val healthConnectAvailability: HealthConnectAvailability,
-        val healthConnectConnectionStatus: HealthConnectConnectionStatus,
-        val healthConnectPermissionStatus: HealthConnectPermissionStatus,
-        val missingHealthConnectPermissions: Set<String>,
-        val lastSyncTimestamp: Instant?,
-        val isSyncInProgress: Boolean,
-        val importedTodaySummary: ImportedActivitySummary,
-        val importedWeekSummary: ImportedActivitySummary,
     ) : SettingsUiState
 }

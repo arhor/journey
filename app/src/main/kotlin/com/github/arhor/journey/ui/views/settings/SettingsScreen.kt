@@ -1,7 +1,5 @@
 package com.github.arhor.journey.ui.views.settings
 
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,8 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.Button
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -25,14 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.settings.model.DistanceUnit
-import com.github.arhor.journey.domain.model.HealthConnectAvailability
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
-import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
-import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus
-import com.github.arhor.journey.ui.views.settings.model.ImportedActivitySummary
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun SettingsScreen(
@@ -142,114 +135,7 @@ internal fun SettingsContent(
                     )
                 }
             }
-
-            Text(
-                text = stringResource(R.string.settings_health_connect_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = stringResource(R.string.settings_health_connect_data_usage),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = stringResource(R.string.settings_health_connect_import_scope),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = healthConnectStatusLabel(state),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = stringResource(
-                    R.string.settings_health_connect_last_sync,
-                    state.lastSyncTimestamp?.atOffset(ZoneOffset.UTC)?.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                        ?: stringResource(R.string.settings_health_connect_last_sync_never),
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(
-                    onClick = { dispatch(SettingsIntent.ConnectHealthConnect) },
-                    enabled = state.healthConnectAvailability == HealthConnectAvailability.AVAILABLE &&
-                        state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(text = stringResource(R.string.settings_health_connect_connect_action))
-                }
-                Button(
-                    onClick = { dispatch(SettingsIntent.ManageHealthConnectPermissions) },
-                    enabled = state.healthConnectAvailability != HealthConnectAvailability.NOT_SUPPORTED &&
-                        state.healthConnectConnectionStatus != HealthConnectConnectionStatus.CONNECTING,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(text = stringResource(R.string.settings_health_connect_manage_permissions_action))
-                }
-            }
-
-            Button(
-                onClick = { dispatch(SettingsIntent.ManualSyncHealthData) },
-                enabled = state.healthConnectAvailability == HealthConnectAvailability.AVAILABLE &&
-                    !state.isSyncInProgress,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.isSyncInProgress) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.height(20.dp),
-                        strokeWidth = 2.dp,
-                    )
-                }
-                Text(
-                    text = if (state.isSyncInProgress) {
-                        stringResource(R.string.settings_health_connect_manual_sync_loading)
-                    } else {
-                        stringResource(R.string.settings_health_connect_manual_sync_action)
-                    },
-                )
-            }
-
-            ImportSummaryCard(
-                title = stringResource(R.string.settings_health_connect_imported_today_title),
-                summary = state.importedTodaySummary,
-            )
-            ImportSummaryCard(
-                title = stringResource(R.string.settings_health_connect_imported_week_title),
-                summary = state.importedWeekSummary,
-            )
             MapCreditsCard()
-        }
-    }
-}
-
-@Composable
-private fun ImportSummaryCard(
-    title: String,
-    summary: ImportedActivitySummary,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(text = title, style = MaterialTheme.typography.titleSmall)
-            Text(
-                text = stringResource(
-                    R.string.settings_health_connect_imported_summary_activities,
-                    summary.importedActivities,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = stringResource(
-                    R.string.settings_health_connect_imported_summary_steps,
-                    summary.importedSteps,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-            )
         }
     }
 }
@@ -283,34 +169,3 @@ private fun distanceUnitLabel(unit: DistanceUnit): String =
         DistanceUnit.METRIC -> stringResource(R.string.settings_distance_unit_metric)
         DistanceUnit.IMPERIAL -> stringResource(R.string.settings_distance_unit_imperial)
     }
-
-@Composable
-private fun healthConnectStatusLabel(state: SettingsUiState.Content): String =
-    when {
-        state.healthConnectAvailability == HealthConnectAvailability.NEEDS_UPDATE_OR_INSTALL -> {
-            stringResource(R.string.settings_health_connect_status_needs_update)
-        }
-
-        state.healthConnectAvailability == HealthConnectAvailability.NOT_SUPPORTED -> {
-            stringResource(R.string.settings_health_connect_status_not_supported)
-        }
-
-        state.healthConnectConnectionStatus == HealthConnectConnectionStatus.CONNECTED -> {
-            stringResource(R.string.settings_health_connect_status_connected)
-        }
-
-        state.healthConnectPermissionStatus == HealthConnectPermissionStatus.REQUESTING -> {
-            stringResource(R.string.settings_health_connect_status_requesting)
-        }
-
-        state.healthConnectPermissionStatus == HealthConnectPermissionStatus.DENIED -> {
-            stringResource(
-                R.string.settings_health_connect_status_denied,
-                state.missingHealthConnectPermissions.size,
-            )
-        }
-
-        else -> stringResource(R.string.settings_health_connect_status_disconnected)
-    }
-
-

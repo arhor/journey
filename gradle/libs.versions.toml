@@ -5,9 +5,9 @@ composeBom = "2026.02.01"
 coreKtx = "1.17.0"
 datastorePreferences = "1.2.0"
 espressoCore = "3.7.0"
+healthConnectClient = "1.1.0"
 hilt = "2.59.2"
 hiltNavigationCompose = "1.3.0"
-healthConnectClient = "1.1.0-rc01"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 kotestAssertionsCore = "6.1.4"
@@ -16,12 +16,11 @@ kotlinxCoroutinesAndroid = "1.10.2"
 kotlinxSerializationJson = "1.10.0"
 ksp = "2.3.4"
 lifecycleRuntimeKtx = "2.10.0"
+maplibreCompose = "0.12.1"
 materialIconsExtended = "1.7.8"
 mockk = "1.14.9"
-maplibreCompose = "0.12.1"
 navigationCompose = "2.9.7"
 room = "2.8.4"
-workRuntimeKtx = "2.10.5"
 
 [libraries]
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
@@ -60,13 +59,11 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
-androidx-hilt-work = { module = "androidx.hilt:hilt-work", version = "1.3.0" }
-androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-kotlin-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

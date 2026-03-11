@@ -1,6 +1,5 @@
 package com.github.arhor.journey.domain.activity.model
 
-import com.github.arhor.journey.domain.activity.model.RecordedActivity
 import com.github.arhor.journey.domain.model.Reward
 
 /**
@@ -13,4 +12,3 @@ data class ActivityLogEntry(
     val recorded: RecordedActivity,
     val reward: Reward,
 )
-

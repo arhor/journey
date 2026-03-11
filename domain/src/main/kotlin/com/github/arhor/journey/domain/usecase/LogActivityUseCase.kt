@@ -13,11 +13,6 @@ import javax.inject.Inject
 
 /**
  * Logs a new activity and applies its reward to the current hero atomically.
- *
- * MVI consumption sketch:
- * - inject [LogActivityUseCase] into a `@HiltViewModel`
- * - in `handleIntent`, call `logActivityUseCase(recordedActivity)`
- * - update state with the returned [heroAfter] and use [reward]/[levelUps] for transient UI feedback
  */
 class LogActivityUseCase @Inject constructor(
     private val heroRepository: HeroRepository,

@@ -6,9 +6,6 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:ignore="HealthConnectPolicy" />
-    <uses-permission android:name="android.permission.health.READ_STEPS" tools:ignore="HealthConnectPolicy" />
-    <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:ignore="HealthConnectPolicy" />
-    <uses-permission android:name="android.permission.health.READ_SLEEP" tools:ignore="HealthConnectPolicy" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
@@ -24,16 +21,6 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Journey">
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
-        </provider>
 
         <activity
             android:name=".ui.MainActivity"
@@ -42,15 +29,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <activity
-            android:name=".ui.views.settings.HealthConnectPermissionsRationaleActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Journey">
-            <intent-filter>
-                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
             </intent-filter>
         </activity>
 

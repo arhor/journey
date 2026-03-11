@@ -2,7 +2,6 @@ package com.github.arhor.journey.di
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
-import androidx.work.WorkManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -41,11 +40,4 @@ object AppInfrastructureModule {
     @Provides
     @Singleton
     fun provideClock(): Clock = Clock.systemUTC()
-
-    @Provides
-    @Singleton
-    fun provideWorkManager(
-        @ApplicationContext context: Context,
-    ): WorkManager = WorkManager.getInstance(context)
-
 }
