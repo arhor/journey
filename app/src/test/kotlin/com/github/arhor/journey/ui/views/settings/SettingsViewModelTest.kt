@@ -1,7 +1,6 @@
 package com.github.arhor.journey.ui.views.settings
 
 import com.github.arhor.journey.domain.model.ActivityLogEntry
-import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.HealthConnectAvailability

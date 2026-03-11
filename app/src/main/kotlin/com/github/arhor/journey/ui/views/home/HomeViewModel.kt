@@ -2,7 +2,6 @@ package com.github.arhor.journey.ui.views.home
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.core.logging.LoggerFactory
 import com.github.arhor.journey.domain.model.ActivityLogEntry
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.ActivityType
