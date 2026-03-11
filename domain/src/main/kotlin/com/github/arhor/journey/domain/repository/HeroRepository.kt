@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.repository
 
-import com.github.arhor.journey.domain.model.Hero
+import com.github.arhor.journey.domain.player.model.Hero
 import kotlinx.coroutines.flow.Flow
 
 /**
