@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.Hero
+import com.github.arhor.journey.domain.model.LogActivityResult
 import com.github.arhor.journey.domain.model.RecordedActivity
 import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.progression.ActivityRewardCalculator
@@ -10,14 +10,6 @@ import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.TransactionRunner
 import java.time.Clock
 import javax.inject.Inject
-
-data class LogActivityResult(
-    val logEntryId: Long,
-    val reward: Reward,
-    val heroBefore: Hero,
-    val heroAfter: Hero,
-    val levelUps: Int,
-)
 
 /**
  * Logs a new activity and applies its reward to the current hero atomically.

@@ -12,7 +12,7 @@ import com.github.arhor.journey.domain.model.HealthDataType
 import com.github.arhor.journey.domain.repository.HealthConnectAvailabilityRepository
 import com.github.arhor.journey.domain.repository.HealthSyncCheckpointRepository
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCase
-import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCaseResult
+import com.github.arhor.journey.domain.model.SyncHealthDataUseCaseResult
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.time.Clock

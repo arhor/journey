@@ -3,8 +3,6 @@ package com.github.arhor.journey.ui.views.settings
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.viewModelScope
-import com.github.arhor.journey.core.logging.LoggerFactory
-import com.github.arhor.journey.core.logging.NoOpLoggerFactory
 import com.github.arhor.journey.domain.model.ActivityLogEntry
 import com.github.arhor.journey.domain.model.ActivitySource
 import com.github.arhor.journey.domain.model.AppSettings
@@ -24,7 +22,7 @@ import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCase
-import com.github.arhor.journey.domain.usecase.SyncHealthDataUseCaseResult
+import com.github.arhor.journey.domain.model.SyncHealthDataUseCaseResult
 import com.github.arhor.journey.ui.MviViewModel
 import com.github.arhor.journey.ui.views.settings.model.HealthConnectConnectionStatus
 import com.github.arhor.journey.ui.views.settings.model.HealthConnectPermissionStatus

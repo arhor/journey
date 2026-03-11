@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.Hero
+import com.github.arhor.journey.domain.model.ImportActivitiesResult
 import com.github.arhor.journey.domain.model.RecordedActivity
 import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.progression.ActivityRewardCalculator
@@ -12,16 +12,6 @@ import java.time.Clock
 import javax.inject.Inject
 
 private const val DEFAULT_BATCH_SIZE = 100
-
-data class ImportActivitiesResult(
-    val heroBefore: Hero,
-    val heroAfter: Hero,
-    val importedCount: Int,
-    val rewardedCount: Int,
-    val skippedRewardCount: Int,
-    val totalReward: Reward,
-    val totalLevelUps: Int,
-)
 
 /**
  * Imports external activity records in batches while reusing the same reward/progression logic

@@ -10,12 +10,12 @@ data class HeroStats(
     val vitality: Int,
     val dexterity: Int,
     val stamina: Int,
-)
-
-fun HeroStats.apply(delta: StatsDelta): HeroStats =
-    HeroStats(
-        strength = (strength + delta.strength).coerceAtLeast(0),
-        vitality = (vitality + delta.vitality).coerceAtLeast(0),
-        dexterity = (dexterity + delta.dexterity).coerceAtLeast(0),
-        stamina = (stamina + delta.stamina).coerceAtLeast(0),
-    )
+) {
+    operator fun plus(delta: StatsDelta): HeroStats =
+        HeroStats(
+            strength = (strength + delta.strength).coerceAtLeast(0),
+            vitality = (vitality + delta.vitality).coerceAtLeast(0),
+            dexterity = (dexterity + delta.dexterity).coerceAtLeast(0),
+            stamina = (stamina + delta.stamina).coerceAtLeast(0),
+        )
+}

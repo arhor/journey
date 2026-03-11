@@ -12,7 +12,7 @@ import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.progression.ActivityRewardCalculator
 import com.github.arhor.journey.domain.progression.ProgressionEngine
 import com.github.arhor.journey.domain.progression.ProgressionPolicy
-import com.github.arhor.journey.domain.repository.ActivityLogInsertResult
+import com.github.arhor.journey.domain.model.ActivityLogInsertResult
 import com.github.arhor.journey.domain.repository.ActivityLogRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.TransactionRunner

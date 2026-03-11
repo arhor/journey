@@ -19,8 +19,3 @@ data class RecordedActivity(
     val importMetadata: ImportedActivityMetadata? = null,
 )
 
-data class ImportedActivityMetadata(
-    val externalRecordId: String,
-    val originPackageName: String,
-    val timeBoundsHash: String,
-)

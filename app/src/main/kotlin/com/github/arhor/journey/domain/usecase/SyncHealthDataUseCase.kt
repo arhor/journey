@@ -2,11 +2,11 @@ package com.github.arhor.journey.domain.usecase
 
 import com.github.arhor.journey.domain.model.HealthDataSyncFailure
 import com.github.arhor.journey.domain.model.HealthDataSyncMode
-import com.github.arhor.journey.domain.model.HealthDataSyncPayload
 import com.github.arhor.journey.domain.model.HealthDataSyncRequest
 import com.github.arhor.journey.domain.model.HealthDataSyncResult
 import com.github.arhor.journey.domain.model.HealthDataTimeRange
 import com.github.arhor.journey.domain.model.HealthDataType
+import com.github.arhor.journey.domain.model.SyncHealthDataUseCaseResult
 import com.github.arhor.journey.domain.repository.HealthDataSyncRepository
 import com.github.arhor.journey.domain.repository.HealthPermissionRepository
 import javax.inject.Inject
@@ -47,9 +47,3 @@ class SyncHealthDataUseCase @Inject constructor(
     }
 }
 
-sealed interface SyncHealthDataUseCaseResult {
-
-    data class Success(val payload: HealthDataSyncPayload) : SyncHealthDataUseCaseResult
-
-    data class Failure(val reason: HealthDataSyncFailure) : SyncHealthDataUseCaseResult
-}
