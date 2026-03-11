@@ -2,6 +2,7 @@ package com.github.arhor.journey.data.repository
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.edit
+import com.github.arhor.journey.domain.model.DistanceUnit
 import io.kotest.matchers.shouldBe
 import java.io.File
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,11 +22,11 @@ class DataStoreSettingsRepositoryImplTest {
         val repository = DataStoreSettingsRepositoryImpl(dataStore)
 
         // When
-        repository.setDistanceUnit(com.github.arhor.journey.domain.model.DistanceUnit.IMPERIAL)
+        repository.setDistanceUnit(DistanceUnit.IMPERIAL)
         val settings = repository.observeSettings().first()
 
         // Then
-        settings.distanceUnit shouldBe com.github.arhor.journey.domain.model.DistanceUnit.IMPERIAL
+        settings.distanceUnit shouldBe DistanceUnit.IMPERIAL
     }
 
     @Test
@@ -40,6 +41,6 @@ class DataStoreSettingsRepositoryImplTest {
         val settings = repository.observeSettings().first()
 
         // Then
-        settings.distanceUnit shouldBe com.github.arhor.journey.domain.model.DistanceUnit.METRIC
+        settings.distanceUnit shouldBe DistanceUnit.METRIC
     }
 }
