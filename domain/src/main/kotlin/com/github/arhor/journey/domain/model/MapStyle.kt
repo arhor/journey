@@ -12,8 +12,6 @@ data class MapStyle(
     }
 
     companion object {
-        const val DEFAULT_ID = "<default>"
-
         fun bundle(id: String, name: String, value: String) =
             MapStyle(id = id, name = name, type = Type.BUNDLE, value = value)
 

@@ -196,11 +196,9 @@ class MapViewModel @Inject constructor(
     }
 
     private fun List<MapStyle>.resolveSelectedStyle(selectedMapStyleId: String?): MapStyle? =
-        if (selectedMapStyleId != null) {
-            firstOrNull { it.id == selectedMapStyleId }
-        } else {
-            null
-        }
+        selectedMapStyleId
+            ?.let { styleId -> firstOrNull { it.id == styleId } }
+            ?: firstOrNull()
 
     private fun mapObjects(
         pointsOfInterest: List<PointOfInterest>,

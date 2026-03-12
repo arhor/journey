@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.DistanceUnit
-import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -41,8 +40,8 @@ class DataStoreSettingsRepositoryImpl @Inject constructor(
     private val Preferences.distanceUnitPref: DistanceUnit
         get() = this[distanceUnit]?.let(DistanceUnit::fromString) ?: DistanceUnit.METRIC
 
-    private val Preferences.selectedMapStyleIdPref: String
-        get() = this[selectedMapStyleId] ?: MapStyle.DEFAULT_ID
+    private val Preferences.selectedMapStyleIdPref: String?
+        get() = this[selectedMapStyleId]
 
     companion object {
         val distanceUnit = stringPreferencesKey("distance_unit")
