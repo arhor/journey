@@ -9,11 +9,6 @@ import javax.inject.Singleton
 class MapStylesRepositoryImpl @Inject constructor() : MapStylesRepository {
 
     override fun findAll(): List<MapStyle> = DEFAULT_STYLES.values.toList()
-
-    override fun findById(id: String): MapStyle? = DEFAULT_STYLES[id]
-
-    override fun existsById(id: String): Boolean = id in DEFAULT_STYLES
-
     /* ------------------------------------------ Internal implementation ------------------------------------------- */
 
     private companion object {
