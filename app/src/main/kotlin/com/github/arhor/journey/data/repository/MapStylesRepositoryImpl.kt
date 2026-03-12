@@ -7,6 +7,7 @@ import com.github.arhor.journey.core.common.asFailure
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapStyle.Type
 import com.github.arhor.journey.domain.repository.MapStylesRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import jakarta.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,7 @@ data class MapStyleRecord(
 @Singleton
 class MapStylesRepositoryImpl @Inject constructor(
     private val json: Json,
-    private val context: Context,
+    @ApplicationContext private val context: Context,
 ) : MapStylesRepository {
 
     private val path = "map/styles/remote.json"
