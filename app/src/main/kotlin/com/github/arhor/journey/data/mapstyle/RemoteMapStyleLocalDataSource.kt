@@ -35,14 +35,6 @@ class RemoteMapStyleLocalDataSource @Inject constructor(
             }
         }
 
-    suspend fun replaceCachedStyles(styles: List<MapStyleRecord>) {
-        val values = styles.filter { it.source == MapStyleRecord.Source.REMOTE }
-            .map { style -> RemoteStyleCacheRecord(style.id, style.name, style.uri.orEmpty()) }
-        preferencesDataStore.edit { prefs ->
-            prefs[remoteStylesCache] = json.encodeToString(values)
-        }
-    }
-
     @Serializable
     private data class RemoteStyleCacheRecord(
         val id: String,

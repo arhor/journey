@@ -11,7 +11,7 @@ import javax.inject.Inject
  * This is intentionally simple and local-only. Future versions can incorporate distance/steps,
  * user settings, or balancing parameters without changing persistence or UI layers.
  */
-internal class ActivityRewardCalculator @Inject constructor() {
+class ActivityRewardCalculator @Inject constructor() {
 
     private val xpPerMinute: Map<ActivityType, Long> = mapOf(
         ActivityType.WALK to 10L,

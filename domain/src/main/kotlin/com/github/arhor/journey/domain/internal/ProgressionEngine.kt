@@ -2,7 +2,7 @@ package com.github.arhor.journey.domain.internal
 
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.Progression
-import com.github.arhor.journey.domain.model.ProgressionApplicationResult
+import com.github.arhor.journey.domain.internal.ProgressionApplicationResult
 import com.github.arhor.journey.domain.model.Reward
 import com.github.arhor.journey.domain.model.StatsDelta
 import java.time.Instant
@@ -13,7 +13,7 @@ import javax.inject.Inject
  *
  * This stays pure and easy to unit-test: no I/O and no dependency on Android components.
  */
-internal class ProgressionEngine @Inject constructor(
+class ProgressionEngine @Inject constructor(
     private val policy: ProgressionPolicy,
 ) {
 
