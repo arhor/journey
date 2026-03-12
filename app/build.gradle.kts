@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.android.hilt)
@@ -51,6 +48,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(project(":domain"))
+    implementation(project(":core:common"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
