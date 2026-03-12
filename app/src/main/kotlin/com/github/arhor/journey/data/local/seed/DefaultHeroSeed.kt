@@ -26,7 +26,7 @@ object DefaultHeroSeed {
                 level = 1,
                 xpInLevel = 0L,
             ),
-            energy = HeroEnergy(current = 100, max = 100),
+            energy = HeroEnergy(max = 100),
             createdAt = now,
             updatedAt = now,
         )

@@ -22,7 +22,7 @@ fun HeroEntity.toDomain(): Hero =
             xpInLevel = xpInLevel,
         ),
         energy = HeroEnergy(
-            current = energyCurrent,
+            now = energyNow,
             max = energyMax,
         ),
         createdAt = Instant.ofEpochMilli(createdAtMs),
@@ -39,7 +39,7 @@ fun Hero.toEntity(): HeroEntity =
         vitality = stats.vitality,
         dexterity = stats.dexterity,
         stamina = stats.stamina,
-        energyCurrent = energy.now,
+        energyNow = energy.now,
         energyMax = energy.max,
         createdAtMs = createdAt.toEpochMilli(),
         updatedAtMs = updatedAt.toEpochMilli(),

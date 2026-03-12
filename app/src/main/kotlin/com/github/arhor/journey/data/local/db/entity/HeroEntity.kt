@@ -17,7 +17,7 @@ data class HeroEntity(
     val dexterity: Int,
     val stamina: Int,
     @ColumnInfo(name = "energy_current")
-    val energyCurrent: Int,
+    val energyNow: Int,
     @ColumnInfo(name = "energy_max")
     val energyMax: Int,
     @ColumnInfo(name = "created_at_ms")

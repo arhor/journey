@@ -13,7 +13,7 @@ data class Hero(
     val name: String,
     val stats: HeroStats,
     val progression: Progression,
-    val energy: HeroEnergy = HeroEnergy(current = 100, max = 100),
+    val energy: HeroEnergy = HeroEnergy(max = 100),
     val createdAt: Instant,
     val updatedAt: Instant,
 )

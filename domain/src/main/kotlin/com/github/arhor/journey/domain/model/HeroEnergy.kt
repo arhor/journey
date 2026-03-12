@@ -12,5 +12,9 @@ data class HeroEnergy private constructor(
 
             return HeroEnergy(now = clampedNow, max = clampedMax)
         }
+
+        operator fun invoke(max: Int): HeroEnergy {
+            return invoke(max, max)
+        }
     }
 }
