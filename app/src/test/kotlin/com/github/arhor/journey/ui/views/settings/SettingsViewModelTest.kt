@@ -1,14 +1,14 @@
 package com.github.arhor.journey.ui.views.settings
 
 import com.github.arhor.journey.domain.map.model.MapStyle
-import com.github.arhor.journey.domain.repository.MapStylesRepository
-import com.github.arhor.journey.domain.repository.SettingsRepository
+import com.github.arhor.journey.domain.map.repository.MapStylesRepository
+import com.github.arhor.journey.domain.settings.repository.SettingsRepository
 import com.github.arhor.journey.domain.settings.model.AppSettings
 import com.github.arhor.journey.domain.settings.model.DistanceUnit
-import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
-import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
-import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
+import com.github.arhor.journey.domain.map.usecase.ObserveMapStylesUseCase
+import com.github.arhor.journey.domain.settings.usecase.ObserveSettingsUseCase
+import com.github.arhor.journey.domain.settings.usecase.SetDistanceUnitUseCase
+import com.github.arhor.journey.domain.map.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.testutils.MainDispatcherRule
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf

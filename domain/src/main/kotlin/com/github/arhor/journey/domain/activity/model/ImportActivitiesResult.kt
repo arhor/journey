@@ -1,7 +1,7 @@
 package com.github.arhor.journey.domain.activity.model
 
 import com.github.arhor.journey.domain.player.model.Hero
-import com.github.arhor.journey.domain.model.Reward
+import com.github.arhor.journey.domain.player.model.Reward
 
 data class ImportActivitiesResult(
     val heroBefore: Hero,

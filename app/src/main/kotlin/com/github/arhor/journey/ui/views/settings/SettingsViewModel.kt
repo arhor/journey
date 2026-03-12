@@ -4,10 +4,10 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.domain.settings.model.AppSettings
-import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
-import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
-import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
+import com.github.arhor.journey.domain.map.usecase.ObserveMapStylesUseCase
+import com.github.arhor.journey.domain.settings.usecase.ObserveSettingsUseCase
+import com.github.arhor.journey.domain.settings.usecase.SetDistanceUnitUseCase
+import com.github.arhor.journey.domain.map.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow

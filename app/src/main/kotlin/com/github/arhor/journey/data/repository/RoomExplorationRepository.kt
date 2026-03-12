@@ -5,7 +5,7 @@ import com.github.arhor.journey.data.mapper.toDomain
 import com.github.arhor.journey.data.mapper.toEntity
 import com.github.arhor.journey.domain.exploration.model.DiscoveredPoi
 import com.github.arhor.journey.domain.exploration.model.ExplorationProgress
-import com.github.arhor.journey.domain.repository.ExplorationRepository
+import com.github.arhor.journey.domain.exploration.repository.ExplorationRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.time.Instant

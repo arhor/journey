@@ -8,7 +8,7 @@ import com.github.arhor.journey.data.local.db.dao.ActivityLogDao
 import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
 import com.github.arhor.journey.data.local.db.dao.HeroDao
 import com.github.arhor.journey.data.local.db.dao.PoiDao
-import com.github.arhor.journey.domain.repository.TransactionRunner
+import com.github.arhor.journey.domain.TransactionRunner
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

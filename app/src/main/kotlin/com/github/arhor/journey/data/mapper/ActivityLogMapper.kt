@@ -6,7 +6,7 @@ import com.github.arhor.journey.domain.activity.model.ActivitySource
 import com.github.arhor.journey.domain.activity.model.ActivityType
 import com.github.arhor.journey.domain.activity.model.ImportedActivityMetadata
 import com.github.arhor.journey.domain.activity.model.RecordedActivity
-import com.github.arhor.journey.domain.model.Reward
+import com.github.arhor.journey.domain.player.model.Reward
 import java.time.Duration
 import java.time.Instant
 

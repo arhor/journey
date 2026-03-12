@@ -7,10 +7,10 @@ import com.github.arhor.journey.domain.activity.model.ActivitySource
 import com.github.arhor.journey.domain.activity.model.ActivityType
 import com.github.arhor.journey.domain.player.model.Hero
 import com.github.arhor.journey.domain.activity.model.RecordedActivity
-import com.github.arhor.journey.domain.progression.ProgressionPolicy
-import com.github.arhor.journey.domain.usecase.LogActivityUseCase
-import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
-import com.github.arhor.journey.domain.usecase.ObserveCurrentHeroUseCase
+import com.github.arhor.journey.domain.player.progression.ProgressionPolicy
+import com.github.arhor.journey.domain.activity.usecase.LogActivityUseCase
+import com.github.arhor.journey.domain.activity.usecase.ObserveActivityLogUseCase
+import com.github.arhor.journey.domain.player.usecase.ObserveHeroUseCase
 import com.github.arhor.journey.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -34,7 +34,7 @@ private data class State(
 @Stable
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val observeCurrentHero: ObserveCurrentHeroUseCase,
+    private val observeCurrentHero: ObserveHeroUseCase,
     private val observeActivityLog: ObserveActivityLogUseCase,
     private val logActivity: LogActivityUseCase,
     private val progressionPolicy: ProgressionPolicy,

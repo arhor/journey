@@ -7,9 +7,9 @@ import com.github.arhor.journey.data.mapper.toEntity
 import com.github.arhor.journey.domain.activity.model.ActivityLogEntry
 import com.github.arhor.journey.domain.activity.model.ActivitySource
 import com.github.arhor.journey.domain.activity.model.RecordedActivity
-import com.github.arhor.journey.domain.model.Reward
+import com.github.arhor.journey.domain.player.model.Reward
 import com.github.arhor.journey.domain.activity.model.ActivityLogInsertResult
-import com.github.arhor.journey.domain.repository.ActivityLogRepository
+import com.github.arhor.journey.domain.activity.repository.ActivityLogRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject

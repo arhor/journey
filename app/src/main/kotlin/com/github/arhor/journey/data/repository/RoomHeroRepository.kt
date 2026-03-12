@@ -5,7 +5,7 @@ import com.github.arhor.journey.data.local.seed.DefaultHeroSeed
 import com.github.arhor.journey.data.mapper.toDomain
 import com.github.arhor.journey.data.mapper.toEntity
 import com.github.arhor.journey.domain.player.model.Hero
-import com.github.arhor.journey.domain.repository.HeroRepository
+import com.github.arhor.journey.domain.player.repository.HeroRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map

@@ -4,7 +4,7 @@ import com.github.arhor.journey.data.local.db.entity.HeroEntity
 import com.github.arhor.journey.domain.player.model.Hero
 import com.github.arhor.journey.domain.player.model.HeroEnergy
 import com.github.arhor.journey.domain.player.model.HeroStats
-import com.github.arhor.journey.domain.model.Progression
+import com.github.arhor.journey.domain.player.model.Progression
 import java.time.Instant
 
 fun HeroEntity.toDomain(): Hero =

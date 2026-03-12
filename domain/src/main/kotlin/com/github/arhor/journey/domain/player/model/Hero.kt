@@ -1,6 +1,5 @@
 package com.github.arhor.journey.domain.player.model
 
-import com.github.arhor.journey.domain.model.Progression
 import java.time.Instant
 
 /**
