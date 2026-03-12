@@ -1,0 +1,20 @@
+[
+  {
+    "id": "voyager-gl-style",
+    "name": "Voyager",
+    "type": "remote",
+    "value": "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+  },
+  {
+    "id": "positron-gl-style",
+    "name": "Positron",
+    "type": "remote",
+    "value": "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+  },
+  {
+    "id": "dark-matter-gl-style",
+    "name": "Dark Matter",
+    "type": "remote",
+    "value": "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+  }
+]
