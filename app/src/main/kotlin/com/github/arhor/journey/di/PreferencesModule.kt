@@ -8,7 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import com.github.arhor.journey.data.repository.DataStoreSettingsRepositoryImpl
-import com.github.arhor.journey.domain.settings.repository.SettingsRepository
+import com.github.arhor.journey.domain.repository.SettingsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

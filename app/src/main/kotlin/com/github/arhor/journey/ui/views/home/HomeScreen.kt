@@ -31,7 +31,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.R
-import com.github.arhor.journey.domain.activity.model.ActivityType
+import com.github.arhor.journey.domain.model.ActivityType
 import com.github.arhor.journey.ui.components.LoadingIndicator
 
 @Composable

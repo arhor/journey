@@ -1,7 +1,7 @@
 package com.github.arhor.journey.ui.views.home
 
 import androidx.compose.runtime.Immutable
-import com.github.arhor.journey.domain.activity.model.ActivityType
+import com.github.arhor.journey.domain.model.ActivityType
 
 sealed interface HomeUiState {
 

@@ -1,12 +1,12 @@
 package com.github.arhor.journey.data.mapper
 
 import com.github.arhor.journey.data.local.db.entity.ActivityLogEntity
-import com.github.arhor.journey.domain.activity.model.ActivityLogEntry
-import com.github.arhor.journey.domain.activity.model.ActivitySource
-import com.github.arhor.journey.domain.activity.model.ActivityType
-import com.github.arhor.journey.domain.activity.model.ImportedActivityMetadata
-import com.github.arhor.journey.domain.activity.model.RecordedActivity
-import com.github.arhor.journey.domain.player.model.Reward
+import com.github.arhor.journey.domain.model.ActivityLogEntry
+import com.github.arhor.journey.domain.model.ActivitySource
+import com.github.arhor.journey.domain.model.ActivityType
+import com.github.arhor.journey.domain.model.ImportedActivityMetadata
+import com.github.arhor.journey.domain.model.RecordedActivity
+import com.github.arhor.journey.domain.model.Reward
 import java.time.Duration
 import java.time.Instant
 

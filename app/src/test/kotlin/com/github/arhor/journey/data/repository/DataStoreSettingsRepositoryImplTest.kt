@@ -2,8 +2,8 @@ package com.github.arhor.journey.data.repository
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import com.github.arhor.journey.domain.settings.model.AppSettings
-import com.github.arhor.journey.domain.settings.model.DistanceUnit
+import com.github.arhor.journey.domain.model.AppSettings
+import com.github.arhor.journey.domain.model.DistanceUnit
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first

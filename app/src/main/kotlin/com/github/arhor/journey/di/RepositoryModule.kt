@@ -5,11 +5,11 @@ import com.github.arhor.journey.data.repository.RoomActivityLogRepository
 import com.github.arhor.journey.data.repository.RoomExplorationRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
 import com.github.arhor.journey.data.repository.RoomPointOfInterestRepository
-import com.github.arhor.journey.domain.activity.repository.ActivityLogRepository
-import com.github.arhor.journey.domain.exploration.repository.ExplorationRepository
-import com.github.arhor.journey.domain.player.repository.HeroRepository
-import com.github.arhor.journey.domain.map.repository.MapStylesRepository
-import com.github.arhor.journey.domain.exploration.repository.PointOfInterestRepository
+import com.github.arhor.journey.domain.repository.ActivityLogRepository
+import com.github.arhor.journey.domain.repository.ExplorationRepository
+import com.github.arhor.journey.domain.repository.HeroRepository
+import com.github.arhor.journey.domain.repository.MapStylesRepository
+import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

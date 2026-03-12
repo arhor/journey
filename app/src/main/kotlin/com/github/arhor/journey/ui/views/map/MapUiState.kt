@@ -1,9 +1,9 @@
 package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.runtime.Immutable
+import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.model.ResolvedMapStyle
 import com.github.arhor.journey.ui.views.map.model.CameraPositionState
-import com.github.arhor.journey.domain.map.model.ResolvedMapStyle
-import com.github.arhor.journey.domain.map.model.MapStyle
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.ui.views.map.model.MapObjectUiModel
 

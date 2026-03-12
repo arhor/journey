@@ -4,10 +4,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
-import com.github.arhor.journey.domain.map.model.MapStyle
-import com.github.arhor.journey.domain.settings.repository.SettingsRepository
-import com.github.arhor.journey.domain.settings.model.AppSettings
-import com.github.arhor.journey.domain.settings.model.DistanceUnit
+import com.github.arhor.journey.domain.model.AppSettings
+import com.github.arhor.journey.domain.model.DistanceUnit
+import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject

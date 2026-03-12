@@ -1,6 +1,6 @@
 package com.github.arhor.journey.ui.views.settings
 
-import com.github.arhor.journey.domain.settings.model.DistanceUnit
+import com.github.arhor.journey.domain.model.DistanceUnit
 
 sealed interface SettingsIntent {
 

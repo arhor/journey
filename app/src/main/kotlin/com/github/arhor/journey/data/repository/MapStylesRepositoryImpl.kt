@@ -4,11 +4,11 @@ import android.content.Context
 import com.github.arhor.journey.data.mapstyle.BundledMapStyleDataSource
 import com.github.arhor.journey.data.mapstyle.MapStyleRecord
 import com.github.arhor.journey.data.mapstyle.RemoteMapStyleLocalDataSource
-import com.github.arhor.journey.domain.map.model.MapStyle
-import com.github.arhor.journey.domain.map.model.ResolvedMapStyle
-import com.github.arhor.journey.domain.map.repository.MapStylesRepository
-import com.github.arhor.journey.domain.settings.repository.SettingsRepository
-import com.github.arhor.journey.domain.settings.model.AppSettings
+import com.github.arhor.journey.domain.model.AppSettings
+import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.model.ResolvedMapStyle
+import com.github.arhor.journey.domain.repository.MapStylesRepository
+import com.github.arhor.journey.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import jakarta.inject.Inject
 import kotlinx.coroutines.flow.Flow

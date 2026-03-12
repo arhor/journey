@@ -1,8 +1,8 @@
 package com.github.arhor.journey.data.local.seed
 
-import com.github.arhor.journey.domain.exploration.model.GeoPoint
-import com.github.arhor.journey.domain.exploration.model.PoiCategory
-import com.github.arhor.journey.domain.exploration.model.PointOfInterest
+import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.PoiCategory
+import com.github.arhor.journey.domain.model.PointOfInterest
 
 /**
  * Small, local-only demo set of POIs.
