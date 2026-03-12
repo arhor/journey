@@ -7,12 +7,10 @@ import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
-import com.github.arhor.journey.domain.model.ResolvedMapStyle
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.GetAllMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
-import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSelectedStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.ui.MviViewModel
 import com.github.arhor.journey.ui.views.map.model.CameraPositionState
@@ -51,9 +49,8 @@ class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val observeSettings: ObserveSettingsUseCase,
-    private val observeAvailableMapStyles: ObserveMapStylesUseCase,
+    private val getAllMapStyles: GetAllMapStylesUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
-    private val observeSelectedStyle: ObserveSelectedStyleUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -66,27 +63,24 @@ class MapViewModel @Inject constructor(
     )
 
     private data class MapContentState(
-        val resolvedStyle: ResolvedMapStyle,
         val pointsOfInterest: List<PointOfInterest>,
         val explorationProgress: ExplorationProgress,
     )
 
     override fun buildUiState(): Flow<MapUiState> =
         combine(
-            combine(_state, observeSettings(), observeAvailableMapStyles()) { state, settings, availableStyles ->
+            combine(_state, observeSettings()) { state, settings ->
                 SelectionState(
                     state = state,
                     settings = settings,
-                    availableStyles = availableStyles,
+                    availableStyles = getAllMapStyles(),
                 )
             },
-            combine(observeSelectedStyle(), observePointsOfInterest(), observeExplorationProgress()) {
-                    resolvedStyle,
+            combine(observePointsOfInterest(), observeExplorationProgress()) {
                     pointsOfInterest,
                     explorationProgress,
                 ->
                 MapContentState(
-                    resolvedStyle = resolvedStyle,
                     pointsOfInterest = pointsOfInterest,
                     explorationProgress = explorationProgress,
                 )
@@ -96,7 +90,6 @@ class MapViewModel @Inject constructor(
                 state = selectionState.state,
                 settings = selectionState.settings,
                 availableStyles = selectionState.availableStyles,
-                resolvedStyle = mapContentState.resolvedStyle,
                 pointsOfInterest = mapContentState.pointsOfInterest,
                 explorationProgress = mapContentState.explorationProgress,
             )
@@ -187,7 +180,6 @@ class MapViewModel @Inject constructor(
         state: State,
         settings: AppSettings,
         availableStyles: List<MapStyle>,
-        resolvedStyle: ResolvedMapStyle,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
     ): MapUiState {
@@ -199,13 +191,16 @@ class MapViewModel @Inject constructor(
             cameraPosition = state.cameraPosition,
             cameraUpdateOrigin = state.cameraUpdateOrigin,
             selectedStyle = availableStyles.resolveSelectedStyle(settings.selectedMapStyleId),
-            resolvedStyle = resolvedStyle,
             visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
         )
     }
 
-    private fun List<MapStyle>.resolveSelectedStyle(selectedMapStyleId: String): MapStyle =
-        firstOrNull { it.id == selectedMapStyleId } ?: first { it.id == MapStyle.DEFAULT_ID }
+    private fun List<MapStyle>.resolveSelectedStyle(selectedMapStyleId: String?): MapStyle? =
+        if (selectedMapStyleId != null) {
+            firstOrNull { it.id == selectedMapStyleId }
+        } else {
+            null
+        }
 
     private fun mapObjects(
         pointsOfInterest: List<PointOfInterest>,

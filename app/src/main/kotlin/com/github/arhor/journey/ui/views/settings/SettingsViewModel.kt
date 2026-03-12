@@ -3,8 +3,7 @@ package com.github.arhor.journey.ui.views.settings
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
+import com.github.arhor.journey.domain.usecase.GetAllMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
@@ -27,7 +26,7 @@ private data class State(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
-    private val observeMapStyles: ObserveMapStylesUseCase,
+    private val getAllMapStyles: GetAllMapStylesUseCase,
     private val setDistanceUnit: SetDistanceUnitUseCase,
     private val setMapStyle: SetMapStyleUseCase,
 ) : MviViewModel<SettingsUiState, SettingsEffect, SettingsIntent>(
@@ -39,7 +38,6 @@ class SettingsViewModel @Inject constructor(
         combine(
             _state,
             observeSettings(),
-            observeMapStyles(),
             ::intoUiState
         ).catch {
             emit(
@@ -61,16 +59,16 @@ class SettingsViewModel @Inject constructor(
     private fun intoUiState(
         state: State,
         settings: AppSettings,
-        availableMapStyles: List<MapStyle>,
-    ): SettingsUiState = SettingsUiState.Content(
-        isUpdating = state.isUpdating,
-        distanceUnit = settings.distanceUnit,
-        selectedMapStyleId = availableMapStyles.resolveSelectedStyleId(settings.selectedMapStyleId),
-        availableMapStyles = availableMapStyles,
-    )
+    ): SettingsUiState {
+        val availableMapStyles = getAllMapStyles()
 
-    private fun List<MapStyle>.resolveSelectedStyleId(selectedMapStyleId: String): String =
-        firstOrNull { it.id == selectedMapStyleId }?.id ?: MapStyle.DEFAULT_ID
+        return SettingsUiState.Content(
+            isUpdating = state.isUpdating,
+            distanceUnit = settings.distanceUnit,
+            selectedMapStyleId = settings.selectedMapStyleId,
+            availableMapStyles = availableMapStyles,
+        )
+    }
 
     private suspend fun onSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
         if (_state.value.isUpdating) {

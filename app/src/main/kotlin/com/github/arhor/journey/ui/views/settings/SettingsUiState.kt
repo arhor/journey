@@ -16,7 +16,7 @@ sealed interface SettingsUiState {
     data class Content(
         val isUpdating: Boolean,
         val distanceUnit: DistanceUnit,
-        val selectedMapStyleId: String,
+        val selectedMapStyleId: String?,
         val availableMapStyles: List<MapStyle>,
     ) : SettingsUiState
 }

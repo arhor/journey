@@ -2,18 +2,12 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.github.arhor.journey.domain.model.ResolvedMapStyle
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
 import com.github.arhor.journey.ui.views.map.model.CameraPositionState
@@ -62,11 +56,6 @@ internal fun MapContent(
         ),
     )
     val styleState = rememberStyleState()
-    var isMapLoaded by remember { mutableStateOf(false) }
-
-    LaunchedEffect(state.resolvedStyle) {
-        isMapLoaded = false
-    }
 
     LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
         if (state.cameraUpdateOrigin != CameraUpdateOrigin.PROGRAMMATIC) {
@@ -110,54 +99,46 @@ internal fun MapContent(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        key(state.resolvedStyle) {
-            MaplibreMap(
-                modifier = Modifier.fillMaxSize(),
-                baseStyle = state.resolvedStyle.toBaseStyle(),
-                cameraState = cameraState,
-                styleState = styleState,
-                options = MapOptions(
-                    gestureOptions = GestureOptions.Standard,
-                    ornamentOptions = OrnamentOptions.AllDisabled,
-                ),
-                onMapClick = { position, _ ->
-                    dispatch(
-                        MapIntent.MapTapped(
-                            target = LatLng(
-                                latitude = position.latitude,
-                                longitude = position.longitude,
+        state.selectedStyle?.let {
+            key(it) {
+                MaplibreMap(
+                    modifier = Modifier.fillMaxSize(),
+                    baseStyle = when (it.type) {
+                        MapStyle.Type.BUNDLE -> BaseStyle.Json(it.value)
+                        MapStyle.Type.REMOTE -> BaseStyle.Uri(it.value)
+                    },
+                    cameraState = cameraState,
+                    styleState = styleState,
+                    options = MapOptions(
+                        gestureOptions = GestureOptions.Standard,
+                        ornamentOptions = OrnamentOptions.AllDisabled,
+                    ),
+                    onMapClick = { position, _ ->
+                        dispatch(
+                            MapIntent.MapTapped(
+                                target = LatLng(
+                                    latitude = position.latitude,
+                                    longitude = position.longitude,
+                                ),
                             ),
-                        ),
-                    )
-                    org.maplibre.compose.util.ClickResult.Pass
-                },
-                onMapLoadFinished = {
-                    isMapLoaded = true
-                },
-                onMapLoadFailed = { error ->
-                    isMapLoaded = false
-                    dispatch(MapIntent.MapLoadFailed(error))
-                },
-                content = {
-                    MapObjectsRendererAdapter(
-                        objects = state.visibleObjects,
-                        onObjectTapped = { objectId ->
-                            dispatch(MapIntent.ObjectTapped(objectId))
-                        },
-                    )
-                },
-            )
-        }
-
-        if (!isMapLoaded) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                        )
+                        org.maplibre.compose.util.ClickResult.Pass
+                    },
+                    onMapLoadFailed = { error ->
+                        dispatch(MapIntent.MapLoadFailed(error))
+                    },
+                    content = {
+                        MapObjectsRendererAdapter(
+                            objects = state.visibleObjects,
+                            onObjectTapped = { objectId ->
+                                dispatch(MapIntent.ObjectTapped(objectId))
+                            },
+                        )
+                    },
+                )
+            }
         }
     }
-}
-
-private fun ResolvedMapStyle.toBaseStyle(): BaseStyle = when (this) {
-    is ResolvedMapStyle.Json -> BaseStyle.Json(value)
-    is ResolvedMapStyle.Uri -> BaseStyle.Uri(value)
 }
 
 private const val CAMERA_SETTLE_DEBOUNCE_MS = 300L
