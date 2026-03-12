@@ -47,3 +47,68 @@ sealed class State<out T, out E : StateError> {
      */
     data class Failure<out E : StateError>(val error: E) : State<Nothing, E>()
 }
+
+/**
+ * Maps the success payload ([State.Content]) while preserving [State.Loading] and [State.Failure].
+ */
+inline fun <T, E : StateError, R> State<T, E>.map(transform: (T) -> R): State<R, E> =
+    when (this) {
+        State.Loading -> State.Loading
+        is State.Content -> State.Content(transform(data))
+        is State.Failure -> this
+    }
+
+/**
+ * Flat-maps the success payload ([State.Content]) into another [State], preserving
+ * [State.Loading] and [State.Failure].
+ */
+inline fun <T, E : StateError, R> State<T, E>.flatMap(transform: (T) -> State<R, E>): State<R, E> =
+    when (this) {
+        State.Loading -> State.Loading
+        is State.Content -> transform(data)
+        is State.Failure -> this
+    }
+
+/**
+ * Folds a [State] into a single value by providing handlers for each case.
+ */
+inline fun <T, E : StateError, R> State<T, E>.fold(
+    onLoading: () -> R,
+    onContent: (T) -> R,
+    onFailure: (E) -> R,
+): R = when (this) {
+    State.Loading -> onLoading()
+    is State.Content -> onContent(data)
+    is State.Failure -> onFailure(error)
+}
+
+/**
+ * Invokes [block] if this is [State.Content], returning the original [State] unchanged.
+ */
+inline fun <T, E : StateError> State<T, E>.onContent(block: (T) -> Unit): State<T, E> =
+    also { if (it is State.Content) block(it.data) }
+
+/**
+ * Invokes [block] if this is [State.Failure], returning the original [State] unchanged.
+ */
+inline fun <T, E : StateError> State<T, E>.onFailure(block: (E) -> Unit): State<T, E> =
+    also { if (it is State.Failure) block(it.error) }
+
+/**
+ * Invokes [block] if this is [State.Loading], returning the original [State] unchanged.
+ */
+inline fun <T, E : StateError> State<T, E>.onLoading(block: () -> Unit): State<T, E> =
+    also { if (it === State.Loading) block() }
+
+/**
+ * Converts a failure into success by providing a fallback value.
+ * - If [State.Content], returns itself
+ * - If [State.Failure], returns [State.Content] of the fallback
+ * - If [State.Loading], stays loading
+ */
+inline fun <T, E : StateError> State<T, E>.recover(onFailure: (E) -> T): State<T, E> =
+    when (this) {
+        State.Loading -> State.Loading
+        is State.Content -> this
+        is State.Failure -> State.Content(onFailure(error))
+    }
