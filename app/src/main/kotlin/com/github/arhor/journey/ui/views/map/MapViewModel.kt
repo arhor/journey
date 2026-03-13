@@ -110,6 +110,7 @@ class MapViewModel @Inject constructor(
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
+            is MapIntent.RecenterPermissionResolved -> onRecenterPermissionResolved(intent)
         }
     }
 
@@ -120,16 +121,31 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onRecenterClicked() {
+        emitEffect(MapEffect.RequestLocationPermission)
+    }
+
+    private fun onRecenterPermissionResolved(intent: MapIntent.RecenterPermissionResolved) {
+        if (!intent.isGranted) {
+            emitEffect(MapEffect.ShowMessage(LOCATION_PERMISSION_DENIED_MESSAGE))
+            return
+        }
+
+        val location = intent.location
+        if (location == null) {
+            emitEffect(MapEffect.ShowMessage(USER_LOCATION_UNAVAILABLE_MESSAGE))
+            return
+        }
+
         _state.update {
             it.copy(
                 cameraPosition = CameraPositionState(
-                    target = DEFAULT_CAMERA_TARGET,
-                    zoom = DEFAULT_ZOOM,
+                    target = location,
+                    zoom = it.cameraPosition.zoom,
                 ),
                 cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
             )
         }
-        emitEffect(MapEffect.RequestLocationPermission)
+
     }
 
     private fun onMapTapped(intent: MapIntent.MapTapped) {
@@ -249,5 +265,7 @@ class MapViewModel @Inject constructor(
         const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
+        const val LOCATION_PERMISSION_DENIED_MESSAGE = "Location permission denied."
+        const val USER_LOCATION_UNAVAILABLE_MESSAGE = "Current location is unavailable."
     }
 }
