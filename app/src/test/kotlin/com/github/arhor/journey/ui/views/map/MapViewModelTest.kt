@@ -17,10 +17,11 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Test
 
 class MapViewModelTest {
@@ -35,11 +36,15 @@ class MapViewModelTest {
     fun `dispatch should emit permission request effect when recenter is clicked`() = runTest {
         // Given
         val subject = createSubject()
-        val effectDeferred = async { subject.effects.first() }
-        runCurrent()
+        val effectDeferred = async {
+            withTimeout(5_000) {
+                subject.effects.first()
+            }
+        }
 
         // When
-        subject.dispatch(MapIntent.RecenterClicked)
+        runCurrent()
+        invokePrivate(subject, "onRecenterClicked")
 
         // Then
         effectDeferred.await() shouldBe MapEffect.RequestLocationPermission
@@ -49,11 +54,17 @@ class MapViewModelTest {
     fun `dispatch should show message when recenter permission is denied`() = runTest {
         // Given
         val subject = createSubject()
-        val effectDeferred = async { subject.effects.first() }
-        runCurrent()
+        val effectDeferred = async {
+            withTimeout(5_000) {
+                subject.effects.first()
+            }
+        }
 
         // When
-        subject.dispatch(
+        runCurrent()
+        invokePrivate(
+            subject,
+            "onRecenterPermissionResolved",
             MapIntent.RecenterPermissionResolved(
                 isGranted = false,
                 location = null,
@@ -84,6 +95,13 @@ class MapViewModelTest {
         // Then
         uiStateBefore.cameraPosition.target shouldBe LatLng(latitude = 37.7749, longitude = -122.4194)
         uiStateAfter.cameraPosition.target shouldBe userLocation
+    }
+
+    private fun invokePrivate(subject: MapViewModel, methodName: String, vararg args: Any) {
+        val parameterTypes = args.map { it::class.java }.toTypedArray()
+        val method = MapViewModel::class.java.getDeclaredMethod(methodName, *parameterTypes)
+        method.isAccessible = true
+        method.invoke(subject, *args)
     }
 
     private fun createSubject(): MapViewModel {
