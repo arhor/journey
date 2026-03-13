@@ -88,7 +88,6 @@ fun MapRoute(
     MapScreen(
         state = state,
         dispatch = vm::dispatch,
-        isLocationPermissionGranted = isLocationPermissionGranted,
         recenterRequestToken = recenterRequestToken,
     )
 }
@@ -98,9 +97,8 @@ private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_COARSE_LOCATION,
 )
 
-private fun Context.hasLocationPermission(): Boolean =
-    checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
-        PackageManager.PERMISSION_GRANTED ||
+fun Context.hasLocationPermission(): Boolean =
+    checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
 private fun Map<String, Boolean>.hasGrantedLocationPermission(): Boolean =

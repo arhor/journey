@@ -1,7 +1,7 @@
 package com.github.arhor.journey.ui.views.map
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -14,6 +14,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.R
@@ -24,11 +25,11 @@ import com.github.arhor.journey.ui.views.map.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.ui.views.map.model.LatLng
 import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
@@ -52,7 +53,6 @@ import kotlin.time.Duration.Companion.seconds
 fun MapScreen(
     state: MapUiState,
     dispatch: (MapIntent) -> Unit,
-    isLocationPermissionGranted: Boolean,
     recenterRequestToken: Int,
 ) {
     when (state) {
@@ -61,7 +61,6 @@ fun MapScreen(
         is MapUiState.Content -> MapContent(
             state = state,
             dispatch = dispatch,
-            isLocationPermissionGranted = isLocationPermissionGranted,
             recenterRequestToken = recenterRequestToken,
         )
     }
@@ -71,9 +70,9 @@ fun MapScreen(
 internal fun MapContent(
     state: MapUiState.Content,
     dispatch: (MapIntent) -> Unit,
-    isLocationPermissionGranted: Boolean,
     recenterRequestToken: Int,
 ) {
+    val context = LocalContext.current
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
             target = Position(
@@ -84,7 +83,8 @@ internal fun MapContent(
         ),
     )
     val styleState = rememberStyleState()
-    val locationProvider = if (isLocationPermissionGranted) {
+    val hasLocationPermission = context.hasLocationPermission()
+    val locationProvider = if (hasLocationPermission) {
         rememberDefaultLocationProvider()
     } else {
         rememberNullLocationProvider()
@@ -133,8 +133,8 @@ internal fun MapContent(
             }
     }
 
-    LaunchedEffect(recenterRequestToken, isLocationPermissionGranted) {
-        if (!isLocationPermissionGranted || recenterRequestToken <= 0) {
+    LaunchedEffect(recenterRequestToken, hasLocationPermission) {
+        if (!hasLocationPermission || recenterRequestToken <= 0) {
             return@LaunchedEffect
         }
 
@@ -183,7 +183,7 @@ internal fun MapContent(
                     },
                     onMapLoadFailed = { dispatch(MapIntent.MapLoadFailed(it)) },
                 ) {
-                    if (isLocationPermissionGranted && currentUserLocation != null) {
+                    if (hasLocationPermission && currentUserLocation != null) {
                         LocationPuck(
                             idPrefix = USER_LOCATION_PUCK_ID_PREFIX,
                             locationState = userLocationState,
