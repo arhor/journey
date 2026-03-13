@@ -9,7 +9,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class GetAllMapStylesUseCase @Inject constructor(
+class ObserveMapStylesUseCase @Inject constructor(
     private val mapStylesRepository: MapStylesRepository,
 ) {
     operator fun invoke(): StateFlow<Output<List<MapStyle>, MapStylesError>> =

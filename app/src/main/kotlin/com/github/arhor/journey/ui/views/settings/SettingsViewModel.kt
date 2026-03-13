@@ -7,7 +7,7 @@ import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStylesError
-import com.github.arhor.journey.domain.usecase.GetAllMapStylesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
@@ -30,7 +30,7 @@ private data class State(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
-    private val getAllMapStyles: GetAllMapStylesUseCase,
+    private val observeMapStyles: ObserveMapStylesUseCase,
     private val setDistanceUnit: SetDistanceUnitUseCase,
     private val setMapStyle: SetMapStyleUseCase,
 ) : MviViewModel<SettingsUiState, SettingsEffect, SettingsIntent>(
@@ -42,7 +42,7 @@ class SettingsViewModel @Inject constructor(
         combine(
             _state,
             observeSettings(),
-            getAllMapStyles(),
+            observeMapStyles(),
             ::intoUiState
         ).catch {
             emit(

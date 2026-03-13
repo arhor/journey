@@ -5,7 +5,7 @@ import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.GetAllMapStylesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
@@ -35,7 +35,7 @@ class MapViewModelTest {
     private val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
     private val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
     private val observeSettings = mockk<ObserveSettingsUseCase>()
-    private val getAllMapStyles = mockk<GetAllMapStylesUseCase>()
+    private val getAllMapStyles = mockk<ObserveMapStylesUseCase>()
     private val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
 
     @Test

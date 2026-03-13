@@ -10,7 +10,7 @@ import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.repository.MapStylesError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.GetAllMapStylesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
@@ -52,7 +52,7 @@ class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val observeSettings: ObserveSettingsUseCase,
-    private val getAllMapStyles: GetAllMapStylesUseCase,
+    private val observeMapStyles: ObserveMapStylesUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
@@ -72,7 +72,7 @@ class MapViewModel @Inject constructor(
 
     override fun buildUiState(): Flow<MapUiState> =
         combine(
-            combine(_state, observeSettings(), getAllMapStyles()) { state, settings, mapStylesState ->
+            combine(_state, observeSettings(), observeMapStyles()) { state, settings, mapStylesState ->
                 SelectionState(
                     state = state,
                     settings = settings,
