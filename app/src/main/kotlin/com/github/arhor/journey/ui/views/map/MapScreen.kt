@@ -34,6 +34,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.UserLocationState
 import org.maplibre.compose.location.rememberDefaultLocationProvider
 import org.maplibre.compose.location.rememberNullLocationProvider
 import org.maplibre.compose.location.rememberUserLocationState
@@ -72,7 +73,7 @@ internal fun MapContent(
     dispatch: (MapIntent) -> Unit,
     recenterRequestToken: Int,
 ) {
-    val context = LocalContext.current
+    val userLocationState = rememberUserLocationStateInternal()
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
             target = Position(
@@ -83,13 +84,6 @@ internal fun MapContent(
         ),
     )
     val styleState = rememberStyleState()
-    val hasLocationPermission = context.hasLocationPermission()
-    val locationProvider = if (hasLocationPermission) {
-        rememberDefaultLocationProvider()
-    } else {
-        rememberNullLocationProvider()
-    }
-    val userLocationState = rememberUserLocationState(locationProvider)
     val currentUserLocation = userLocationState.location
 
     LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
@@ -133,8 +127,8 @@ internal fun MapContent(
             }
     }
 
-    LaunchedEffect(recenterRequestToken, hasLocationPermission) {
-        if (!hasLocationPermission || recenterRequestToken <= 0) {
+    LaunchedEffect(recenterRequestToken) {
+        if (recenterRequestToken <= 0) {
             return@LaunchedEffect
         }
 
@@ -183,7 +177,7 @@ internal fun MapContent(
                     },
                     onMapLoadFailed = { dispatch(MapIntent.MapLoadFailed(it)) },
                 ) {
-                    if (hasLocationPermission && currentUserLocation != null) {
+                    if (currentUserLocation != null) {
                         LocationPuck(
                             idPrefix = USER_LOCATION_PUCK_ID_PREFIX,
                             locationState = userLocationState,
@@ -219,6 +213,12 @@ internal fun MapContent(
         }
     }
 }
+
+@Composable
+private fun rememberUserLocationStateInternal(): UserLocationState =
+    LocalContext.current
+        .let { if (it.hasLocationPermission()) rememberDefaultLocationProvider() else rememberNullLocationProvider() }
+        .let { rememberUserLocationState(it) }
 
 private const val CAMERA_SETTLE_DEBOUNCE_MS = 300L
 private const val USER_LOCATION_PUCK_ID_PREFIX = "user-location"
