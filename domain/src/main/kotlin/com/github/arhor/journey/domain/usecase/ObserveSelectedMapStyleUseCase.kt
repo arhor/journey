@@ -18,10 +18,12 @@ class ObserveSelectedMapStyleUseCase @Inject constructor(
     operator fun invoke(): Flow<Output<MapStyle?, DomainError>> = combine(
         flow1 = settingsRepository.observeSettings(),
         flow2 = mapStylesRepository.observeMapStyles(),
-    ) { settings, mapStyles ->
+    ) { (_, selectedMapStyleId), mapStyles ->
 
-        settings.selectedMapStyleId
-            ?.let { mapStyles.find { style -> style.id == it } }
-            ?: mapStyles.firstOrNull()
+        if (selectedMapStyleId != null) {
+            mapStyles.firstOrNull { it.id == selectedMapStyleId }
+        } else {
+            mapStyles.firstOrNull()
+        }
     }
 }
