@@ -2,7 +2,6 @@ package com.github.arhor.journey.ui.views.settings
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.core.common.State as AsyncState
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStylesError
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
+import com.github.arhor.journey.core.common.State as AsyncState
 
 @Immutable
 private data class State(
@@ -66,7 +66,6 @@ class SettingsViewModel @Inject constructor(
         mapStylesState: AsyncState<List<MapStyle>, MapStylesError>,
     ): SettingsUiState =
         when (mapStylesState) {
-            AsyncState.Loading -> SettingsUiState.Loading
             is AsyncState.Failure -> SettingsUiState.Failure(
                 errorMessage = mapStylesState.error.message
                     ?: mapStylesState.error.cause?.message

@@ -1,10 +1,11 @@
+@file:Suppress("unused")
+
 package com.github.arhor.journey.core.common
 
 /**
  * Represents the state of an asynchronous or deferred value.
  *
  * `State` models a value that is either:
- * - currently being produced ([Loading]),
  * - successfully available ([Content]),
  * - or failed with a domain-specific error ([Failure]).
  *
@@ -24,16 +25,10 @@ package com.github.arhor.journey.core.common
  *   error can be used where a more general error is expected.
  *
  * ## Type arguments in subtypes
- * - [Loading] uses `Nothing` for both `T` and `E` because it contains neither data nor error.
  * - [Content] uses `Nothing` for `E` because it cannot represent a failure.
  * - [Failure] uses `Nothing` for `T` because it cannot contain successful data.
  */
 sealed class State<out T, out E : StateError> {
-    /**
-     * Indicates that the value is currently being loaded or computed.
-     */
-    data object Loading : State<Nothing, Nothing>()
-
     /**
      * Indicates that the value was produced successfully.
      */
@@ -49,22 +44,19 @@ sealed class State<out T, out E : StateError> {
 }
 
 /**
- * Maps the success payload ([State.Content]) while preserving [State.Loading] and [State.Failure].
+ * Maps the success payload ([State.Content]) while preserving [State.Failure].
  */
 inline fun <T, E : StateError, R> State<T, E>.map(transform: (T) -> R): State<R, E> =
     when (this) {
-        State.Loading -> State.Loading
         is State.Content -> State.Content(transform(value))
         is State.Failure -> this
     }
 
 /**
- * Flat-maps the success payload ([State.Content]) into another [State], preserving
- * [State.Loading] and [State.Failure].
+ * Flat-maps the success payload ([State.Content]) into another [State], preserving [State.Failure].
  */
 inline fun <T, E : StateError, R> State<T, E>.flatMap(transform: (T) -> State<R, E>): State<R, E> =
     when (this) {
-        State.Loading -> State.Loading
         is State.Content -> transform(value)
         is State.Failure -> this
     }
@@ -73,11 +65,9 @@ inline fun <T, E : StateError, R> State<T, E>.flatMap(transform: (T) -> State<R,
  * Folds a [State] into a single value by providing handlers for each case.
  */
 inline fun <T, E : StateError, R> State<T, E>.fold(
-    onLoading: () -> R,
     onContent: (T) -> R,
     onFailure: (E) -> R,
 ): R = when (this) {
-    State.Loading -> onLoading()
     is State.Content -> onContent(value)
     is State.Failure -> onFailure(error)
 }
@@ -95,20 +85,12 @@ inline fun <T, E : StateError> State<T, E>.onFailure(block: (E) -> Unit): State<
     also { if (it is State.Failure) block(it.error) }
 
 /**
- * Invokes [block] if this is [State.Loading], returning the original [State] unchanged.
- */
-inline fun <T, E : StateError> State<T, E>.onLoading(block: () -> Unit): State<T, E> =
-    also { if (it === State.Loading) block() }
-
-/**
  * Converts a failure into success by providing a fallback value.
  * - If [State.Content], returns itself
  * - If [State.Failure], returns [State.Content] of the fallback
- * - If [State.Loading], stays loading
  */
 inline fun <T, E : StateError> State<T, E>.recover(onFailure: (E) -> T): State<T, E> =
     when (this) {
-        State.Loading -> State.Loading
         is State.Content -> this
         is State.Failure -> State.Content(onFailure(error))
     }

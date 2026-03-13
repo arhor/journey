@@ -189,10 +189,6 @@ class MapViewModel @Inject constructor(
             return MapUiState.Failure(errorMessage = errorMessage)
         }
 
-        if (availableStylesState === AsyncState.Loading) {
-            return MapUiState.Loading
-        }
-
         if (availableStylesState is AsyncState.Failure) {
             return MapUiState.Failure(
                 errorMessage = availableStylesState.error.message

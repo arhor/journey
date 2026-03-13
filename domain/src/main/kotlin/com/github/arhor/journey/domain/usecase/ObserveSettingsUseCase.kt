@@ -29,7 +29,6 @@ class ObserveSettingsUseCase @Inject constructor(
         mapStylesState: State<List<MapStyle>, MapStylesError>,
     ): AppSettings =
         when (mapStylesState) {
-            State.Loading -> settings
             is State.Failure -> settings
             is State.Content -> resolveSelectedMapStyleId(settings, mapStylesState.value)
         }

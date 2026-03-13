@@ -13,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -42,7 +41,7 @@ class MapStylesRepositoryImpl @Inject constructor(
 
     private val path = "map/styles/remote.json"
     private val mutex = Mutex()
-    private val mapStyles = MutableStateFlow<State<List<MapStyle>, MapStylesError>>(State.Loading)
+    private val mapStyles = MutableStateFlow<State<List<MapStyle>, MapStylesError>>(State.Content(emptyList()))
 
     init {
         appScope.launch {
@@ -57,8 +56,6 @@ class MapStylesRepositoryImpl @Inject constructor(
 
     private suspend fun loadMapStyles() {
         mutex.withLock {
-            mapStyles.update { State.Loading }
-
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     context.assets.open(path).use {
