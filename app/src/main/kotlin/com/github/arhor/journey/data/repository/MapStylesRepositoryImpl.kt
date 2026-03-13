@@ -2,59 +2,62 @@ package com.github.arhor.journey.data.repository
 
 import android.content.Context
 import com.github.arhor.journey.core.common.State
-import com.github.arhor.journey.core.common.ThrowableStateError
-import com.github.arhor.journey.core.common.asFailure
+import com.github.arhor.journey.di.AppCoroutineScope
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.model.MapStyle.Type
+import com.github.arhor.journey.domain.repository.MapStylesError
 import com.github.arhor.journey.domain.repository.MapStylesRepository
 import jakarta.inject.Inject
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromStream
+import java.io.IOException
 import javax.inject.Singleton
 
 @Serializable
 data class MapStyleRecord(
     val id: String,
     val name: String,
-    val data: String,
+    val value: String,
 )
 
 @Singleton
 class MapStylesRepositoryImpl @Inject constructor(
     private val json: Json,
     private val context: Context,
+    @AppCoroutineScope private val appScope: CoroutineScope,
 ) : MapStylesRepository {
 
     private val path = "map/styles/remote.json"
     private val mutex = Mutex()
-    private var asset = MutableStateFlow<State<List<MapStyle>, ThrowableStateError>>(State.Loading)
+    private val mapStyles = MutableStateFlow<State<List<MapStyle>, MapStylesError>>(State.Loading)
 
     init {
-        runBlocking {
-            initialize()
+        appScope.launch {
+            loadMapStyles()
         }
     }
 
-    val data: StateFlow<State<List<MapStyle>, ThrowableStateError>>
-        get() = asset.asStateFlow()
+    override fun observeMapStyles(): StateFlow<State<List<MapStyle>, MapStylesError>> =
+        mapStyles.asStateFlow()
 
-    suspend fun initialize() {
+    /* ------------------------------------------ Internal implementation ------------------------------------------- */
+
+    private suspend fun loadMapStyles() {
         mutex.withLock {
-            if (asset.value is State.Content) {
-                return
-            }
+            mapStyles.update { State.Loading }
 
-            asset.value = State.Loading
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     context.assets.open(path).use {
@@ -65,46 +68,28 @@ class MapStylesRepositoryImpl @Inject constructor(
                     }
                 }
             }
-            result
-                .map { items ->
-                    items.map {
-                        MapStyle(
-                            id = it.id,
-                            name = it.name,
-                            type = Type.REMOTE,
-                            value = it.data
-                        )
-                    }
-                }
-                .onSuccess { asset.value = State.Content(it) }
-                .onFailure { asset.value = it.asFailure() }
+
+            mapStyles.value = result.fold(
+                onSuccess = { State.Content(it.toMapStylesValue()) },
+                onFailure = { State.Failure(it.toMapStylesError()) }
+            )
+
         }
     }
 
-    override fun findAll(): List<MapStyle> = DEFAULT_STYLES.values.toList()
-    /* ------------------------------------------ Internal implementation ------------------------------------------- */
+    private fun List<MapStyleRecord>.toMapStylesValue(): List<MapStyle> =
+        map {
+            MapStyle.remote(
+                id = it.id,
+                name = it.name,
+                value = it.value
+            )
+        }
 
-    private companion object {
-        private val MAP_STYLE_VOYAGER = MapStyle.remote(
-            id = "voyager-gl-style",
-            name = "Voyager",
-            value = "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json",
-        )
-        private val MAP_STYLE_POSITRON = MapStyle.remote(
-            id = "positron-gl-style",
-            name = "Positron",
-            value = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-        )
-        private val MAP_STYLE_DARK_MATTER = MapStyle.remote(
-            id = "dark-matter-gl-style",
-            name = "Dark Matter",
-            value = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-        )
-
-        val DEFAULT_STYLES = listOf(
-            MAP_STYLE_VOYAGER,
-            MAP_STYLE_POSITRON,
-            MAP_STYLE_DARK_MATTER,
-        ).associateBy { it.id }
-    }
+    private fun Throwable.toMapStylesError(): MapStylesError =
+        when (this) {
+            is SerializationException -> MapStylesError.DeserializationFailure(cause = this)
+            is IOException -> MapStylesError.AssetReadFailure(cause = this)
+            else -> MapStylesError.UnknownFailure(cause = this)
+        }
 }

@@ -2,7 +2,10 @@ package com.github.arhor.journey.ui.views.settings
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.common.State as AsyncState
 import com.github.arhor.journey.domain.model.AppSettings
+import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.repository.MapStylesError
 import com.github.arhor.journey.domain.usecase.GetAllMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
@@ -38,6 +41,7 @@ class SettingsViewModel @Inject constructor(
         combine(
             _state,
             observeSettings(),
+            getAllMapStyles(),
             ::intoUiState
         ).catch {
             emit(
@@ -59,16 +63,22 @@ class SettingsViewModel @Inject constructor(
     private fun intoUiState(
         state: State,
         settings: AppSettings,
-    ): SettingsUiState {
-        val availableMapStyles = getAllMapStyles()
-
-        return SettingsUiState.Content(
-            isUpdating = state.isUpdating,
-            distanceUnit = settings.distanceUnit,
-            selectedMapStyleId = settings.selectedMapStyleId,
-            availableMapStyles = availableMapStyles,
-        )
-    }
+        mapStylesState: AsyncState<List<MapStyle>, MapStylesError>,
+    ): SettingsUiState =
+        when (mapStylesState) {
+            AsyncState.Loading -> SettingsUiState.Loading
+            is AsyncState.Failure -> SettingsUiState.Failure(
+                errorMessage = mapStylesState.error.message
+                    ?: mapStylesState.error.cause?.message
+                    ?: SETTINGS_LOADING_FAILED_MESSAGE,
+            )
+            is AsyncState.Content -> SettingsUiState.Content(
+                isUpdating = state.isUpdating,
+                distanceUnit = settings.distanceUnit,
+                selectedMapStyleId = settings.selectedMapStyleId,
+                availableMapStyles = mapStylesState.value,
+            )
+        }
 
     private suspend fun onSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
         if (_state.value.isUpdating) {

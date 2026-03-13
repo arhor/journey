@@ -2,11 +2,13 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.common.State as AsyncState
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.repository.MapStylesError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetAllMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
@@ -59,7 +61,7 @@ class MapViewModel @Inject constructor(
     private data class SelectionState(
         val state: State,
         val settings: AppSettings,
-        val availableStyles: List<MapStyle>,
+        val availableStylesState: AsyncState<List<MapStyle>, MapStylesError>,
     )
 
     private data class MapContentState(
@@ -69,11 +71,11 @@ class MapViewModel @Inject constructor(
 
     override fun buildUiState(): Flow<MapUiState> =
         combine(
-            combine(_state, observeSettings()) { state, settings ->
+            combine(_state, observeSettings(), getAllMapStyles()) { state, settings, mapStylesState ->
                 SelectionState(
                     state = state,
                     settings = settings,
-                    availableStyles = getAllMapStyles(),
+                    availableStylesState = mapStylesState,
                 )
             },
             combine(observePointsOfInterest(), observeExplorationProgress()) {
@@ -89,7 +91,7 @@ class MapViewModel @Inject constructor(
             intoUiState(
                 state = selectionState.state,
                 settings = selectionState.settings,
-                availableStyles = selectionState.availableStyles,
+                availableStylesState = selectionState.availableStylesState,
                 pointsOfInterest = mapContentState.pointsOfInterest,
                 explorationProgress = mapContentState.explorationProgress,
             )
@@ -179,13 +181,27 @@ class MapViewModel @Inject constructor(
     private fun intoUiState(
         state: State,
         settings: AppSettings,
-        availableStyles: List<MapStyle>,
+        availableStylesState: AsyncState<List<MapStyle>, MapStylesError>,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
     ): MapUiState {
         state.failureMessage?.let { errorMessage ->
             return MapUiState.Failure(errorMessage = errorMessage)
         }
+
+        if (availableStylesState === AsyncState.Loading) {
+            return MapUiState.Loading
+        }
+
+        if (availableStylesState is AsyncState.Failure) {
+            return MapUiState.Failure(
+                errorMessage = availableStylesState.error.message
+                    ?: availableStylesState.error.cause?.message
+                    ?: MAP_LOADING_FAILED_MESSAGE,
+            )
+        }
+
+        val availableStyles = (availableStylesState as AsyncState.Content).value
 
         return MapUiState.Content(
             cameraPosition = state.cameraPosition,

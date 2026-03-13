@@ -1,5 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.State
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStylesRepository
 import com.github.arhor.journey.domain.repository.SettingsRepository
@@ -7,6 +8,7 @@ import io.mockk.coJustRun
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -28,7 +30,9 @@ class SetMapStyleUseCaseTest {
             name = "Voyager",
             value = "https://example.com/voyager.json",
         )
-        every { mapStylesRepository.findAll() } returns listOf(selectedStyle)
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(
+            State.Content(listOf(selectedStyle)),
+        )
         coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
 
         // When
@@ -51,7 +55,9 @@ class SetMapStyleUseCaseTest {
             name = "Positron",
             value = "https://example.com/positron.json",
         )
-        every { mapStylesRepository.findAll() } returns listOf(firstStyle, secondStyle)
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(
+            State.Content(listOf(firstStyle, secondStyle)),
+        )
         coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
 
         // When
@@ -64,11 +70,26 @@ class SetMapStyleUseCaseTest {
     @Test
     fun `invoke should skip persistence when no styles are available`() = runTest {
         // Given
-        every { mapStylesRepository.findAll() } returns emptyList()
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(
+            State.Content(emptyList()),
+        )
         coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
 
         // When
         subject("missing-style")
+
+        // Then
+        coVerify(exactly = 0) { settingsRepository.setSelectedMapStyleId(any()) }
+    }
+
+    @Test
+    fun `invoke should skip persistence when map styles are still loading`() = runTest {
+        // Given
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(State.Loading)
+        coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
+
+        // When
+        subject("voyager")
 
         // Then
         coVerify(exactly = 0) { settingsRepository.setSelectedMapStyleId(any()) }

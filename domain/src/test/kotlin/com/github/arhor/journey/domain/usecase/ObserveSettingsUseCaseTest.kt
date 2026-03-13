@@ -1,5 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.State
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.MapStyle
@@ -12,6 +13,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -44,7 +46,9 @@ class ObserveSettingsUseCaseTest {
                 selectedMapStyleId = null,
             ),
         )
-        every { mapStylesRepository.findAll() } returns listOf(firstStyle, secondStyle)
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(
+            State.Content(listOf(firstStyle, secondStyle)),
+        )
         coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
 
         // When
@@ -69,7 +73,9 @@ class ObserveSettingsUseCaseTest {
                 selectedMapStyleId = "unknown-style",
             ),
         )
-        every { mapStylesRepository.findAll() } returns listOf(firstStyle)
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(
+            State.Content(listOf(firstStyle)),
+        )
         coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
 
         // When
@@ -99,7 +105,9 @@ class ObserveSettingsUseCaseTest {
                 selectedMapStyleId = selectedStyle.id,
             ),
         )
-        every { mapStylesRepository.findAll() } returns listOf(selectedStyle, anotherStyle)
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(
+            State.Content(listOf(selectedStyle, anotherStyle)),
+        )
         coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
 
         // When
@@ -119,7 +127,9 @@ class ObserveSettingsUseCaseTest {
                 selectedMapStyleId = null,
             ),
         )
-        every { mapStylesRepository.findAll() } returns emptyList()
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(
+            State.Content(emptyList()),
+        )
         coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
 
         // When
@@ -127,6 +137,26 @@ class ObserveSettingsUseCaseTest {
 
         // Then
         result.selectedMapStyleId shouldBe null
+        coVerify(exactly = 0) { settingsRepository.setSelectedMapStyleId(any()) }
+    }
+
+    @Test
+    fun `invoke should keep selected style unchanged when map styles are loading`() = runTest {
+        // Given
+        every { settingsRepository.observeSettings() } returns flowOf(
+            AppSettings(
+                distanceUnit = DistanceUnit.METRIC,
+                selectedMapStyleId = "voyager",
+            ),
+        )
+        every { mapStylesRepository.observeMapStyles() } returns MutableStateFlow(State.Loading)
+        coJustRun { settingsRepository.setSelectedMapStyleId(any()) }
+
+        // When
+        val result = subject().first()
+
+        // Then
+        result.selectedMapStyleId shouldBe "voyager"
         coVerify(exactly = 0) { settingsRepository.setSelectedMapStyleId(any()) }
     }
 }

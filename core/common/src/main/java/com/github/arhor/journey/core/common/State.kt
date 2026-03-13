@@ -37,7 +37,7 @@ sealed class State<out T, out E : StateError> {
     /**
      * Indicates that the value was produced successfully.
      */
-    data class Content<out T>(val data: T) : State<T, Nothing>()
+    data class Content<out T>(val value: T) : State<T, Nothing>()
 
     /**
      * Indicates that producing the value failed.
@@ -54,7 +54,7 @@ sealed class State<out T, out E : StateError> {
 inline fun <T, E : StateError, R> State<T, E>.map(transform: (T) -> R): State<R, E> =
     when (this) {
         State.Loading -> State.Loading
-        is State.Content -> State.Content(transform(data))
+        is State.Content -> State.Content(transform(value))
         is State.Failure -> this
     }
 
@@ -65,7 +65,7 @@ inline fun <T, E : StateError, R> State<T, E>.map(transform: (T) -> R): State<R,
 inline fun <T, E : StateError, R> State<T, E>.flatMap(transform: (T) -> State<R, E>): State<R, E> =
     when (this) {
         State.Loading -> State.Loading
-        is State.Content -> transform(data)
+        is State.Content -> transform(value)
         is State.Failure -> this
     }
 
@@ -78,7 +78,7 @@ inline fun <T, E : StateError, R> State<T, E>.fold(
     onFailure: (E) -> R,
 ): R = when (this) {
     State.Loading -> onLoading()
-    is State.Content -> onContent(data)
+    is State.Content -> onContent(value)
     is State.Failure -> onFailure(error)
 }
 
@@ -86,7 +86,7 @@ inline fun <T, E : StateError, R> State<T, E>.fold(
  * Invokes [block] if this is [State.Content], returning the original [State] unchanged.
  */
 inline fun <T, E : StateError> State<T, E>.onContent(block: (T) -> Unit): State<T, E> =
-    also { if (it is State.Content) block(it.data) }
+    also { if (it is State.Content) block(it.value) }
 
 /**
  * Invokes [block] if this is [State.Failure], returning the original [State] unchanged.
