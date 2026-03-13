@@ -6,6 +6,7 @@ import com.github.arhor.journey.di.AppCoroutineScope
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStylesError
 import com.github.arhor.journey.domain.repository.MapStylesRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import jakarta.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ data class MapStyleRecord(
 @Singleton
 class MapStylesRepositoryImpl @Inject constructor(
     private val json: Json,
+    @ApplicationContext private val context: Context,
     private val context: Context,
     @AppCoroutineScope private val appScope: CoroutineScope,
 ) : MapStylesRepository {
