@@ -2,11 +2,18 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
@@ -19,6 +26,8 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.UserLocationState
 import org.maplibre.compose.map.GestureOptions
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
@@ -28,22 +37,27 @@ import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.absoluteValue
 
-
 @Composable
 fun MapScreen(
     state: MapUiState,
+    userLocationState: UserLocationState?,
     dispatch: (MapIntent) -> Unit,
 ) {
     when (state) {
         is MapUiState.Loading -> LoadingIndicator()
         is MapUiState.Failure -> ErrorMessage(message = state.errorMessage)
-        is MapUiState.Content -> MapContent(state = state, dispatch = dispatch)
+        is MapUiState.Content -> MapContent(
+            state = state,
+            userLocationState = userLocationState,
+            dispatch = dispatch,
+        )
     }
 }
 
 @Composable
 internal fun MapContent(
     state: MapUiState.Content,
+    userLocationState: UserLocationState?,
     dispatch: (MapIntent) -> Unit,
 ) {
     val cameraState = rememberCameraState(
@@ -128,6 +142,14 @@ internal fun MapContent(
                         dispatch(MapIntent.MapLoadFailed(error))
                     },
                     content = {
+                        if (userLocationState != null) {
+                            LocationPuck(
+                                idPrefix = "user-location",
+                                locationState = userLocationState,
+                                cameraState = cameraState,
+                            )
+                        }
+
                         MapObjectsRendererAdapter(
                             objects = state.visibleObjects,
                             onObjectTapped = { objectId ->
@@ -137,6 +159,20 @@ internal fun MapContent(
                     },
                 )
             }
+        }
+
+        FloatingActionButton(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            onClick = {
+                dispatch(MapIntent.RecenterClicked)
+            },
+        ) {
+            Icon(
+                imageVector = Icons.Default.MyLocation,
+                contentDescription = "Recenter",
+            )
         }
     }
 }
