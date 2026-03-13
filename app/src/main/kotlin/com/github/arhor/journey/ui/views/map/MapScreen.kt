@@ -54,7 +54,6 @@ import kotlin.time.Duration.Companion.seconds
 fun MapScreen(
     state: MapUiState,
     dispatch: (MapIntent) -> Unit,
-    recenterRequestToken: Int,
 ) {
     when (state) {
         is MapUiState.Loading -> LoadingIndicator()
@@ -62,7 +61,6 @@ fun MapScreen(
         is MapUiState.Content -> MapContent(
             state = state,
             dispatch = dispatch,
-            recenterRequestToken = recenterRequestToken,
         )
     }
 }
@@ -71,7 +69,6 @@ fun MapScreen(
 internal fun MapContent(
     state: MapUiState.Content,
     dispatch: (MapIntent) -> Unit,
-    recenterRequestToken: Int,
 ) {
     val userLocationState = rememberUserLocationStateInternal()
     val cameraState = rememberCameraState(
@@ -127,8 +124,8 @@ internal fun MapContent(
             }
     }
 
-    LaunchedEffect(recenterRequestToken) {
-        if (recenterRequestToken <= 0) {
+    LaunchedEffect(state.recenterRequestToken) {
+        if (state.recenterRequestToken <= 0) {
             return@LaunchedEffect
         }
 

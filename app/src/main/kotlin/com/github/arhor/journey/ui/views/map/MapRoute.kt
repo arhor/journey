@@ -9,9 +9,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,7 +21,6 @@ fun MapRoute(
 ) {
     val context = LocalContext.current
     val state by vm.uiState.collectAsStateWithLifecycle()
-    var recenterRequestToken by remember { mutableIntStateOf(0) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -46,10 +42,6 @@ fun MapRoute(
                     locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
                 }
 
-                is MapEffect.RecenterOnCurrentLocation -> {
-                    recenterRequestToken += 1
-                }
-
                 is MapEffect.OpenObjectDetails -> {
                     snackbarHostState.showSnackbar("Open details for ${effect.objectId}")
                 }
@@ -60,7 +52,6 @@ fun MapRoute(
     MapScreen(
         state = state,
         dispatch = vm::dispatch,
-        recenterRequestToken = recenterRequestToken,
     )
 }
 

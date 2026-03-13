@@ -20,6 +20,7 @@ sealed interface MapUiState {
     data class Content(
         val cameraPosition: CameraPositionState,
         val cameraUpdateOrigin: CameraUpdateOrigin,
+        val recenterRequestToken: Int,
         val selectedStyle: MapStyle?,
         val visibleObjects: List<MapObjectUiModel>,
     ) : MapUiState

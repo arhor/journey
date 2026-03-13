@@ -41,6 +41,7 @@ private data class State(
         zoom = DEFAULT_ZOOM,
     ),
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+    val recenterRequestToken: Int = 0,
     val isAwaitingLocationPermissionResult: Boolean = false,
     val failureMessage: String? = null,
 )
@@ -96,6 +97,7 @@ class MapViewModel @Inject constructor(
                 MapUiState.Content(
                     cameraPosition = state.cameraPosition,
                     cameraUpdateOrigin = state.cameraUpdateOrigin,
+                    recenterRequestToken = state.recenterRequestToken,
                     selectedStyle = it,
                     visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
                 )
@@ -137,7 +139,9 @@ class MapViewModel @Inject constructor(
         }
 
         if (intent.isGranted) {
-            emitEffect(MapEffect.RecenterOnCurrentLocation)
+            _state.update {
+                it.copy(recenterRequestToken = it.recenterRequestToken + 1)
+            }
         } else {
             emitEffect(MapEffect.ShowMessage(LOCATION_PERMISSION_DENIED_MESSAGE))
         }
