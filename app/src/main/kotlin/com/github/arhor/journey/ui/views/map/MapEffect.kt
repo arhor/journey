@@ -7,6 +7,8 @@ sealed interface MapEffect {
 
     data object RequestLocationPermission : MapEffect
 
+    data object RecenterOnCurrentLocation : MapEffect
+
     data class ShowMessage(
         val message: String,
     ) : MapEffect

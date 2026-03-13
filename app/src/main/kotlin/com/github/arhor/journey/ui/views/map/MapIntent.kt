@@ -16,6 +16,12 @@ sealed interface MapIntent {
 
     data object RecenterClicked : MapIntent
 
+    data class LocationPermissionResult(
+        val isGranted: Boolean,
+    ) : MapIntent
+
+    data object CurrentLocationUnavailable : MapIntent
+
     data class ObjectTapped(
         val objectId: String,
     ) : MapIntent

@@ -42,6 +42,7 @@ private data class State(
         zoom = DEFAULT_ZOOM,
     ),
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+    val isAwaitingLocationPermissionResult: Boolean = false,
     val failureMessage: String? = null,
 )
 
@@ -106,6 +107,8 @@ class MapViewModel @Inject constructor(
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
             is MapIntent.CameraSettled -> onCameraSettled(intent)
+            is MapIntent.CurrentLocationUnavailable -> onCurrentLocationUnavailable()
+            is MapIntent.LocationPermissionResult -> onLocationPermissionResult(intent)
             is MapIntent.MapTapped -> onMapTapped(intent)
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
@@ -121,15 +124,31 @@ class MapViewModel @Inject constructor(
 
     private fun onRecenterClicked() {
         _state.update {
-            it.copy(
-                cameraPosition = CameraPositionState(
-                    target = DEFAULT_CAMERA_TARGET,
-                    zoom = DEFAULT_ZOOM,
-                ),
-                cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
-            )
+            it.copy(isAwaitingLocationPermissionResult = true)
         }
         emitEffect(MapEffect.RequestLocationPermission)
+    }
+
+    private fun onLocationPermissionResult(intent: MapIntent.LocationPermissionResult) {
+        val isAwaitingLocationPermissionResult = _state.value.isAwaitingLocationPermissionResult
+
+        _state.update {
+            it.copy(isAwaitingLocationPermissionResult = false)
+        }
+
+        if (!isAwaitingLocationPermissionResult) {
+            return
+        }
+
+        if (intent.isGranted) {
+            emitEffect(MapEffect.RecenterOnCurrentLocation)
+        } else {
+            emitEffect(MapEffect.ShowMessage(LOCATION_PERMISSION_DENIED_MESSAGE))
+        }
+    }
+
+    private fun onCurrentLocationUnavailable() {
+        emitEffect(MapEffect.ShowMessage(CURRENT_LOCATION_UNAVAILABLE_MESSAGE))
     }
 
     private fun onMapTapped(intent: MapIntent.MapTapped) {
@@ -245,5 +264,9 @@ class MapViewModel @Inject constructor(
         const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
+        const val LOCATION_PERMISSION_DENIED_MESSAGE =
+            "Location permission is required to center the map on your position."
+        const val CURRENT_LOCATION_UNAVAILABLE_MESSAGE =
+            "Current location is not available yet."
     }
 }

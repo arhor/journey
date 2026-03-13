@@ -1,12 +1,22 @@
 package com.github.arhor.journey.ui.views.map
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.ui.components.ErrorMessage
 import com.github.arhor.journey.ui.components.LoadingIndicator
@@ -14,11 +24,18 @@ import com.github.arhor.journey.ui.views.map.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.ui.views.map.model.LatLng
 import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.rememberDefaultLocationProvider
+import org.maplibre.compose.location.rememberNullLocationProvider
+import org.maplibre.compose.location.rememberUserLocationState
 import org.maplibre.compose.map.GestureOptions
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
@@ -27,17 +44,26 @@ import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.absoluteValue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 
 @Composable
 fun MapScreen(
     state: MapUiState,
     dispatch: (MapIntent) -> Unit,
+    isLocationPermissionGranted: Boolean,
+    recenterRequestToken: Int,
 ) {
     when (state) {
         is MapUiState.Loading -> LoadingIndicator()
         is MapUiState.Failure -> ErrorMessage(message = state.errorMessage)
-        is MapUiState.Content -> MapContent(state = state, dispatch = dispatch)
+        is MapUiState.Content -> MapContent(
+            state = state,
+            dispatch = dispatch,
+            isLocationPermissionGranted = isLocationPermissionGranted,
+            recenterRequestToken = recenterRequestToken,
+        )
     }
 }
 
@@ -45,6 +71,8 @@ fun MapScreen(
 internal fun MapContent(
     state: MapUiState.Content,
     dispatch: (MapIntent) -> Unit,
+    isLocationPermissionGranted: Boolean,
+    recenterRequestToken: Int,
 ) {
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
@@ -56,6 +84,13 @@ internal fun MapContent(
         ),
     )
     val styleState = rememberStyleState()
+    val locationProvider = if (isLocationPermissionGranted) {
+        rememberDefaultLocationProvider()
+    } else {
+        rememberNullLocationProvider()
+    }
+    val userLocationState = rememberUserLocationState(locationProvider)
+    val currentUserLocation = userLocationState.location
 
     LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
         if (state.cameraUpdateOrigin != CameraUpdateOrigin.PROGRAMMATIC) {
@@ -98,6 +133,28 @@ internal fun MapContent(
             }
     }
 
+    LaunchedEffect(recenterRequestToken, isLocationPermissionGranted) {
+        if (!isLocationPermissionGranted || recenterRequestToken <= 0) {
+            return@LaunchedEffect
+        }
+
+        val location = userLocationState.location ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
+            snapshotFlow { userLocationState.location }
+                .filterNotNull()
+                .first()
+        }
+
+        if (location == null) {
+            dispatch(MapIntent.CurrentLocationUnavailable)
+            return@LaunchedEffect
+        }
+
+        cameraState.animateTo(
+            finalPosition = cameraState.position.copy(target = location.position),
+            duration = USER_LOCATION_RECENTER_ANIMATION_DURATION,
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         state.selectedStyle?.let {
             key(it) {
@@ -128,6 +185,14 @@ internal fun MapContent(
                         dispatch(MapIntent.MapLoadFailed(error))
                     },
                     content = {
+                        if (isLocationPermissionGranted && currentUserLocation != null) {
+                            LocationPuck(
+                                idPrefix = USER_LOCATION_PUCK_ID_PREFIX,
+                                locationState = userLocationState,
+                                cameraState = cameraState,
+                            )
+                        }
+
                         MapObjectsRendererAdapter(
                             objects = state.visibleObjects,
                             onObjectTapped = { objectId ->
@@ -138,10 +203,30 @@ internal fun MapContent(
                 )
             }
         }
+
+        FloatingActionButton(
+            onClick = { dispatch(MapIntent.RecenterClicked) },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 24.dp,
+                    ),
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.MyLocation,
+                contentDescription = stringResource(R.string.map_recenter_content_description),
+            )
+        }
     }
 }
 
 private const val CAMERA_SETTLE_DEBOUNCE_MS = 300L
+private const val USER_LOCATION_PUCK_ID_PREFIX = "user-location"
+private val USER_LOCATION_TIMEOUT = 5.seconds
+private val USER_LOCATION_RECENTER_ANIMATION_DURATION = 600.milliseconds
 
 private fun areCameraPositionsEquivalent(first: CameraPosition, second: CameraPosition): Boolean {
     return (first.target.latitude - second.target.latitude).absoluteValue < CAMERA_SETTLE_COORDINATE_THRESHOLD &&
