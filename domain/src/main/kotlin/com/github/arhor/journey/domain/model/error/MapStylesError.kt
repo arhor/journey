@@ -1,4 +1,4 @@
-package com.github.arhor.journey.domain.repository
+package com.github.arhor.journey.domain.model.error
 
 import com.github.arhor.journey.core.common.DomainError
 

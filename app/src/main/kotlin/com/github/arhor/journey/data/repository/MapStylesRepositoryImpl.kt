@@ -4,7 +4,7 @@ import android.content.Context
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.di.AppCoroutineScope
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.repository.MapStylesError
+import com.github.arhor.journey.domain.model.error.MapStylesError
 import com.github.arhor.journey.domain.repository.MapStylesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import jakarta.inject.Inject

@@ -2,6 +2,7 @@ package com.github.arhor.journey.domain.repository
 
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.model.error.MapStylesError
 import kotlinx.coroutines.flow.StateFlow
 
 interface MapStylesRepository {

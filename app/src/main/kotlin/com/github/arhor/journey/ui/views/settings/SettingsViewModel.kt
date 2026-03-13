@@ -3,10 +3,12 @@ package com.github.arhor.journey.ui.views.settings
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.combine
 import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.repository.MapStylesError
+import com.github.arhor.journey.domain.model.error.AppSettingsError
+import com.github.arhor.journey.domain.model.error.MapStylesError
 import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
@@ -63,25 +65,27 @@ class SettingsViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
-        settings: AppSettings,
-        mapStylesState: Output<List<MapStyle>, MapStylesError>,
-    ): SettingsUiState = mapStylesState.fold(
-        onSuccess = {
-            SettingsUiState.Content(
-                isUpdating = state.isUpdating,
-                distanceUnit = settings.distanceUnit,
-                selectedMapStyleId = settings.selectedMapStyleId,
-                availableMapStyles = it,
-            )
-        },
-        onFailure = {
-            SettingsUiState.Failure(
-                errorMessage = it.message
-                    ?: it.cause?.message
-                    ?: SETTINGS_LOADING_FAILED_MESSAGE,
-            )
-        },
-    )
+        settingsOutput: Output<AppSettings, AppSettingsError>,
+        mapStylesOutput: Output<List<MapStyle>, MapStylesError>,
+    ): SettingsUiState {
+        return combine(settingsOutput, mapStylesOutput).fold(
+            onSuccess = { (settings, mapStyles) ->
+                SettingsUiState.Content(
+                    isUpdating = state.isUpdating,
+                    distanceUnit = settings.distanceUnit,
+                    selectedMapStyleId = settings.selectedMapStyleId,
+                    availableMapStyles = mapStyles,
+                )
+            },
+            onFailure = {
+                SettingsUiState.Failure(
+                    errorMessage = it.message
+                        ?: it.cause?.message
+                        ?: SETTINGS_LOADING_FAILED_MESSAGE,
+                )
+            },
+        )
+    }
 
     private suspend fun onSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
         if (_state.value.isUpdating) {

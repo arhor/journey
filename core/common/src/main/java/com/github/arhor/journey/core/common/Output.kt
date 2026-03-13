@@ -2,6 +2,10 @@
 
 package com.github.arhor.journey.core.common
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
+
 /**
  * Represents the output of an operation.
  *
@@ -99,6 +103,13 @@ inline fun <T, E : DomainError> Output<T, E>.recover(onFailure: (E) -> T): Outpu
         is Output.Failure -> Output.Success(onFailure(error))
     }
 
+inline fun <T, R, E : DomainError> Flow<T>.toOutputFlow(
+    crossinline onSuccess: (T) -> R,
+    crossinline onFailure: (Throwable) -> E,
+): Flow<Output<R, E>> =
+    this.map<T, Output<R, E>> { Output.Success(onSuccess(it)) }
+        .catch { emit(Output.Failure(onFailure(it))) }
+
 /**
  * Converts this [Throwable] into a typed [Output.Failure] with a given [DomainError].
  *
@@ -109,3 +120,35 @@ fun <T> Throwable.asFailure(): Output<T, DomainError> = Output.Failure(object : 
     override val cause: Throwable = this@asFailure
     override val message: String? = cause.message
 })
+
+/**
+ * Combines two [Output] values that may have different error types.
+ *
+ * If both are [Output.Success], applies [transform] to their values.
+ * If either is [Output.Failure], returns the first failure in left-to-right order.
+ *
+ * [E] is the common supertype of [E1] and [E2]. In the most general case it will be [DomainError].
+ */
+inline fun <A, B, E, E1, E2, R> combine(
+    out1: Output<A, E1>,
+    out2: Output<B, E2>,
+    transform: (A, B) -> R,
+): Output<R, E> where E : DomainError, E1 : E, E2 : E = when (out1) {
+    is Output.Failure -> out1
+    is Output.Success -> when (out2) {
+        is Output.Failure -> out2
+        is Output.Success -> Output.Success(transform(out1.value, out2.value))
+    }
+}
+
+/**
+ * Combines [out1] with [out2] into a [Pair].
+ */
+fun <A, B, E, E1, E2> combine(
+    out1: Output<A, E1>,
+    out2: Output<B, E2>,
+): Output<Pair<A, B>, E> where E : DomainError, E1 : E, E2 : E = combine(
+    out1 = out1,
+    out2 = out2,
+    transform = ::Pair,
+)

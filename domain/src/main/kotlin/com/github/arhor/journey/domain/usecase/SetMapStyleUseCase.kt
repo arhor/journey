@@ -9,8 +9,8 @@ import javax.inject.Singleton
 
 @Singleton
 class SetMapStyleUseCase @Inject constructor(
-    private val mapStylesRepository: MapStylesRepository,
     private val settingsRepository: SettingsRepository,
+    private val mapStylesRepository: MapStylesRepository,
 ) {
     suspend operator fun invoke(mapStyleId: String) {
         val id =

@@ -8,10 +8,11 @@ import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
-import com.github.arhor.journey.domain.repository.MapStylesError
+import com.github.arhor.journey.domain.model.error.AppSettingsError
+import com.github.arhor.journey.domain.model.error.MapStylesError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
+import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
 import com.github.arhor.journey.ui.MviViewModel
@@ -59,50 +60,27 @@ class MapViewModel @Inject constructor(
 ) {
     private val _state = MutableStateFlow(State())
 
-    private data class SelectionState(
-        val state: State,
-        val settings: AppSettings,
-        val availableStylesState: Output<List<MapStyle>, MapStylesError>,
-    )
-
-    private data class MapContentState(
-        val pointsOfInterest: List<PointOfInterest>,
-        val explorationProgress: ExplorationProgress,
-    )
-
-    override fun buildUiState(): Flow<MapUiState> =
-        combine(
-            combine(_state, observeSettings(), observeMapStyles()) { state, settings, mapStylesState ->
-                SelectionState(
-                    state = state,
-                    settings = settings,
-                    availableStylesState = mapStylesState,
-                )
-            },
-            combine(observePointsOfInterest(), observeExplorationProgress()) {
-                    pointsOfInterest,
-                    explorationProgress,
-                ->
-                MapContentState(
-                    pointsOfInterest = pointsOfInterest,
-                    explorationProgress = explorationProgress,
-                )
-            },
-        ) { selectionState, mapContentState ->
-            intoUiState(
-                state = selectionState.state,
-                settings = selectionState.settings,
-                availableStylesState = selectionState.availableStylesState,
-                pointsOfInterest = mapContentState.pointsOfInterest,
-                explorationProgress = mapContentState.explorationProgress,
-            )
-        }.catch {
-            emit(
-                MapUiState.Failure(
-                    errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
-                ),
-            )
-        }.distinctUntilChanged()
+    override fun buildUiState(): Flow<MapUiState> = combine(
+        _state,
+        observeSettings(),
+        observeMapStyles(),
+        observePointsOfInterest(),
+        observeExplorationProgress(),
+    ) { state, settingsOutput, mapStylesOutput, pointsOfInterest, explorationProgress ->
+        intoUiState(
+            state = state,
+            settingsOutput = settingsOutput,
+            mapStylesOutput = mapStylesOutput,
+            pointsOfInterest = pointsOfInterest,
+            explorationProgress = explorationProgress,
+        )
+    }.catch {
+        emit(
+            MapUiState.Failure(
+                errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
+            ),
+        )
+    }.distinctUntilChanged()
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
@@ -199,8 +177,8 @@ class MapViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
-        settings: AppSettings,
-        availableStylesState: Output<List<MapStyle>, MapStylesError>,
+        settingsOutput: Output<AppSettings, AppSettingsError>,
+        mapStylesOutput: Output<List<MapStyle>, MapStylesError>,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
     ): MapUiState {
@@ -208,15 +186,24 @@ class MapViewModel @Inject constructor(
             return MapUiState.Failure(errorMessage = errorMessage)
         }
 
-        if (availableStylesState is Output.Failure) {
+        if (settingsOutput is Output.Failure) {
             return MapUiState.Failure(
-                errorMessage = availableStylesState.error.message
-                    ?: availableStylesState.error.cause?.message
+                errorMessage = settingsOutput.error.message
+                    ?: settingsOutput.error.cause?.message
+                    ?: SETTINGS_LOADING_FAILED_MESSAGE,
+            )
+        }
+
+        if (mapStylesOutput is Output.Failure) {
+            return MapUiState.Failure(
+                errorMessage = mapStylesOutput.error.message
+                    ?: mapStylesOutput.error.cause?.message
                     ?: MAP_LOADING_FAILED_MESSAGE,
             )
         }
 
-        val availableStyles = (availableStylesState as Output.Success).value
+        val settings = (settingsOutput as Output.Success).value
+        val availableStyles = (mapStylesOutput as Output.Success).value
 
         return MapUiState.Content(
             cameraPosition = state.cameraPosition,
@@ -262,6 +249,7 @@ class MapViewModel @Inject constructor(
 
     private companion object {
         const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."
+        const val SETTINGS_LOADING_FAILED_MESSAGE = "Failed to load settings state."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
         const val LOCATION_PERMISSION_DENIED_MESSAGE =

@@ -156,13 +156,13 @@ internal fun MapContent(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        state.selectedStyle?.let {
-            key(it) {
+        state.selectedStyle?.let { style ->
+            key(style) {
                 MaplibreMap(
                     modifier = Modifier.fillMaxSize(),
-                    baseStyle = when (it.type) {
-                        MapStyle.Type.BUNDLE -> BaseStyle.Json(it.value)
-                        MapStyle.Type.REMOTE -> BaseStyle.Uri(it.value)
+                    baseStyle = when (style.type) {
+                        MapStyle.Type.BUNDLE -> BaseStyle.Json(style.value)
+                        MapStyle.Type.REMOTE -> BaseStyle.Uri(style.value)
                     },
                     cameraState = cameraState,
                     styleState = styleState,
@@ -181,26 +181,23 @@ internal fun MapContent(
                         )
                         org.maplibre.compose.util.ClickResult.Pass
                     },
-                    onMapLoadFailed = { error ->
-                        dispatch(MapIntent.MapLoadFailed(error))
-                    },
-                    content = {
-                        if (isLocationPermissionGranted && currentUserLocation != null) {
-                            LocationPuck(
-                                idPrefix = USER_LOCATION_PUCK_ID_PREFIX,
-                                locationState = userLocationState,
-                                cameraState = cameraState,
-                            )
-                        }
-
-                        MapObjectsRendererAdapter(
-                            objects = state.visibleObjects,
-                            onObjectTapped = { objectId ->
-                                dispatch(MapIntent.ObjectTapped(objectId))
-                            },
+                    onMapLoadFailed = { dispatch(MapIntent.MapLoadFailed(it)) },
+                ) {
+                    if (isLocationPermissionGranted && currentUserLocation != null) {
+                        LocationPuck(
+                            idPrefix = USER_LOCATION_PUCK_ID_PREFIX,
+                            locationState = userLocationState,
+                            cameraState = cameraState,
                         )
-                    },
-                )
+                    }
+
+                    MapObjectsRendererAdapter(
+                        objects = state.visibleObjects,
+                        onObjectTapped = { objectId ->
+                            dispatch(MapIntent.ObjectTapped(objectId))
+                        },
+                    )
+                }
             }
         }
 
