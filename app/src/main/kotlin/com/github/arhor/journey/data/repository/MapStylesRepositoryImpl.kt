@@ -37,7 +37,6 @@ data class MapStyleRecord(
 class MapStylesRepositoryImpl @Inject constructor(
     private val json: Json,
     @ApplicationContext private val context: Context,
-    private val context: Context,
     @AppCoroutineScope private val appScope: CoroutineScope,
 ) : MapStylesRepository {
 
