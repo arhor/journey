@@ -2,19 +2,17 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
-import com.github.arhor.journey.domain.model.AppSettings
+import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
-import com.github.arhor.journey.domain.model.error.AppSettingsError
-import com.github.arhor.journey.domain.model.error.MapStylesError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
-import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.ui.MviViewModel
 import com.github.arhor.journey.ui.views.map.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
@@ -52,8 +50,7 @@ private data class State(
 class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
-    private val observeSettings: ObserveSettingsUseCase,
-    private val observeMapStyles: ObserveMapStylesUseCase,
+    private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
@@ -62,19 +59,11 @@ class MapViewModel @Inject constructor(
 
     override fun buildUiState(): Flow<MapUiState> = combine(
         _state,
-        observeSettings(),
-        observeMapStyles(),
+        observeSelectedMapStyle(),
         observePointsOfInterest(),
         observeExplorationProgress(),
-    ) { state, settingsOutput, mapStylesOutput, pointsOfInterest, explorationProgress ->
-        intoUiState(
-            state = state,
-            settingsOutput = settingsOutput,
-            mapStylesOutput = mapStylesOutput,
-            pointsOfInterest = pointsOfInterest,
-            explorationProgress = explorationProgress,
-        )
-    }.catch {
+        ::intoUiState,
+    ).catch {
         emit(
             MapUiState.Failure(
                 errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
@@ -92,6 +81,35 @@ class MapViewModel @Inject constructor(
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
+    }
+
+    /* ------------------------------------------ Internal implementation ------------------------------------------- */
+
+    private fun intoUiState(
+        state: State,
+        mapStyleOutput: Output<MapStyle?, DomainError>,
+        pointsOfInterest: List<PointOfInterest>,
+        explorationProgress: ExplorationProgress,
+    ): MapUiState = if (state.failureMessage == null) {
+        mapStyleOutput.fold(
+            onSuccess = {
+                MapUiState.Content(
+                    cameraPosition = state.cameraPosition,
+                    cameraUpdateOrigin = state.cameraUpdateOrigin,
+                    selectedStyle = it,
+                    visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
+                )
+            },
+            onFailure = {
+                MapUiState.Failure(
+                    errorMessage = it.message
+                        ?: it.cause?.message
+                        ?: SETTINGS_LOADING_FAILED_MESSAGE,
+                )
+            }
+        )
+    } else {
+        MapUiState.Failure(errorMessage = state.failureMessage)
     }
 
     private fun onMapLoadFailed(intent: MapIntent.MapLoadFailed) {
@@ -174,49 +192,6 @@ class MapViewModel @Inject constructor(
             emitEffect(MapEffect.ShowMessage(e.message ?: OBJECT_DISCOVERY_FAILED_MESSAGE))
         }
     }
-
-    private fun intoUiState(
-        state: State,
-        settingsOutput: Output<AppSettings, AppSettingsError>,
-        mapStylesOutput: Output<List<MapStyle>, MapStylesError>,
-        pointsOfInterest: List<PointOfInterest>,
-        explorationProgress: ExplorationProgress,
-    ): MapUiState {
-        state.failureMessage?.let { errorMessage ->
-            return MapUiState.Failure(errorMessage = errorMessage)
-        }
-
-        if (settingsOutput is Output.Failure) {
-            return MapUiState.Failure(
-                errorMessage = settingsOutput.error.message
-                    ?: settingsOutput.error.cause?.message
-                    ?: SETTINGS_LOADING_FAILED_MESSAGE,
-            )
-        }
-
-        if (mapStylesOutput is Output.Failure) {
-            return MapUiState.Failure(
-                errorMessage = mapStylesOutput.error.message
-                    ?: mapStylesOutput.error.cause?.message
-                    ?: MAP_LOADING_FAILED_MESSAGE,
-            )
-        }
-
-        val settings = (settingsOutput as Output.Success).value
-        val availableStyles = (mapStylesOutput as Output.Success).value
-
-        return MapUiState.Content(
-            cameraPosition = state.cameraPosition,
-            cameraUpdateOrigin = state.cameraUpdateOrigin,
-            selectedStyle = availableStyles.resolveSelectedStyle(settings.selectedMapStyleId),
-            visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
-        )
-    }
-
-    private fun List<MapStyle>.resolveSelectedStyle(selectedMapStyleId: String?): MapStyle? =
-        selectedMapStyleId
-            ?.let { styleId -> firstOrNull { it.id == styleId } }
-            ?: firstOrNull()
 
     private fun mapObjects(
         pointsOfInterest: List<PointOfInterest>,

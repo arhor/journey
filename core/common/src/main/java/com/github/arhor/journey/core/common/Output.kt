@@ -4,6 +4,7 @@ package com.github.arhor.journey.core.common
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 /**
@@ -130,25 +131,54 @@ fun <T> Throwable.asFailure(): Output<T, DomainError> = Output.Failure(object : 
  * [E] is the common supertype of [E1] and [E2]. In the most general case it will be [DomainError].
  */
 inline fun <A, B, E, E1, E2, R> combine(
-    out1: Output<A, E1>,
-    out2: Output<B, E2>,
+    output1: Output<A, E1>,
+    output2: Output<B, E2>,
     transform: (A, B) -> R,
-): Output<R, E> where E : DomainError, E1 : E, E2 : E = when (out1) {
-    is Output.Failure -> out1
-    is Output.Success -> when (out2) {
-        is Output.Failure -> out2
-        is Output.Success -> Output.Success(transform(out1.value, out2.value))
+): Output<R, E> where E : DomainError, E1 : E, E2 : E = when (output1) {
+    is Output.Failure -> output1
+    is Output.Success -> when (output2) {
+        is Output.Failure -> output2
+        is Output.Success -> Output.Success(transform(output1.value, output2.value))
     }
 }
 
+inline fun <A, B, E : DomainError, E1 : E, E2 : E, R> combine(
+    flow1: Flow<Output<A, E1>>,
+    flow2: Flow<Output<B, E2>>,
+    crossinline transform: (A, B) -> R,
+): Flow<Output<R, E>> = combine(
+    flow = flow1,
+    flow2 = flow2,
+) { output1, output2 ->
+    combine(
+        output1 = output1,
+        output2 = output2,
+        transform = transform,
+    )
+}
+
+fun <A, B, E : DomainError, E1 : E, E2 : E> combine(
+    flow1: Flow<Output<A, E1>>,
+    flow2: Flow<Output<B, E2>>,
+): Flow<Output<Pair<A, B>, E>> =
+    combine(
+        flow = flow1,
+        flow2 = flow2,
+    ) { output1, output2 ->
+        combine(
+            output1 = output1,
+            output2 = output2,
+        )
+    }
+
 /**
- * Combines [out1] with [out2] into a [Pair].
+ * Combines [output1] with [output2] into a [Pair].
  */
 fun <A, B, E, E1, E2> combine(
-    out1: Output<A, E1>,
-    out2: Output<B, E2>,
+    output1: Output<A, E1>,
+    output2: Output<B, E2>,
 ): Output<Pair<A, B>, E> where E : DomainError, E1 : E, E2 : E = combine(
-    out1 = out1,
-    out2 = out2,
+    output1 = output1,
+    output2 = output2,
     transform = ::Pair,
 )
