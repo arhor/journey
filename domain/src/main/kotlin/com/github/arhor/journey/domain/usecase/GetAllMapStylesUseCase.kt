@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.core.common.State
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStylesError
 import com.github.arhor.journey.domain.repository.MapStylesRepository
@@ -12,6 +12,6 @@ import javax.inject.Singleton
 class GetAllMapStylesUseCase @Inject constructor(
     private val mapStylesRepository: MapStylesRepository,
 ) {
-    operator fun invoke(): StateFlow<State<List<MapStyle>, MapStylesError>> =
+    operator fun invoke(): StateFlow<Output<List<MapStyle>, MapStylesError>> =
         mapStylesRepository.observeMapStyles()
 }

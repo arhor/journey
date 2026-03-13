@@ -2,6 +2,8 @@ package com.github.arhor.journey.ui.views.settings
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStylesError
@@ -18,7 +20,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
-import com.github.arhor.journey.core.common.State as AsyncState
 
 @Immutable
 private data class State(
@@ -63,21 +64,24 @@ class SettingsViewModel @Inject constructor(
     private fun intoUiState(
         state: State,
         settings: AppSettings,
-        mapStylesState: AsyncState<List<MapStyle>, MapStylesError>,
-    ): SettingsUiState =
-        when (mapStylesState) {
-            is AsyncState.Failure -> SettingsUiState.Failure(
-                errorMessage = mapStylesState.error.message
-                    ?: mapStylesState.error.cause?.message
-                    ?: SETTINGS_LOADING_FAILED_MESSAGE,
-            )
-            is AsyncState.Content -> SettingsUiState.Content(
+        mapStylesState: Output<List<MapStyle>, MapStylesError>,
+    ): SettingsUiState = mapStylesState.fold(
+        onSuccess = {
+            SettingsUiState.Content(
                 isUpdating = state.isUpdating,
                 distanceUnit = settings.distanceUnit,
                 selectedMapStyleId = settings.selectedMapStyleId,
-                availableMapStyles = mapStylesState.value,
+                availableMapStyles = it,
             )
-        }
+        },
+        onFailure = {
+            SettingsUiState.Failure(
+                errorMessage = it.message
+                    ?: it.cause?.message
+                    ?: SETTINGS_LOADING_FAILED_MESSAGE,
+            )
+        },
+    )
 
     private suspend fun onSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
         if (_state.value.isUpdating) {

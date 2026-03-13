@@ -2,7 +2,7 @@ package com.github.arhor.journey.ui.views.map
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.core.common.State as AsyncState
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
@@ -61,7 +61,7 @@ class MapViewModel @Inject constructor(
     private data class SelectionState(
         val state: State,
         val settings: AppSettings,
-        val availableStylesState: AsyncState<List<MapStyle>, MapStylesError>,
+        val availableStylesState: Output<List<MapStyle>, MapStylesError>,
     )
 
     private data class MapContentState(
@@ -181,7 +181,7 @@ class MapViewModel @Inject constructor(
     private fun intoUiState(
         state: State,
         settings: AppSettings,
-        availableStylesState: AsyncState<List<MapStyle>, MapStylesError>,
+        availableStylesState: Output<List<MapStyle>, MapStylesError>,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
     ): MapUiState {
@@ -189,7 +189,7 @@ class MapViewModel @Inject constructor(
             return MapUiState.Failure(errorMessage = errorMessage)
         }
 
-        if (availableStylesState is AsyncState.Failure) {
+        if (availableStylesState is Output.Failure) {
             return MapUiState.Failure(
                 errorMessage = availableStylesState.error.message
                     ?: availableStylesState.error.cause?.message
@@ -197,7 +197,7 @@ class MapViewModel @Inject constructor(
             )
         }
 
-        val availableStyles = (availableStylesState as AsyncState.Content).value
+        val availableStyles = (availableStylesState as Output.Success).value
 
         return MapUiState.Content(
             cameraPosition = state.cameraPosition,

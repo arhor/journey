@@ -1,9 +1,9 @@
 package com.github.arhor.journey.core.common
 
 /**
- * Base contract for domain-level errors carried by [State.Failure].
+ * Base contract for domain-level errors carried by [Output.Failure].
  *
- * Unlike using [Throwable] directly, `StateError` lets you model failures with your own error types
+ * Unlike using [Throwable] directly, `DomainError` lets you model failures with your own error types
  * (often a sealed interface with multiple implementations) so callers can pattern-match errors in
  * an exhaustive `when`.
  *
@@ -16,7 +16,7 @@ package com.github.arhor.journey.core.common
  *
  * Example:
  * ```
- * sealed interface LoginError : StateError {
+ * sealed interface LoginError : DomainError {
  *     data object InvalidCredentials : LoginError {
  *         override val message = "Wrong email or password"
  *     }
@@ -27,7 +27,7 @@ package com.github.arhor.journey.core.common
  * }
  * ```
  */
-interface StateError {
+interface DomainError {
     /**
      * Optional, human-readable description of the error.
      */

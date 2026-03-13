@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.core.common.State
+import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.domain.repository.MapStylesRepository
 import com.github.arhor.journey.domain.repository.SettingsRepository
 import com.github.arhor.journey.domain.usecase.internal.resolveMapStyleId
@@ -13,11 +13,11 @@ class SetMapStyleUseCase @Inject constructor(
     private val settingsRepository: SettingsRepository,
 ) {
     suspend operator fun invoke(mapStyleId: String) {
-        val availableStyles = when (val mapStylesState = mapStylesRepository.observeMapStyles().value) {
-            is State.Failure -> emptyList()
-            is State.Content -> mapStylesState.value
-        }
-        val id = availableStyles.resolveMapStyleId(mapStyleId)
+        val id =
+            mapStylesRepository.observeMapStyles()
+                .value
+                .fold(onSuccess = { it }, onFailure = { emptyList() })
+                .resolveMapStyleId(mapStyleId)
 
         if (id != null) {
             settingsRepository.setSelectedMapStyleId(id)

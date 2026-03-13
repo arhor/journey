@@ -1,7 +1,7 @@
 package com.github.arhor.journey.data.repository
 
 import android.content.Context
-import com.github.arhor.journey.core.common.State
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.di.AppCoroutineScope
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.repository.MapStylesError
@@ -41,7 +41,7 @@ class MapStylesRepositoryImpl @Inject constructor(
 
     private val path = "map/styles/remote.json"
     private val mutex = Mutex()
-    private val mapStyles = MutableStateFlow<State<List<MapStyle>, MapStylesError>>(State.Content(emptyList()))
+    private val mapStyles = MutableStateFlow<Output<List<MapStyle>, MapStylesError>>(Output.Success(emptyList()))
 
     init {
         appScope.launch {
@@ -49,7 +49,7 @@ class MapStylesRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun observeMapStyles(): StateFlow<State<List<MapStyle>, MapStylesError>> =
+    override fun observeMapStyles(): StateFlow<Output<List<MapStyle>, MapStylesError>> =
         mapStyles.asStateFlow()
 
     /* ------------------------------------------ Internal implementation ------------------------------------------- */
@@ -68,8 +68,8 @@ class MapStylesRepositoryImpl @Inject constructor(
             }
 
             mapStyles.value = result.fold(
-                onSuccess = { State.Content(it.toMapStylesValue()) },
-                onFailure = { State.Failure(it.toMapStylesError()) }
+                onSuccess = { Output.Success(it.toMapStylesValue()) },
+                onFailure = { Output.Failure(it.toMapStylesError()) }
             )
 
         }
