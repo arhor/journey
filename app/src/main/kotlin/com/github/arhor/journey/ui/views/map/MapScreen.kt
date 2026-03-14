@@ -1,10 +1,7 @@
 package com.github.arhor.journey.ui.views.map
 
 import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,7 +16,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.R
@@ -30,6 +26,10 @@ import com.github.arhor.journey.ui.views.map.model.CameraPositionState
 import com.github.arhor.journey.ui.views.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.ui.views.map.model.LatLng
 import com.github.arhor.journey.ui.views.map.renderer.MapObjectsRendererAdapter
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.MultiplePermissionsState
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -70,13 +70,14 @@ fun MapScreen(
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 internal fun MapContent(
     state: MapUiState.Content,
     dispatch: (MapIntent) -> Unit,
 ) {
-    val context = LocalContext.current
-    val userLocationState = rememberUserLocationStateInternal(context)
+    val locationPermissionsState = rememberMultiplePermissionsState(LOCATION_PERMISSIONS.toList())
+    val userLocationState = rememberUserLocationStateInternal(locationPermissionsState)
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
             target = Position(
@@ -88,17 +89,6 @@ internal fun MapContent(
     )
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = {
-            dispatch(
-                MapIntent.LocationPermissionResult(
-                    isGranted = it.hasGrantedLocationPermission() || context.checkPermission()
-                )
-            )
-        },
-    )
-
     LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
         if (state.cameraUpdateOrigin != CameraUpdateOrigin.PROGRAMMATIC) {
             return@LaunchedEffect
@@ -211,7 +201,7 @@ internal fun MapContent(
         FloatingActionButton(
             onClick = {
                 dispatch(MapIntent.RecenterClicked)
-                locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
+                locationPermissionsState.launchMultiplePermissionRequest()
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -241,10 +231,14 @@ private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_COARSE_LOCATION,
 )
 
+@SuppressLint("MissingPermission")
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
-private fun rememberUserLocationStateInternal(ctx: Context): UserLocationState {
+private fun rememberUserLocationStateInternal(
+    locationPermissionsState: MultiplePermissionsState,
+): UserLocationState {
     return rememberUserLocationState(
-        if (ctx.checkPermission()) {
+        if (locationPermissionsState.hasGrantedLocationPermission()) {
             rememberDefaultLocationProvider()
         } else {
             rememberNullLocationProvider()
@@ -258,15 +252,7 @@ private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): 
         && abs(a.zoom - b.zoom) < CAMERA_SETTLE_ZOOM_THRESHOLD
 }
 
-private fun Context.checkPermission(permission: String): Boolean =
-    checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
-
-
-private fun Context.checkPermission(): Boolean {
-    return checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-        || checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
-}
-
-private fun Map<String, Boolean>.hasGrantedLocationPermission(): Boolean {
-    return LOCATION_PERMISSIONS.any { this[it] == true }
+@OptIn(ExperimentalPermissionsApi::class)
+private fun MultiplePermissionsState.hasGrantedLocationPermission(): Boolean {
+    return permissions.any { it.status.isGranted }
 }
