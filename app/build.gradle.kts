@@ -49,6 +49,7 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":domain"))
     implementation(project(":core:common"))
+    implementation(project(":core:navigation"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:map"))
     implementation(project(":feature:home"))

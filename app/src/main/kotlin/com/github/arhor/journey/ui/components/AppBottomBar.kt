@@ -14,7 +14,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.github.arhor.journey.ui.navigation.BottomNavItems
+import com.github.arhor.journey.ui.navigation.bottomNavDestinations
 
 @Composable
 fun AppBottomBar(navController: NavHostController) {
@@ -22,14 +22,14 @@ fun AppBottomBar(navController: NavHostController) {
     val graphHierarchy = backStackEntry?.destination?.hierarchy ?: emptySequence()
 
     NavigationBar {
-        BottomNavItems.forEach { item ->
-            val label = stringResource(item.labelRes)
+        bottomNavDestinations.forEach { destination ->
+            val label = stringResource(destination.labelRes)
 
             NavigationBarItem(
-                modifier = Modifier.testTag(item.testTag),
-                selected = graphHierarchy.any { it.hasRoute(item.destination::class) },
+                modifier = Modifier.testTag(destination.testTag),
+                selected = graphHierarchy.any { it.hasRoute(destination.destination::class) },
                 onClick = {
-                    navController.navigate(item.destination) {
+                    navController.navigate(destination.destination) {
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = false
                         }
@@ -39,7 +39,7 @@ fun AppBottomBar(navController: NavHostController) {
                 },
                 icon = {
                     Icon(
-                        imageVector = item.icon,
+                        imageVector = destination.icon,
                         contentDescription = label,
                     )
                 },
