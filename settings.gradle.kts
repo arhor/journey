@@ -33,3 +33,5 @@ include(":app")
 include(":domain")
 
 include(":core:common")
+
+include(":data")
