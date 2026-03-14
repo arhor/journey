@@ -5,8 +5,6 @@ sealed interface MapEffect {
         val objectId: String,
     ) : MapEffect
 
-    data object RequestLocationPermission : MapEffect
-
     data class ShowMessage(
         val message: String,
     ) : MapEffect

@@ -124,7 +124,6 @@ class MapViewModel @Inject constructor(
         _state.update {
             it.copy(isAwaitingLocationPermissionResult = true)
         }
-        emitEffect(MapEffect.RequestLocationPermission)
     }
 
     private fun onLocationPermissionResult(intent: MapIntent.LocationPermissionResult) {
