@@ -45,8 +45,8 @@ android {
 dependencies {
     ksp(libs.hilt.android.compiler)
     ksp(libs.androidx.hilt.compiler)
-    ksp(libs.androidx.room.compiler)
 
+    implementation(project(":data"))
     implementation(project(":domain"))
     implementation(project(":core:common"))
 
@@ -57,15 +57,12 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.health.connect.client)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.maplibre.compose)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.room.runtime)
     implementation(libs.hilt.android)
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.coroutines.android)
