@@ -32,6 +32,7 @@ fun App() {
                 AppNavGraph(
                     navController = navController,
                     innerPadding = innerPadding,
+                    snackbarHostState = snackbarHostState,
                 )
             }
         }

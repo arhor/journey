@@ -1,0 +1,18 @@
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_distance_unit_title">Distance Unit</string>
+    <string name="settings_distance_unit_metric">Metric (km, m)</string>
+    <string name="settings_distance_unit_imperial">Imperial (mi, ft)</string>
+    <string name="settings_map_style_title">Map Style</string>
+    <string name="settings_map_style_default">Default</string>
+    <string name="settings_map_style_classic">Classic</string>
+    <string name="settings_map_style_dark">Dark</string>
+    <string name="settings_map_style_satellite">Satellite</string>
+    <string name="settings_map_style_terrain">Terrain</string>
+    <string name="settings_updating">Updating…</string>
+    <string name="settings_map_credits_title">Map Credits</string>
+    <string name="settings_map_credits_maplibre">Maps powered by MapLibre.</string>
+    <string name="settings_map_credits_openfreemap">OpenFreeMap © OpenMapTiles Data from OpenStreetMap</string>
+    <string name="health_connect_permissions_rationale_title">Health Connect data usage</string>
+    <string name="health_connect_permissions_rationale_body">Journey reads your Health Connect exercise sessions to import completed activities into your in-app progression. It does not write, modify, or share your Health Connect data.</string>
+</resources>

@@ -35,3 +35,11 @@ include(":domain")
 include(":core:common")
 
 include(":data")
+
+include(":core:mvi")
+
+include(":feature:home")
+
+include(":feature:map")
+
+include(":feature:settings")
