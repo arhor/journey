@@ -15,4 +15,5 @@
     <string name="settings_map_credits_openfreemap">OpenFreeMap © OpenMapTiles Data from OpenStreetMap</string>
     <string name="health_connect_permissions_rationale_title">Health Connect data usage</string>
     <string name="health_connect_permissions_rationale_body">Journey reads your Health Connect exercise sessions to import completed activities into your in-app progression. It does not write, modify, or share your Health Connect data.</string>
+    <string name="settings_nav_label">Settings</string>
 </resources>

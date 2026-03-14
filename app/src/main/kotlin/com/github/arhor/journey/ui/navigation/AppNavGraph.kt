@@ -7,10 +7,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import com.github.arhor.journey.feature.home.HomeRoute
-import com.github.arhor.journey.feature.map.MapRoute
-import com.github.arhor.journey.feature.settings.SettingsRoute
+import com.github.arhor.journey.feature.home.HomeDestination
+import com.github.arhor.journey.feature.home.homeGraph
+import com.github.arhor.journey.feature.map.mapGraph
+import com.github.arhor.journey.feature.settings.settingsGraph
 
 @Composable
 fun AppNavGraph(
@@ -20,17 +20,11 @@ fun AppNavGraph(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Home,
+        startDestination = HomeDestination,
         modifier = Modifier.padding(innerPadding),
     ) {
-        composable<Home> {
-            HomeRoute(snackbarHostState = snackbarHostState)
-        }
-        composable<Map> {
-            MapRoute(snackbarHostState = snackbarHostState)
-        }
-        composable<Settings> {
-            SettingsRoute(snackbarHostState = snackbarHostState)
-        }
+        homeGraph(snackbarHostState = snackbarHostState)
+        mapGraph(snackbarHostState = snackbarHostState)
+        settingsGraph(snackbarHostState = snackbarHostState)
     }
 }

@@ -22,4 +22,5 @@
     <string name="home_import_summary_title">Imported Activity (Today)</string>
     <string name="home_import_summary_today_activities">Imported activities: %1$d</string>
     <string name="home_import_summary_today_steps">Imported steps: %1$d</string>
+    <string name="home_nav_label">Home</string>
 </resources>

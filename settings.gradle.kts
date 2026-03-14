@@ -43,3 +43,5 @@ include(":feature:home")
 include(":feature:map")
 
 include(":feature:settings")
+
+include(":core:navigation")
