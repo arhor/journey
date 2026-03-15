@@ -12,6 +12,8 @@ import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.feature.map.location.ForegroundUserLocationTracker
+import com.github.arhor.journey.feature.map.location.UserLocationUpdate
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import io.kotest.matchers.shouldBe
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -128,6 +131,7 @@ class MapViewModelTest {
         val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
+        val foregroundUserLocationTracker = mockk<ForegroundUserLocationTracker>()
 
         every { observePointsOfInterest.invoke() } returns flowOf(emptyList())
         every { observeExplorationProgress.invoke() } returns flowOf(ExplorationProgress(discovered = emptySet()))
@@ -135,12 +139,14 @@ class MapViewModelTest {
             throw IllegalStateException("Broken map style stream.")
         }
         coEvery { discoverPointOfInterest.invoke(any()) } just runs
+        every { foregroundUserLocationTracker.observeLocations() } returns flowOf(UserLocationUpdate.TemporarilyUnavailable)
 
         val viewModel = MapViewModel(
             observePointsOfInterest = observePointsOfInterest,
             observeExplorationProgress = observeExplorationProgress,
             observeSelectedMapStyle = observeSelectedMapStyle,
             discoverPointOfInterest = discoverPointOfInterest,
+            foregroundUserLocationTracker = foregroundUserLocationTracker,
         )
 
         try {
@@ -172,6 +178,88 @@ class MapViewModelTest {
             // Then
             val actual = fixture.viewModel.awaitContent { it.recenterRequestToken == 1 }
             actual.recenterRequestToken shouldBe 1
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should expose tracked user location when location tracking starts`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            userLocationUpdates = flowOf(
+                UserLocationUpdate.Available(GeoPoint(lat = 40.7128, lon = -74.0060)),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.StartLocationTracking)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.userLocation != null }
+            actual.userLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.userLocationTrackingStatus shouldBe UserLocationTrackingStatus.TRACKING
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should emit permission denied tracking status when location permission is unavailable`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            userLocationUpdates = flowOf(UserLocationUpdate.PermissionDenied),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.StartLocationTracking)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent()
+            actual.userLocationTrackingStatus shouldBe UserLocationTrackingStatus.PERMISSION_DENIED
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should stop collecting user location updates when tracking is stopped`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        var collectionCancelled = false
+        val fixture = createFixture(
+            userLocationUpdates = flow {
+                emit(UserLocationUpdate.TemporarilyUnavailable)
+                kotlinx.coroutines.awaitCancellation()
+            }.onCompletion {
+                collectionCancelled = true
+            },
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.StartLocationTracking)
+            advanceUntilIdle()
+            fixture.viewModel.dispatch(MapIntent.StopLocationTracking)
+            advanceUntilIdle()
+
+            // Then
+            collectionCancelled shouldBe true
         } finally {
             tearDownMainDispatcher()
         }
@@ -363,11 +451,14 @@ class MapViewModelTest {
         ),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         discoverError: Throwable? = null,
+        userLocationUpdates: kotlinx.coroutines.flow.Flow<UserLocationUpdate> =
+            flowOf(UserLocationUpdate.TemporarilyUnavailable),
     ): Fixture {
         val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
         val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
+        val foregroundUserLocationTracker = mockk<ForegroundUserLocationTracker>()
 
         val mapStyle = MapStyle.remote(
             id = "style-remote",
@@ -387,12 +478,15 @@ class MapViewModelTest {
             coEvery { discoverPointOfInterest.invoke(any()) } just runs
         }
 
+        every { foregroundUserLocationTracker.observeLocations() } returns userLocationUpdates
+
         return Fixture(
             viewModel = MapViewModel(
                 observePointsOfInterest = observePointsOfInterest,
                 observeExplorationProgress = observeExplorationProgress,
                 observeSelectedMapStyle = observeSelectedMapStyle,
                 discoverPointOfInterest = discoverPointOfInterest,
+                foregroundUserLocationTracker = foregroundUserLocationTracker,
             ),
             mapStyle = mapStyle,
             discoverPointOfInterest = discoverPointOfInterest,

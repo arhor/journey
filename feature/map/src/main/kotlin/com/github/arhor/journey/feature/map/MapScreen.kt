@@ -88,11 +88,11 @@ internal fun MapContent(
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
     val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        contract = ActivityResultContracts.RequestPermission(),
         onResult = {
             dispatch(
                 MapIntent.LocationPermissionResult(
-                    isGranted = it.hasGrantedLocationPermission() || context.checkPermission()
+                    isGranted = it || context.checkPermission()
                 )
             )
         },
@@ -210,7 +210,7 @@ internal fun MapContent(
         FloatingActionButton(
             onClick = {
                 dispatch(MapIntent.RecenterClicked)
-                locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
+                locationPermissionLauncher.launch(LOCATION_PERMISSION)
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -235,10 +235,7 @@ private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
 private const val CAMERA_SETTLE_ZOOM_THRESHOLD = 0.01
 private val USER_LOCATION_TIMEOUT = 5.seconds
 private val USER_LOCATION_RECENTER_ANIMATION_DURATION = 600.milliseconds
-private val LOCATION_PERMISSIONS = arrayOf(
-    Manifest.permission.ACCESS_FINE_LOCATION,
-    Manifest.permission.ACCESS_COARSE_LOCATION,
-)
+private const val LOCATION_PERMISSION = Manifest.permission.ACCESS_FINE_LOCATION
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -265,8 +262,4 @@ private fun Context.checkPermission(permission: String): Boolean =
 private fun Context.checkPermission(): Boolean {
     return checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)
         || checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
-}
-
-private fun Map<String, Boolean>.hasGrantedLocationPermission(): Boolean {
-    return LOCATION_PERMISSIONS.any { this[it] == true }
 }
