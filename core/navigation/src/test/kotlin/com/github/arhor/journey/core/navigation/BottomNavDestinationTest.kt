@@ -52,6 +52,94 @@ class BottomNavDestinationTest {
         first shouldNotBe second
     }
 
+    @Test
+    fun `equals should return true and hashCode should match when all properties are the same`() {
+        // Given
+        val icon = testIcon(name = "settings")
+        val first = BottomNavDestination(
+            destination = SettingsRoute,
+            labelRes = 301,
+            icon = icon,
+            testTag = "bottomNav:settings",
+        )
+        val second = BottomNavDestination(
+            destination = SettingsRoute,
+            labelRes = 301,
+            icon = icon,
+            testTag = "bottomNav:settings",
+        )
+
+        // When
+        val areEqual = first == second
+        val hasSameHashCode = first.hashCode() == second.hashCode()
+
+        // Then
+        areEqual shouldBe true
+        hasSameHashCode shouldBe true
+    }
+
+    @Test
+    fun `copy should update only overridden property when destination changes`() {
+        // Given
+        val icon = testIcon(name = "home")
+        val initial = BottomNavDestination(
+            destination = Route("home"),
+            labelRes = 401,
+            icon = icon,
+            testTag = "bottomNav:home",
+        )
+
+        // When
+        val actual = initial.copy(destination = Route("map"))
+
+        // Then
+        actual.destination shouldBe Route("map")
+        actual.labelRes shouldBe 401
+        actual.icon shouldBe icon
+        actual.testTag shouldBe "bottomNav:home"
+    }
+
+    @Test
+    fun `equals should return false when destination value differs with all other fields equal`() {
+        // Given
+        val icon = testIcon(name = "poi")
+        val first = BottomNavDestination(
+            destination = Route("home"),
+            labelRes = 501,
+            icon = icon,
+            testTag = "bottomNav:route",
+        )
+        val second = first.copy(destination = Route("map"))
+
+        // When
+        val areEqual = first == second
+
+        // Then
+        areEqual shouldBe false
+        first shouldNotBe second
+    }
+
+    @Test
+    fun `equals should return false when compared to a different type`() {
+        // Given
+        val destination = BottomNavDestination(
+            destination = "home-route",
+            labelRes = 601,
+            icon = testIcon(name = "home"),
+            testTag = "bottomNav:home",
+        )
+
+        // When
+        val areEqual = destination.equals("home-route")
+
+        // Then
+        areEqual shouldBe false
+    }
+
+    private data class Route(val value: String)
+
+    private data object SettingsRoute
+
     private fun testIcon(name: String): ImageVector = ImageVector.Builder(
         name = name,
         defaultWidth = 24.dp,
