@@ -11,7 +11,7 @@ import com.github.arhor.journey.domain.model.RecordedActivity
 import com.github.arhor.journey.domain.usecase.LogActivityUseCase
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroUseCase
-import com.github.arhor.journey.core.mvi.MviViewModel
+import com.github.arhor.journey.core.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

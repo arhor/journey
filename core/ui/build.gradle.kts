@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.github.arhor.journey.core.mvi"
+    namespace = "com.github.arhor.journey.core.ui"
 
     compileSdk {
         version = release(36) {

@@ -1,4 +1,4 @@
-package com.github.arhor.journey.core.mvi
+package com.github.arhor.journey.core.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

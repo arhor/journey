@@ -34,8 +34,8 @@ dependencies {
 
     implementation(project(":domain"))
     implementation(project(":core:common"))
-    implementation(project(":core:mvi"))
     implementation(project(":core:navigation"))
+    implementation(project(":core:ui"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)

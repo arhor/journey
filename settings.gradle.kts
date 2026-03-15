@@ -36,7 +36,7 @@ include(":domain")
 
 include(":core:common")
 include(":core:navigation")
-include(":core:mvi")
+include(":core:ui")
 
 include(":feature:home")
 include(":feature:map")
