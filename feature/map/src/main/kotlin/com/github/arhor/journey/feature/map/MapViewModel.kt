@@ -2,9 +2,11 @@ package com.github.arhor.journey.feature.map
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.fold
+import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
@@ -13,18 +15,21 @@ import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
-import com.github.arhor.journey.core.ui.MviViewModel
+import com.github.arhor.journey.feature.map.location.ForegroundUserLocationTracker
+import com.github.arhor.journey.feature.map.location.UserLocationUpdate
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private val DEFAULT_CAMERA_TARGET = LatLng(
@@ -42,6 +47,8 @@ private data class State(
     ),
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
     val recenterRequestToken: Int = 0,
+    val userLocation: LatLng? = null,
+    val userLocationTrackingStatus: UserLocationTrackingStatus = UserLocationTrackingStatus.INACTIVE,
     val isAwaitingLocationPermissionResult: Boolean = false,
     val failureMessage: String? = null,
 )
@@ -53,10 +60,12 @@ class MapViewModel @Inject constructor(
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
+    private val foregroundUserLocationTracker: ForegroundUserLocationTracker,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
     private val _state = MutableStateFlow(State())
+    private var locationTrackingJob: Job? = null
 
     override fun buildUiState(): Flow<MapUiState> = combine(
         _state,
@@ -74,6 +83,8 @@ class MapViewModel @Inject constructor(
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
+            is MapIntent.StartLocationTracking -> onStartLocationTracking()
+            is MapIntent.StopLocationTracking -> onStopLocationTracking()
             is MapIntent.CameraSettled -> onCameraSettled(intent)
             is MapIntent.CurrentLocationUnavailable -> onCurrentLocationUnavailable()
             is MapIntent.LocationPermissionResult -> onLocationPermissionResult(intent)
@@ -85,6 +96,54 @@ class MapViewModel @Inject constructor(
     }
 
     /* ------------------------------------------ Internal implementation ------------------------------------------- */
+
+    private fun onStartLocationTracking() {
+        if (locationTrackingJob != null) {
+            return
+        }
+
+        locationTrackingJob = viewModelScope.launch {
+            foregroundUserLocationTracker.observeLocations().collect { update ->
+                when (update) {
+                    is UserLocationUpdate.Available -> {
+                        _state.update {
+                            it.copy(
+                                userLocation = update.location.toLatLng(),
+                                userLocationTrackingStatus = UserLocationTrackingStatus.TRACKING,
+                            )
+                        }
+                    }
+
+                    UserLocationUpdate.LocationServicesDisabled -> {
+                        _state.update {
+                            it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.LOCATION_SERVICES_DISABLED)
+                        }
+                    }
+
+                    UserLocationUpdate.PermissionDenied -> {
+                        _state.update {
+                            it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.PERMISSION_DENIED)
+                        }
+                    }
+
+                    UserLocationUpdate.TemporarilyUnavailable -> {
+                        _state.update {
+                            it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.TEMPORARILY_UNAVAILABLE)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun onStopLocationTracking() {
+        locationTrackingJob?.cancel()
+        locationTrackingJob = null
+
+        _state.update {
+            it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.INACTIVE)
+        }
+    }
 
     private fun intoUiState(
         state: State,
@@ -98,6 +157,8 @@ class MapViewModel @Inject constructor(
                     cameraPosition = state.cameraPosition,
                     cameraUpdateOrigin = state.cameraUpdateOrigin,
                     recenterRequestToken = state.recenterRequestToken,
+                    userLocation = state.userLocation,
+                    userLocationTrackingStatus = state.userLocationTrackingStatus,
                     selectedStyle = it,
                     visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
                 )
@@ -141,6 +202,9 @@ class MapViewModel @Inject constructor(
             _state.update {
                 it.copy(recenterRequestToken = it.recenterRequestToken + 1)
             }
+
+            onStopLocationTracking()
+            onStartLocationTracking()
         } else {
             emitEffect(MapEffect.ShowMessage(LOCATION_PERMISSION_DENIED_MESSAGE))
         }

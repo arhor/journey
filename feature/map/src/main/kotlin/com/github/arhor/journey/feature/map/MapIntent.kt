@@ -5,6 +5,10 @@ import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 
 sealed interface MapIntent {
+    data object StartLocationTracking : MapIntent
+
+    data object StopLocationTracking : MapIntent
+
     data class CameraSettled(
         val position: CameraPositionState,
         val origin: CameraUpdateOrigin,

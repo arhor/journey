@@ -2,6 +2,7 @@ package com.github.arhor.journey.feature.map
 
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -13,6 +14,14 @@ fun MapRoute(
     snackbarHostState: SnackbarHostState,
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
+
+    DisposableEffect(Unit) {
+        vm.dispatch(MapIntent.StartLocationTracking)
+
+        onDispose {
+            vm.dispatch(MapIntent.StopLocationTracking)
+        }
+    }
 
     LaunchedEffect(Unit) {
         vm.effects.collect { effect ->
