@@ -235,7 +235,7 @@ private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
 private const val CAMERA_SETTLE_ZOOM_THRESHOLD = 0.01
 private val USER_LOCATION_TIMEOUT = 5.seconds
 private val USER_LOCATION_RECENTER_ANIMATION_DURATION = 600.milliseconds
-private const val LOCATION_PERMISSION = Manifest.permission.ACCESS_COARSE_LOCATION
+private const val LOCATION_PERMISSION = Manifest.permission.ACCESS_FINE_LOCATION
 
 @SuppressLint("MissingPermission")
 @Composable
