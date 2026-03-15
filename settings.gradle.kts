@@ -30,18 +30,14 @@ rootProject.name = "journey"
 
 include(":app")
 
+include(":data")
+
 include(":domain")
 
 include(":core:common")
-
-include(":data")
-
+include(":core:navigation")
 include(":core:mvi")
 
 include(":feature:home")
-
 include(":feature:map")
-
 include(":feature:settings")
-
-include(":core:navigation")
