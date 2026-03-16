@@ -4,14 +4,21 @@ import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationProgress
+import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.ExplorationTileGrid
+import com.github.arhor.journey.domain.model.ExplorationTilePrototype
+import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
+import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.feature.map.location.ForegroundUserLocationTracker
 import com.github.arhor.journey.feature.map.location.UserLocationUpdate
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
@@ -129,23 +136,32 @@ class MapViewModelTest {
         // Given
         val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
         val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
+        val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
+        val clearExploredTiles = mockk<ClearExploredTilesUseCase>()
         val foregroundUserLocationTracker = mockk<ForegroundUserLocationTracker>()
 
         every { observePointsOfInterest.invoke() } returns flowOf(emptyList())
         every { observeExplorationProgress.invoke() } returns flowOf(ExplorationProgress(discovered = emptySet()))
+        every { observeExploredTiles.invoke(any()) } returns flowOf(emptySet())
         every { observeSelectedMapStyle.invoke() } returns flow {
             throw IllegalStateException("Broken map style stream.")
         }
         coEvery { discoverPointOfInterest.invoke(any()) } just runs
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
+        coEvery { clearExploredTiles.invoke() } just runs
         every { foregroundUserLocationTracker.observeLocations() } returns flowOf(UserLocationUpdate.TemporarilyUnavailable)
 
         val viewModel = MapViewModel(
             observePointsOfInterest = observePointsOfInterest,
             observeExplorationProgress = observeExplorationProgress,
+            observeExploredTiles = observeExploredTiles,
             observeSelectedMapStyle = observeSelectedMapStyle,
             discoverPointOfInterest = discoverPointOfInterest,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            clearExploredTiles = clearExploredTiles,
             foregroundUserLocationTracker = foregroundUserLocationTracker,
         )
 
@@ -229,6 +245,37 @@ class MapViewModelTest {
             // Then
             val actual = fixture.viewModel.awaitContent()
             actual.userLocationTrackingStatus shouldBe UserLocationTrackingStatus.PERMISSION_DENIED
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should reveal exploration tiles when tracked location becomes available`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val location = GeoPoint(lat = 40.7128, lon = -74.0060)
+        val fixture = createFixture(
+            userLocationUpdates = flowOf(UserLocationUpdate.Available(location)),
+            revealTilesResult = setOf(
+                ExplorationTile(
+                    zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                    x = 19292,
+                    y = 24641,
+                ),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.StartLocationTracking)
+            advanceUntilIdle()
+
+            // Then
+            coVerify(exactly = 1) { fixture.revealExplorationTilesAtLocation.invoke(location) }
         } finally {
             tearDownMainDispatcher()
         }
@@ -422,6 +469,75 @@ class MapViewModelTest {
         }
     }
 
+    @Test
+    fun `dispatch should derive fog overlay stats when camera settles on visible bounds`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture(
+            exploredTiles = setOf(
+                ExplorationTile(
+                    zoom = visibleRange.zoom,
+                    x = 10,
+                    y = 20,
+                ),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = com.github.arhor.journey.feature.map.model.CameraPositionState(
+                        target = LatLng(latitude = 0.0, longitude = 0.0),
+                        zoom = 12.0,
+                    ),
+                    origin = CameraUpdateOrigin.USER,
+                    visibleBounds = ExplorationTileGrid.bounds(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 4L }
+            actual.fogOfWar.visibleTileCount shouldBe 4L
+            actual.fogOfWar.exploredVisibleTileCount shouldBe 1
+            actual.fogOfWar.fogRanges.size shouldBe 2
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should clear explored tiles when prototype clear action is tapped`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.ClearExploredTilesClicked)
+            advanceUntilIdle()
+
+            // Then
+            coVerify(exactly = 1) { fixture.clearExploredTiles.invoke() }
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
     private suspend fun MapViewModel.awaitContent(
         predicate: (MapUiState.Content) -> Boolean = { true },
     ): MapUiState.Content = uiState
@@ -442,6 +558,8 @@ class MapViewModelTest {
         val viewModel: MapViewModel,
         val mapStyle: MapStyle,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
+        val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
+        val clearExploredTiles: ClearExploredTilesUseCase,
     )
 
     private fun createFixture(
@@ -450,14 +568,19 @@ class MapViewModelTest {
             pointOfInterest(id = "poi-1", lat = 50.45, lon = 30.52),
         ),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
+        exploredTiles: Set<ExplorationTile> = emptySet(),
         discoverError: Throwable? = null,
+        revealTilesResult: Set<ExplorationTile> = emptySet(),
         userLocationUpdates: kotlinx.coroutines.flow.Flow<UserLocationUpdate> =
             flowOf(UserLocationUpdate.TemporarilyUnavailable),
     ): Fixture {
         val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
         val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
+        val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
+        val clearExploredTiles = mockk<ClearExploredTilesUseCase>()
         val foregroundUserLocationTracker = mockk<ForegroundUserLocationTracker>()
 
         val mapStyle = MapStyle.remote(
@@ -468,6 +591,7 @@ class MapViewModelTest {
 
         every { observePointsOfInterest.invoke() } returns MutableStateFlow(pointsOfInterest)
         every { observeExplorationProgress.invoke() } returns MutableStateFlow(explorationProgress)
+        every { observeExploredTiles.invoke(any()) } returns MutableStateFlow(exploredTiles)
         every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
             mapStyleOutput ?: Output.Success(mapStyle),
         )
@@ -478,18 +602,26 @@ class MapViewModelTest {
             coEvery { discoverPointOfInterest.invoke(any()) } just runs
         }
 
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns revealTilesResult
+        coEvery { clearExploredTiles.invoke() } just runs
+
         every { foregroundUserLocationTracker.observeLocations() } returns userLocationUpdates
 
         return Fixture(
             viewModel = MapViewModel(
                 observePointsOfInterest = observePointsOfInterest,
                 observeExplorationProgress = observeExplorationProgress,
+                observeExploredTiles = observeExploredTiles,
                 observeSelectedMapStyle = observeSelectedMapStyle,
                 discoverPointOfInterest = discoverPointOfInterest,
+                revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+                clearExploredTiles = clearExploredTiles,
                 foregroundUserLocationTracker = foregroundUserLocationTracker,
             ),
             mapStyle = mapStyle,
             discoverPointOfInterest = discoverPointOfInterest,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            clearExploredTiles = clearExploredTiles,
         )
     }
 

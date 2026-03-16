@@ -1,6 +1,7 @@
 package com.github.arhor.journey.feature.map
 
 import androidx.compose.runtime.Immutable
+import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
@@ -26,8 +27,18 @@ sealed interface MapUiState {
         val userLocationTrackingStatus: UserLocationTrackingStatus,
         val selectedStyle: MapStyle?,
         val visibleObjects: List<MapObjectUiModel>,
+        val fogOfWar: FogOfWarUiState,
     ) : MapUiState
 }
+
+@Immutable
+data class FogOfWarUiState(
+    val canonicalZoom: Int,
+    val fogRanges: List<ExplorationTileRange>,
+    val visibleTileCount: Long,
+    val exploredVisibleTileCount: Int,
+    val isSuppressedByVisibleTileLimit: Boolean,
+)
 
 enum class UserLocationTrackingStatus {
     INACTIVE,

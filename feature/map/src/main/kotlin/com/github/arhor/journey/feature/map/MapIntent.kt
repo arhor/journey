@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.map
 
+import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -12,6 +13,7 @@ sealed interface MapIntent {
     data class CameraSettled(
         val position: CameraPositionState,
         val origin: CameraUpdateOrigin,
+        val visibleBounds: GeoBounds?,
     ) : MapIntent
 
     data class MapTapped(
@@ -29,6 +31,8 @@ sealed interface MapIntent {
     data class ObjectTapped(
         val objectId: String,
     ) : MapIntent
+
+    data object ClearExploredTilesClicked : MapIntent
 
     data class MapLoadFailed(
         val message: String? = null,

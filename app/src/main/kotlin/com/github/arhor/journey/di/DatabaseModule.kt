@@ -6,6 +6,7 @@ import com.github.arhor.journey.data.local.db.JourneyDatabase
 import com.github.arhor.journey.data.local.db.RoomTransactionRunner
 import com.github.arhor.journey.data.local.db.dao.ActivityLogDao
 import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
+import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.dao.HeroDao
 import com.github.arhor.journey.data.local.db.dao.PoiDao
 import com.github.arhor.journey.domain.TransactionRunner
@@ -30,7 +31,12 @@ object DatabaseModule {
             JourneyDatabase::class.java,
             "journey.db",
         )
-            .addMigrations(JourneyDatabase.MIGRATION_1_2, JourneyDatabase.MIGRATION_2_3, JourneyDatabase.MIGRATION_3_4)
+            .addMigrations(
+                JourneyDatabase.MIGRATION_1_2,
+                JourneyDatabase.MIGRATION_2_3,
+                JourneyDatabase.MIGRATION_3_4,
+                JourneyDatabase.MIGRATION_4_5,
+            )
             .build()
 
     @Provides
@@ -44,6 +50,9 @@ object DatabaseModule {
 
     @Provides
     fun provideDiscoveredPoiDao(db: JourneyDatabase): DiscoveredPoiDao = db.discoveredPoiDao()
+
+    @Provides
+    fun provideExplorationTileDao(db: JourneyDatabase): ExplorationTileDao = db.explorationTileDao()
 
     @Provides
     @Singleton

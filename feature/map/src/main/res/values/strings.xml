@@ -1,4 +1,5 @@
 <resources>
     <string name="map_recenter_content_description">Center on my location</string>
+    <string name="map_clear_fog_button_label">Clear fog</string>
     <string name="map_nav_label">Map</string>
 </resources>

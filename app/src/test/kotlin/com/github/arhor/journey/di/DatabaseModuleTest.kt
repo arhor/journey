@@ -4,6 +4,7 @@ import com.github.arhor.journey.data.local.db.JourneyDatabase
 import com.github.arhor.journey.data.local.db.RoomTransactionRunner
 import com.github.arhor.journey.data.local.db.dao.ActivityLogDao
 import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
+import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.dao.HeroDao
 import com.github.arhor.journey.data.local.db.dao.PoiDao
 import io.kotest.assertions.throwables.shouldThrow
@@ -22,23 +23,27 @@ class DatabaseModuleTest {
         val activityLogDao = mockk<ActivityLogDao>()
         val poiDao = mockk<PoiDao>()
         val discoveredPoiDao = mockk<DiscoveredPoiDao>()
+        val explorationTileDao = mockk<ExplorationTileDao>()
 
         every { db.heroDao() } returns heroDao
         every { db.activityLogDao() } returns activityLogDao
         every { db.poiDao() } returns poiDao
         every { db.discoveredPoiDao() } returns discoveredPoiDao
+        every { db.explorationTileDao() } returns explorationTileDao
 
         // When
         val providedHeroDao = DatabaseModule.provideHeroDao(db)
         val providedActivityLogDao = DatabaseModule.provideActivityLogDao(db)
         val providedPoiDao = DatabaseModule.providePoiDao(db)
         val providedDiscoveredPoiDao = DatabaseModule.provideDiscoveredPoiDao(db)
+        val providedExplorationTileDao = DatabaseModule.provideExplorationTileDao(db)
 
         // Then
         providedHeroDao shouldBe heroDao
         providedActivityLogDao shouldBe activityLogDao
         providedPoiDao shouldBe poiDao
         providedDiscoveredPoiDao shouldBe discoveredPoiDao
+        providedExplorationTileDao shouldBe explorationTileDao
     }
 
     @Test
