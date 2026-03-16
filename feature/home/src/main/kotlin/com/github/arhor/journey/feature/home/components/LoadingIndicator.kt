@@ -1,6 +1,5 @@
-package com.github.arhor.journey.feature.home
+package com.github.arhor.journey.feature.home.components
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
