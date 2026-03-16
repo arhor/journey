@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.github.arhor.journey.feature.home"
+    namespace = "com.github.arhor.journey.feature.hero"
 
     compileSdk {
         version = release(36) {

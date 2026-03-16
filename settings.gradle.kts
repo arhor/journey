@@ -38,6 +38,6 @@ include(":core:common")
 include(":core:navigation")
 include(":core:ui")
 
-include(":feature:home")
+include(":feature:hero")
 include(":feature:map")
 include(":feature:settings")
