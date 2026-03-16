@@ -40,9 +40,8 @@ fun FogOfWarRendererAdapter(
     FillLayer(
         id = FOG_OF_WAR_LAYER_ID,
         source = source,
-        color = const(Color(0xFF0A1220)),
-        opacity = const(0.58f),
-        outlineColor = const(Color(0x66111924)),
+        color = const(Color(0xFF000000)),
+        opacity = const(0.90f),
     )
 }
 
