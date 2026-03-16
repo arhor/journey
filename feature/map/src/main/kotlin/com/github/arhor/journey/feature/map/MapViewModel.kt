@@ -43,20 +43,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private val DEFAULT_CAMERA_TARGET = LatLng(
-    latitude = 37.7749,
-    longitude = -122.4194,
-)
-
-private const val DEFAULT_ZOOM = 12.0
+private const val DEFAULT_CAMERA_ZOOM = 15.0
 private const val MAX_VISIBLE_FOG_TILE_COUNT = 8_192L
 
 @Immutable
 private data class State(
-    val cameraPosition: CameraPositionState = CameraPositionState(
-        target = DEFAULT_CAMERA_TARGET,
-        zoom = DEFAULT_ZOOM,
-    ),
+    val cameraPosition: CameraPositionState? = null,
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
     val recenterRequestToken: Int = 0,
     val userLocation: LatLng? = null,
@@ -165,9 +157,20 @@ class MapViewModel @Inject constructor(
     }
 
     private suspend fun onUserLocationAvailable(location: GeoPoint) {
-        _state.update {
-            it.copy(
-                userLocation = location.toLatLng(),
+        _state.update { state ->
+            val userLocation = location.toLatLng()
+
+            state.copy(
+                cameraPosition = state.cameraPosition ?: CameraPositionState(
+                    target = userLocation,
+                    zoom = DEFAULT_CAMERA_ZOOM,
+                ),
+                cameraUpdateOrigin = if (state.cameraPosition == null) {
+                    CameraUpdateOrigin.PROGRAMMATIC
+                } else {
+                    state.cameraUpdateOrigin
+                },
+                userLocation = userLocation,
                 userLocationTrackingStatus = UserLocationTrackingStatus.TRACKING,
             )
         }
@@ -260,24 +263,22 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onLocationPermissionResult(intent: MapIntent.LocationPermissionResult) {
-        val isAwaitingLocationPermissionResult = _state.value.isAwaitingLocationPermissionResult
+        val wasAwaitingLocationPermissionResult = _state.value.isAwaitingLocationPermissionResult
 
         _state.update {
             it.copy(isAwaitingLocationPermissionResult = false)
         }
 
-        if (!isAwaitingLocationPermissionResult) {
-            return
-        }
-
         if (intent.isGranted) {
-            _state.update {
-                it.copy(recenterRequestToken = it.recenterRequestToken + 1)
+            if (wasAwaitingLocationPermissionResult) {
+                _state.update {
+                    it.copy(recenterRequestToken = it.recenterRequestToken + 1)
+                }
             }
 
             onStopLocationTracking()
             onStartLocationTracking()
-        } else {
+        } else if (wasAwaitingLocationPermissionResult) {
             emitEffect(MapEffect.ShowMessage(LOCATION_PERMISSION_DENIED_MESSAGE))
         }
     }
@@ -291,7 +292,7 @@ class MapViewModel @Inject constructor(
             it.copy(
                 cameraPosition = CameraPositionState(
                     target = intent.target,
-                    zoom = it.cameraPosition.zoom,
+                    zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
                 ),
                 cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
             )
@@ -339,7 +340,7 @@ class MapViewModel @Inject constructor(
                         it.copy(
                             cameraPosition = CameraPositionState(
                                 target = objectUiModel.position,
-                                zoom = it.cameraPosition.zoom,
+                                zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
                             ),
                             cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
                         )

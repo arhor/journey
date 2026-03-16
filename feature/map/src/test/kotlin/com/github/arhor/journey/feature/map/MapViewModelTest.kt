@@ -52,6 +52,24 @@ import java.time.Instant
 class MapViewModelTest {
 
     @Test
+    fun `uiState should not expose a startup camera before the first location fix`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            // When
+            val actual = fixture.viewModel.awaitContent()
+
+            // Then
+            actual.cameraPosition shouldBe null
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `uiState should map discovery flags when exploration progress contains discovered points of interest`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -220,7 +238,38 @@ class MapViewModelTest {
             // Then
             val actual = fixture.viewModel.awaitContent { it.userLocation != null }
             actual.userLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.cameraPosition?.zoom shouldBe 15.0
             actual.userLocationTrackingStatus shouldBe UserLocationTrackingStatus.TRACKING
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should start tracking without recenter when location permission is granted before recenter click`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            userLocationUpdates = flowOf(
+                UserLocationUpdate.Available(GeoPoint(lat = 51.5074, lon = -0.1278)),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.LocationPermissionResult(isGranted = true))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.userLocation != null }
+            actual.recenterRequestToken shouldBe 0
+            actual.userLocation shouldBe LatLng(latitude = 51.5074, longitude = -0.1278)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 51.5074, longitude = -0.1278)
+            actual.cameraPosition?.zoom shouldBe 15.0
         } finally {
             tearDownMainDispatcher()
         }
@@ -411,9 +460,9 @@ class MapViewModelTest {
             coVerify(exactly = 1) { fixture.discoverPointOfInterest.invoke("poi-1") }
 
             val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition.target == LatLng(latitude = 51.1, longitude = 17.03)
+                it.cameraPosition?.target == LatLng(latitude = 51.1, longitude = 17.03)
             }
-            actual.cameraPosition.target shouldBe LatLng(latitude = 51.1, longitude = 17.03)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 51.1, longitude = 17.03)
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
             tearDownMainDispatcher()
