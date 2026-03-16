@@ -8,8 +8,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun HomeRoute(
-    vm: HomeViewModel = hiltViewModel(),
+fun HeroRoute(
+    vm: HeroViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -17,13 +17,13 @@ fun HomeRoute(
     LaunchedEffect(Unit) {
         vm.effects.collect {
             when (it) {
-                is HomeEffect.Error -> snackbarHostState.showSnackbar(it.message)
-                is HomeEffect.Success -> snackbarHostState.showSnackbar(it.message)
+                is HeroEffect.Error -> snackbarHostState.showSnackbar(it.message)
+                is HeroEffect.Success -> snackbarHostState.showSnackbar(it.message)
             }
         }
     }
 
-    HomeScreen(
+    HeroScreen(
         state = state,
         dispatch = vm::dispatch,
     )

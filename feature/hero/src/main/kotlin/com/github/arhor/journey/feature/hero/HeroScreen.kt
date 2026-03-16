@@ -21,20 +21,20 @@ import com.github.arhor.journey.feature.hero.components.LoadingIndicator
 import com.github.arhor.journey.feature.hero.components.StatRow
 
 @Composable
-fun HomeScreen(
-    state: HomeUiState,
-    dispatch: (HomeIntent) -> Unit,
+fun HeroScreen(
+    state: HeroUiState,
+    dispatch: (HeroIntent) -> Unit,
 ) {
     when (state) {
-        is HomeUiState.Loading -> LoadingIndicator()
-        is HomeUiState.Failure -> HomeFailure(state = state)
-        is HomeUiState.Content -> HomeContent(state = state, dispatch = dispatch)
+        is HeroUiState.Loading -> LoadingIndicator()
+        is HeroUiState.Failure -> HeroFailure(state = state)
+        is HeroUiState.Content -> HeroContent(state = state, dispatch = dispatch)
     }
 }
 
 @Composable
-internal fun HomeFailure(
-    state: HomeUiState.Failure,
+internal fun HeroFailure(
+    state: HeroUiState.Failure,
 ) {
     Column(
         modifier = Modifier
@@ -51,9 +51,9 @@ internal fun HomeFailure(
 }
 
 @Composable
-internal fun HomeContent(
-    state: HomeUiState.Content,
-    dispatch: (HomeIntent) -> Unit,
+internal fun HeroContent(
+    state: HeroUiState.Content,
+    dispatch: (HeroIntent) -> Unit,
 ) {
     val progress = if (state.xpToNextLevel == 0L) {
         0f
@@ -76,7 +76,7 @@ internal fun HomeContent(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.home_hero_summary_title),
+                    text = stringResource(R.string.hero_hero_summary_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
@@ -85,7 +85,7 @@ internal fun HomeContent(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = stringResource(R.string.home_hero_level_value, state.level),
+                    text = stringResource(R.string.hero_hero_level_value, state.level),
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
@@ -99,12 +99,12 @@ internal fun HomeContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.home_progress_title),
+                    text = stringResource(R.string.hero_progress_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
                     text = stringResource(
-                        R.string.home_progress_xp_value,
+                        R.string.hero_progress_xp_value,
                         state.xpInLevel,
                         state.xpToNextLevel,
                     ),
@@ -125,13 +125,13 @@ internal fun HomeContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.home_stats_title),
+                    text = stringResource(R.string.hero_stats_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                StatRow(label = stringResource(R.string.home_stat_strength), value = state.strength)
-                StatRow(label = stringResource(R.string.home_stat_vitality), value = state.vitality)
-                StatRow(label = stringResource(R.string.home_stat_dexterity), value = state.dexterity)
-                StatRow(label = stringResource(R.string.home_stat_stamina), value = state.stamina)
+                StatRow(label = stringResource(R.string.hero_stat_strength), value = state.strength)
+                StatRow(label = stringResource(R.string.hero_stat_vitality), value = state.vitality)
+                StatRow(label = stringResource(R.string.hero_stat_dexterity), value = state.dexterity)
+                StatRow(label = stringResource(R.string.hero_stat_stamina), value = state.stamina)
             }
         }
     }

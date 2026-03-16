@@ -10,7 +10,7 @@ This repository is a single-module Android app (`:app`) built with Kotlin + Jetp
 - Build config: `build.gradle.kts`, `settings.gradle.kts`, `app/build.gradle.kts`, `gradle/libs.versions.toml`
 - CI workflow: `.github/workflows/android-ci.yml`
 
-Organize features under `ui/views/<feature>` (for example `home`, `settings`) and keep shared UI in `ui/components`.
+Organize features under `ui/views/<feature>` (for example `hero`, `settings`) and keep shared UI in `ui/components`.
 
 ## Build, Test, and Development Commands
 Use the Gradle wrapper from repo root:
@@ -30,7 +30,7 @@ Style is enforced via `.editorconfig` and Gradle settings:
 - Indentation: 4 spaces; max line length: 120; UTF-8 + LF.
 - Kotlin style: `official` (`gradle.properties`).
 - Package names: lowercase (`com.github.arhor.journey...`).
-- Type names: PascalCase (`HomeViewModel`, `AppNavGraph`).
+- Type names: PascalCase (`HeroViewModel`, `AppNavGraph`).
 - Keep feature contracts explicit with `Intent`, `UiState`, and `Effect` types.
 - For `MviViewModel` screens, prefer unidirectional state composition:
   implement `buildUiState()` by combining internal feature state (`MutableStateFlow`) with domain flows,

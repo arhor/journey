@@ -33,18 +33,18 @@ private data class State(
 
 @Stable
 @HiltViewModel
-class HomeViewModel @Inject constructor(
+class HeroViewModel @Inject constructor(
     private val observeCurrentHero: ObserveHeroUseCase,
     private val observeActivityLog: ObserveActivityLogUseCase,
     private val logActivity: LogActivityUseCase,
     private val progressionPolicy: ProgressionPolicy,
     private val clock: Clock,
-) : MviViewModel<HomeUiState, HomeEffect, HomeIntent>(
-    initialState = HomeUiState.Loading,
+) : MviViewModel<HeroUiState, HeroEffect, HeroIntent>(
+    initialState = HeroUiState.Loading,
 ) {
     private val _state = MutableStateFlow(State())
 
-    override fun buildUiState(): Flow<HomeUiState> =
+    override fun buildUiState(): Flow<HeroUiState> =
         combine(
             _state,
             observeCurrentHero(),
@@ -52,17 +52,17 @@ class HomeViewModel @Inject constructor(
             ::intoUiState,
         ).catch {
             emit(
-                HomeUiState.Failure(
-                    errorMessage = it.message ?: HOME_LOADING_FAILED_MESSAGE,
+                HeroUiState.Failure(
+                    errorMessage = it.message ?: HERO_LOADING_FAILED_MESSAGE,
                 ),
             )
         }.distinctUntilChanged()
 
-    override suspend fun handleIntent(intent: HomeIntent) {
+    override suspend fun handleIntent(intent: HeroIntent) {
         when (intent) {
-            is HomeIntent.SelectActivityType -> onSelectActivityType(intent)
-            is HomeIntent.ChangeDurationMinutes -> onChangeDurationMinutes(intent)
-            is HomeIntent.SubmitActivity -> onSubmitActivity()
+            is HeroIntent.SelectActivityType -> onSelectActivityType(intent)
+            is HeroIntent.ChangeDurationMinutes -> onChangeDurationMinutes(intent)
+            is HeroIntent.SubmitActivity -> onSubmitActivity()
         }
     }
 
@@ -72,10 +72,10 @@ class HomeViewModel @Inject constructor(
         state: State,
         hero: Hero,
         activityLog: List<ActivityLogEntry>,
-    ): HomeUiState {
+    ): HeroUiState {
         val importedTodayEntries = importedTodayEntries(activityLog)
 
-        return HomeUiState.Content(
+        return HeroUiState.Content(
             heroName = hero.name,
             level = hero.progression.level,
             xpInLevel = hero.progression.xpInLevel,
@@ -92,13 +92,13 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    private fun onChangeDurationMinutes(intent: HomeIntent.ChangeDurationMinutes) {
+    private fun onChangeDurationMinutes(intent: HeroIntent.ChangeDurationMinutes) {
         _state.update {
             it.copy(durationMinutesInput = intent.value)
         }
     }
 
-    private fun onSelectActivityType(intent: HomeIntent.SelectActivityType) {
+    private fun onSelectActivityType(intent: HeroIntent.SelectActivityType) {
         _state.update {
             it.copy(selectedActivityType = intent.type)
         }
@@ -112,7 +112,7 @@ class HomeViewModel @Inject constructor(
 
         val minutes = state.durationMinutesOrNull()
         if (minutes == null) {
-            emitEffect(HomeEffect.Error(INVALID_DURATION_MESSAGE))
+            emitEffect(HeroEffect.Error(INVALID_DURATION_MESSAGE))
             return
         }
 
@@ -128,7 +128,7 @@ class HomeViewModel @Inject constructor(
                 ),
             )
             emitEffect(
-                HomeEffect.Success(
+                HeroEffect.Success(
                     message = if (result.levelUps > 0) {
                         "Activity logged: +${result.reward.xp} XP, +${result.levelUps} level(s)."
                     } else {
@@ -138,7 +138,7 @@ class HomeViewModel @Inject constructor(
             )
         } catch (e: Throwable) {
             emitEffect(
-                HomeEffect.Error(
+                HeroEffect.Error(
                     message = e.message ?: ACTIVITY_LOGGING_FAILED_MESSAGE,
                 ),
             )
@@ -179,7 +179,7 @@ class HomeViewModel @Inject constructor(
 
     private companion object {
         val VALID_DURATION_RANGE_MINUTES = 1..1440
-        const val HOME_LOADING_FAILED_MESSAGE = "Failed to load home state."
+        const val HERO_LOADING_FAILED_MESSAGE = "Failed to load hero state."
         const val INVALID_DURATION_MESSAGE = "Duration must be between 1 and 1440 minutes."
         const val ACTIVITY_LOGGING_FAILED_MESSAGE = "Failed to log activity."
     }

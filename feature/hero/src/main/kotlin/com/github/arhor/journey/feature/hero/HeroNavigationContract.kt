@@ -9,17 +9,17 @@ import com.github.arhor.journey.core.navigation.BottomNavDestination
 import kotlinx.serialization.Serializable
 
 @Serializable
-data object HomeDestination
+data object HeroDestination
 
-val homeBottomNavDestination = BottomNavDestination(
-    destination = HomeDestination,
-    labelRes = R.string.home_nav_label,
+val HeroBottomNavDestination = BottomNavDestination(
+    destination = HeroDestination,
+    labelRes = R.string.hero_nav_label,
     icon = Icons.Outlined.Groups,
-    testTag = "bottomNav:home",
+    testTag = "bottomNav:hero",
 )
 
-fun NavGraphBuilder.homeGraph(snackbarHostState: SnackbarHostState) {
-    composable<HomeDestination> {
-        HomeRoute(snackbarHostState = snackbarHostState)
+fun NavGraphBuilder.heroGraph(snackbarHostState: SnackbarHostState) {
+    composable<HeroDestination> {
+        HeroRoute(snackbarHostState = snackbarHostState)
     }
 }

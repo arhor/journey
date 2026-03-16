@@ -2,14 +2,14 @@ package com.github.arhor.journey.feature.hero
 
 import com.github.arhor.journey.domain.model.ActivityType
 
-sealed interface HomeIntent {
+sealed interface HeroIntent {
     data class SelectActivityType(
         val type: ActivityType,
-    ) : HomeIntent
+    ) : HeroIntent
 
     data class ChangeDurationMinutes(
         val value: String,
-    ) : HomeIntent
+    ) : HeroIntent
 
-    data object SubmitActivity : HomeIntent
+    data object SubmitActivity : HeroIntent
 }

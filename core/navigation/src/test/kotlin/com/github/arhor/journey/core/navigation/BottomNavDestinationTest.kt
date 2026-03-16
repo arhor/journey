@@ -14,22 +14,22 @@ class BottomNavDestinationTest {
     @Test
     fun `constructor should keep provided contract values when destination is created`() {
         // Given
-        val icon = testIcon(name = "home")
+        val icon = testIcon(name = "hero")
         val destination = BottomNavDestination(
-            destination = "home-route",
+            destination = "hero-route",
             labelRes = 101,
             icon = icon,
-            testTag = "bottomNav:home",
+            testTag = "bottomNav:hero",
         )
 
         // When
         val actual = destination
 
         // Then
-        actual.destination shouldBe "home-route"
+        actual.destination shouldBe "hero-route"
         actual.labelRes shouldBe 101
         actual.icon shouldBe icon
-        actual.testTag shouldBe "bottomNav:home"
+        actual.testTag shouldBe "bottomNav:hero"
     }
 
     @Test
@@ -81,12 +81,12 @@ class BottomNavDestinationTest {
     @Test
     fun `copy should update only overridden property when destination changes`() {
         // Given
-        val icon = testIcon(name = "home")
+        val icon = testIcon(name = "hero")
         val initial = BottomNavDestination(
-            destination = Route("home"),
+            destination = Route("hero"),
             labelRes = 401,
             icon = icon,
-            testTag = "bottomNav:home",
+            testTag = "bottomNav:hero",
         )
 
         // When
@@ -96,7 +96,7 @@ class BottomNavDestinationTest {
         actual.destination shouldBe Route("map")
         actual.labelRes shouldBe 401
         actual.icon shouldBe icon
-        actual.testTag shouldBe "bottomNav:home"
+        actual.testTag shouldBe "bottomNav:hero"
     }
 
     @Test
@@ -104,7 +104,7 @@ class BottomNavDestinationTest {
         // Given
         val icon = testIcon(name = "poi")
         val first = BottomNavDestination(
-            destination = Route("home"),
+            destination = Route("hero"),
             labelRes = 501,
             icon = icon,
             testTag = "bottomNav:route",
@@ -123,14 +123,14 @@ class BottomNavDestinationTest {
     fun `equals should return false when compared to a different type`() {
         // Given
         val destination = BottomNavDestination(
-            destination = "home-route",
+            destination = "hero-route",
             labelRes = 601,
-            icon = testIcon(name = "home"),
-            testTag = "bottomNav:home",
+            icon = testIcon(name = "hero"),
+            testTag = "bottomNav:hero",
         )
 
         // When
-        val areEqual = destination.equals("home-route")
+        val areEqual = destination.equals("hero-route")
 
         // Then
         areEqual shouldBe false

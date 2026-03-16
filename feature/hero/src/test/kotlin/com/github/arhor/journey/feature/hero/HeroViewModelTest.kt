@@ -40,7 +40,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 
-class HomeViewModelTest {
+class HeroViewModelTest {
 
     private val fixedNow = Instant.parse("2026-03-15T10:15:30Z")
     private val fixedClock = Clock.fixed(fixedNow, ZoneOffset.UTC)
@@ -96,12 +96,12 @@ class HomeViewModelTest {
             runCurrent()
 
             // When
-            viewModel.dispatch(HomeIntent.ChangeDurationMinutes("0"))
-            viewModel.dispatch(HomeIntent.SubmitActivity)
+            viewModel.dispatch(HeroIntent.ChangeDurationMinutes("0"))
+            viewModel.dispatch(HeroIntent.SubmitActivity)
             advanceUntilIdle()
 
             // Then
-            effectDeferred.await() shouldBe HomeEffect.Error("Duration must be between 1 and 1440 minutes.")
+            effectDeferred.await() shouldBe HeroEffect.Error("Duration must be between 1 and 1440 minutes.")
             activityLogRepository.insertCalls shouldBe 0
             viewModel.awaitContent { it.durationMinutesInput == "0" }.isSubmitting shouldBe false
         } finally {
@@ -130,11 +130,11 @@ class HomeViewModelTest {
             runCurrent()
 
             // When
-            viewModel.dispatch(HomeIntent.SubmitActivity)
+            viewModel.dispatch(HeroIntent.SubmitActivity)
             advanceUntilIdle()
 
             // Then
-            effectDeferred.await() shouldBe HomeEffect.Success("Activity logged: +300 XP, +1 level(s).")
+            effectDeferred.await() shouldBe HeroEffect.Success("Activity logged: +300 XP, +1 level(s).")
             activityLogRepository.insertCalls shouldBe 1
             activityLogRepository.recordedActivities.single() shouldBe RecordedActivity(
                 type = ActivityType.WALK,
@@ -173,11 +173,11 @@ class HomeViewModelTest {
             runCurrent()
 
             // When
-            viewModel.dispatch(HomeIntent.SubmitActivity)
+            viewModel.dispatch(HeroIntent.SubmitActivity)
             advanceUntilIdle()
 
             // Then
-            effectDeferred.await() shouldBe HomeEffect.Error("Storage unavailable.")
+            effectDeferred.await() shouldBe HeroEffect.Error("Storage unavailable.")
             activityLogRepository.insertCalls shouldBe 1
             viewModel.awaitContent().isSubmitting shouldBe false
         } finally {
@@ -195,8 +195,8 @@ class HomeViewModelTest {
             viewModel.awaitContent()
 
             // When
-            viewModel.dispatch(HomeIntent.SelectActivityType(ActivityType.WORKOUT))
-            viewModel.dispatch(HomeIntent.ChangeDurationMinutes("45"))
+            viewModel.dispatch(HeroIntent.SelectActivityType(ActivityType.WORKOUT))
+            viewModel.dispatch(HeroIntent.ChangeDurationMinutes("45"))
             val content = viewModel.awaitContent {
                 it.selectedActivityType == ActivityType.WORKOUT &&
                     it.durationMinutesInput == "45"
@@ -210,10 +210,10 @@ class HomeViewModelTest {
         }
     }
 
-    private suspend fun HomeViewModel.awaitContent(
-        predicate: (HomeUiState.Content) -> Boolean = { true },
-    ): HomeUiState.Content = uiState
-        .mapNotNull { it as? HomeUiState.Content }
+    private suspend fun HeroViewModel.awaitContent(
+        predicate: (HeroUiState.Content) -> Boolean = { true },
+    ): HeroUiState.Content = uiState
+        .mapNotNull { it as? HeroUiState.Content }
         .first(predicate)
 
     private fun TestScope.tearDownMainDispatcher() {
@@ -226,7 +226,7 @@ class HomeViewModelTest {
     private fun createSubject(
         heroRepository: HeroRepository = FakeHeroRepository(initialHero = defaultHero()),
         activityLogRepository: FakeActivityLogRepository = FakeActivityLogRepository(),
-    ): HomeViewModel {
+    ): HeroViewModel {
         val logActivity = LogActivityUseCase(
             heroRepository = heroRepository,
             activityLogRepository = activityLogRepository,
@@ -236,7 +236,7 @@ class HomeViewModelTest {
             clock = fixedClock,
         )
 
-        return HomeViewModel(
+        return HeroViewModel(
             observeCurrentHero = ObserveHeroUseCase(heroRepository),
             observeActivityLog = ObserveActivityLogUseCase(activityLogRepository),
             logActivity = logActivity,

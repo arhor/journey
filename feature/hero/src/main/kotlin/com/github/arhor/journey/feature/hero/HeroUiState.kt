@@ -3,13 +3,13 @@ package com.github.arhor.journey.feature.hero
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ActivityType
 
-sealed interface HomeUiState {
+sealed interface HeroUiState {
 
     @Immutable
-    data object Loading : HomeUiState
+    data object Loading : HeroUiState
 
     @Immutable
-    data class Failure(val errorMessage: String) : HomeUiState
+    data class Failure(val errorMessage: String) : HeroUiState
 
     @Immutable
     data class Content(
@@ -26,5 +26,5 @@ sealed interface HomeUiState {
         val isSubmitting: Boolean,
         val importedTodayActivities: Int,
         val importedTodaySteps: Long,
-    ) : HomeUiState
+    ) : HeroUiState
 }
