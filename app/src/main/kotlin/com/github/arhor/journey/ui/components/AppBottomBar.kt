@@ -20,6 +20,13 @@ import com.github.arhor.journey.ui.navigation.bottomNavDestinations
 fun AppBottomBar(navController: NavHostController) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val graphHierarchy = backStackEntry?.destination?.hierarchy ?: emptySequence()
+    val isBottomBarDestination = bottomNavDestinations.any { destination ->
+        graphHierarchy.any { it.hasRoute(destination.destination::class) }
+    }
+
+    if (!isBottomBarDestination) {
+        return
+    }
 
     NavigationBar {
         bottomNavDestinations.forEach { destination ->

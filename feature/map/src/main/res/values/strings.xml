@@ -2,4 +2,14 @@
     <string name="map_recenter_content_description">Center on my location</string>
     <string name="map_clear_fog_button_label">Clear fog</string>
     <string name="map_nav_label">Map</string>
+    <string name="poi_details_title">Point of interest</string>
+    <string name="poi_details_back_content_description">Navigate back</string>
+    <string name="poi_details_category_label">Category</string>
+    <string name="poi_details_id_label">Identifier</string>
+    <string name="poi_details_radius_label">Discovery radius</string>
+    <string name="poi_details_radius_value">%1$d m</string>
+    <string name="poi_details_coordinates_label">Coordinates</string>
+    <string name="poi_details_coordinates_value">%1$.6f, %2$.6f</string>
+    <string name="poi_details_description_label">Description</string>
+    <string name="poi_details_description_empty">No description available.</string>
 </resources>

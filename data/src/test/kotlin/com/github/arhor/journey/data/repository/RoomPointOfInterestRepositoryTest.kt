@@ -84,6 +84,33 @@ class RoomPointOfInterestRepositoryTest {
         actual.last().category.name shouldBe "LANDMARK"
     }
 
+    @Test
+    fun `getById should map dao entity when point of interest exists`() = runTest {
+        // Given
+        val dao = FakePoiDao(
+            countValue = 1,
+            observedItems = listOf(
+                PoiEntity(
+                    id = "poi-1",
+                    name = "Known",
+                    description = "Known description",
+                    category = "LANDMARK",
+                    lat = 52.0,
+                    lon = 21.0,
+                    radiusMeters = 80,
+                ),
+            ),
+        )
+        val subject = RoomPointOfInterestRepository(dao = dao)
+
+        // When
+        val actual = subject.getById("poi-1")
+
+        // Then
+        actual?.id shouldBe "poi-1"
+        actual?.name shouldBe "Known"
+    }
+
     private suspend fun <T> Flow<T>.firstValue(): T = first()
 
     private class FakePoiDao(

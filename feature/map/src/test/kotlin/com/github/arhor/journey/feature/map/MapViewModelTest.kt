@@ -52,6 +52,32 @@ import java.time.Instant
 class MapViewModelTest {
 
     @Test
+    fun `uiState should center initial camera on available points of interest when points are loaded`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            pointsOfInterest = listOf(
+                pointOfInterest(id = "poi-1", lat = 52.238789, lon = 21.017278),
+                pointOfInterest(id = "poi-2", lat = 52.251667, lon = 21.012222),
+            ),
+        )
+
+        try {
+            // When
+            val actual = fixture.viewModel.awaitContent()
+
+            // Then
+            actual.cameraPosition.target shouldBe LatLng(
+                latitude = (52.238789 + 52.251667) / 2.0,
+                longitude = (21.017278 + 21.012222) / 2.0,
+            )
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `uiState should map discovery flags when exploration progress contains discovered points of interest`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 

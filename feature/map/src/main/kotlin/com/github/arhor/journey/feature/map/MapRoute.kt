@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 fun MapRoute(
     vm: MapViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
+    onOpenObjectDetails: (String) -> Unit,
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -48,7 +49,7 @@ fun MapRoute(
                 }
 
                 is MapEffect.OpenObjectDetails -> {
-                    snackbarHostState.showSnackbar("Open details for ${effect.objectId}")
+                    onOpenObjectDetails(effect.objectId)
                 }
             }
         }

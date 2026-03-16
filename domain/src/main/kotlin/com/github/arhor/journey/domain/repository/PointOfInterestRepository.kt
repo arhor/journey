@@ -7,6 +7,8 @@ interface PointOfInterestRepository {
 
     fun observeAll(): Flow<List<PointOfInterest>>
 
+    suspend fun getById(id: String): PointOfInterest?
+
     /**
      * Ensures a small seed set of POIs exists.
      *
