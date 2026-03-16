@@ -111,6 +111,23 @@ class RoomPointOfInterestRepositoryTest {
         actual?.name shouldBe "Known"
     }
 
+    @Test
+    fun `upsert should map point of interest and pass entity to dao`() = runTest {
+        // Given
+        val dao = FakePoiDao(
+            countValue = 1,
+            observedItems = emptyList(),
+        )
+        val subject = RoomPointOfInterestRepository(dao = dao)
+        val pointOfInterest = PointOfInterestSeed.items.first()
+
+        // When
+        subject.upsert(pointOfInterest)
+
+        // Then
+        dao.upsertedEntity shouldBe pointOfInterest.toEntity()
+    }
+
     private suspend fun <T> Flow<T>.firstValue(): T = first()
 
     private class FakePoiDao(
@@ -118,6 +135,7 @@ class RoomPointOfInterestRepositoryTest {
         private val observedItems: List<PoiEntity>,
     ) : PoiDao {
         var upsertedEntities: List<PoiEntity>? = null
+        var upsertedEntity: PoiEntity? = null
 
         override fun observeAll(): Flow<List<PoiEntity>> = flowOf(observedItems)
 
@@ -125,6 +143,10 @@ class RoomPointOfInterestRepositoryTest {
             observedItems.firstOrNull { it.id == id }
 
         override suspend fun count(): Int = countValue
+
+        override suspend fun upsert(entity: PoiEntity) {
+            upsertedEntity = entity
+        }
 
         override suspend fun upsertAll(entities: List<PoiEntity>) {
             upsertedEntities = entities

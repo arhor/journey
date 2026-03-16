@@ -19,6 +19,9 @@ interface PoiDao {
     suspend fun count(): Int
 
     @Upsert
+    suspend fun upsert(entity: PoiEntity)
+
+    @Upsert
     suspend fun upsertAll(entities: List<PoiEntity>)
 }
 

@@ -66,6 +66,8 @@ class ObservePointsOfInterestUseCaseTest {
 
         override suspend fun getById(id: String): PointOfInterest? = null
 
+        override suspend fun upsert(pointOfInterest: PointOfInterest) = Unit
+
         override suspend fun ensureSeeded() {
             ensureSeededCalls += 1
             ensureSeededError?.let { throw it }

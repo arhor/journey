@@ -18,6 +18,12 @@ data class PoiDetailsDestination(
     val poiId: String,
 )
 
+@Serializable
+data class AddPoiDestination(
+    val initialLatitude: Double,
+    val initialLongitude: Double,
+)
+
 val mapBottomNavDestination = BottomNavDestination(
     destination = MapDestination,
     labelRes = R.string.map_nav_label,
@@ -35,11 +41,26 @@ fun NavGraphBuilder.mapGraph(
             onOpenObjectDetails = { poiId ->
                 navController.navigate(PoiDetailsDestination(poiId = poiId))
             },
+            onOpenAddPoi = { latitude, longitude ->
+                navController.navigate(
+                    AddPoiDestination(
+                        initialLatitude = latitude,
+                        initialLongitude = longitude,
+                    ),
+                )
+            },
         )
     }
 
     composable<PoiDetailsDestination> {
         PoiDetailsRoute(
+            onBack = navController::navigateUp,
+        )
+    }
+
+    composable<AddPoiDestination> {
+        AddPoiRoute(
+            snackbarHostState = snackbarHostState,
             onBack = navController::navigateUp,
         )
     }

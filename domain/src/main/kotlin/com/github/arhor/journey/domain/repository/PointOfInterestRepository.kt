@@ -9,6 +9,8 @@ interface PointOfInterestRepository {
 
     suspend fun getById(id: String): PointOfInterest?
 
+    suspend fun upsert(pointOfInterest: PointOfInterest)
+
     /**
      * Ensures a small seed set of POIs exists.
      *

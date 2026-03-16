@@ -413,6 +413,43 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `dispatch should open add poi flow using current camera target when add poi is clicked`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = com.github.arhor.journey.feature.map.model.CameraPositionState(
+                        target = LatLng(latitude = 52.1, longitude = 21.2),
+                        zoom = 12.0,
+                    ),
+                    origin = CameraUpdateOrigin.USER,
+                    visibleBounds = null,
+                ),
+            )
+            advanceUntilIdle()
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.AddPoiClicked)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.OpenAddPoi(
+                latitude = 52.1,
+                longitude = 21.2,
+            )
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `dispatch should recenter camera and open object details when tapped object is present`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 

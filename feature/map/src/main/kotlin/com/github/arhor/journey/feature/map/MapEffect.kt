@@ -5,6 +5,11 @@ sealed interface MapEffect {
         val objectId: String,
     ) : MapEffect
 
+    data class OpenAddPoi(
+        val latitude: Double,
+        val longitude: Double,
+    ) : MapEffect
+
     data class ShowMessage(
         val message: String,
     ) : MapEffect

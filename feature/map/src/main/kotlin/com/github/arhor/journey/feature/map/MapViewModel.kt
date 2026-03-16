@@ -111,6 +111,7 @@ class MapViewModel @Inject constructor(
             is MapIntent.MapTapped -> onMapTapped(intent)
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
+            MapIntent.AddPoiClicked -> onAddPoiClicked()
             is MapIntent.ClearExploredTilesClicked -> onClearExploredTilesClicked()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
@@ -298,6 +299,16 @@ class MapViewModel @Inject constructor(
                 cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
             )
         }
+    }
+
+    private fun onAddPoiClicked() {
+        val target = _state.value.cameraPosition.target
+        emitEffect(
+            MapEffect.OpenAddPoi(
+                latitude = target.latitude,
+                longitude = target.longitude,
+            ),
+        )
     }
 
     private fun onCameraSettled(intent: MapIntent.CameraSettled) {

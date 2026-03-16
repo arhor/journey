@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -235,6 +236,25 @@ internal fun MapContent(
                 .align(Alignment.TopStart)
                 .padding(16.dp),
         )
+
+        FloatingActionButton(
+            onClick = {
+                dispatch(MapIntent.AddPoiClicked)
+            },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(
+                    PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 24.dp,
+                    ),
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Add,
+                contentDescription = stringResource(R.string.map_add_poi_content_description),
+            )
+        }
 
         FloatingActionButton(
             onClick = {
