@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.home
+package com.github.arhor.journey.feature.hero
 
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ActivityType

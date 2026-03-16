@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.home
+package com.github.arhor.journey.feature.hero
 
 sealed interface HomeEffect {
 

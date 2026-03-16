@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.home
+package com.github.arhor.journey.feature.hero
 
 import com.github.arhor.journey.domain.TransactionRunner
 import com.github.arhor.journey.domain.internal.ActivityRewardCalculator

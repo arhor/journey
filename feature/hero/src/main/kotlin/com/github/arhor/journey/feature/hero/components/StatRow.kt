@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.home.components
+package com.github.arhor.journey.feature.hero.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

@@ -7,8 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import com.github.arhor.journey.feature.home.HomeDestination
-import com.github.arhor.journey.feature.home.homeGraph
+import com.github.arhor.journey.feature.hero.HomeDestination
+import com.github.arhor.journey.feature.hero.homeGraph
 import com.github.arhor.journey.feature.map.mapGraph
 import com.github.arhor.journey.feature.settings.settingsGraph
 

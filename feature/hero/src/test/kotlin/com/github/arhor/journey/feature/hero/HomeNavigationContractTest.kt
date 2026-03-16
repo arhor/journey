@@ -1,6 +1,5 @@
-package com.github.arhor.journey.feature.home
+package com.github.arhor.journey.feature.hero
 
-import com.github.arhor.journey.feature.home.R
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 

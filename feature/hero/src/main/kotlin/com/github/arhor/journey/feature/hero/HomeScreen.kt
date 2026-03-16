@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.home
+package com.github.arhor.journey.feature.hero
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,8 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.github.arhor.journey.feature.home.components.LoadingIndicator
-import com.github.arhor.journey.feature.home.components.StatRow
+import com.github.arhor.journey.feature.hero.components.LoadingIndicator
+import com.github.arhor.journey.feature.hero.components.StatRow
 
 @Composable
 fun HomeScreen(

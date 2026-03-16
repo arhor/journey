@@ -1,7 +1,8 @@
-package com.github.arhor.journey.feature.home
+package com.github.arhor.journey.feature.hero
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.internal.ProgressionPolicy
 import com.github.arhor.journey.domain.model.ActivityLogEntry
 import com.github.arhor.journey.domain.model.ActivitySource
@@ -11,7 +12,6 @@ import com.github.arhor.journey.domain.model.RecordedActivity
 import com.github.arhor.journey.domain.usecase.LogActivityUseCase
 import com.github.arhor.journey.domain.usecase.ObserveActivityLogUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroUseCase
-import com.github.arhor.journey.core.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

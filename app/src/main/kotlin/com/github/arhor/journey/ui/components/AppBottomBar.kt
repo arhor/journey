@@ -14,7 +14,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.github.arhor.journey.feature.home.homeBottomNavDestination
+import com.github.arhor.journey.feature.hero.homeBottomNavDestination
 import com.github.arhor.journey.feature.map.mapBottomNavDestination
 import com.github.arhor.journey.feature.settings.settingsBottomNavDestination
 
