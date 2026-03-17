@@ -32,12 +32,14 @@ sealed interface MapUiState {
         val selectedStyle: MapStyle?,
         val visibleObjects: List<MapObjectUiModel>,
         val fogOfWar: FogOfWarUiState,
+        val debug: MapDebugUiState,
     ) : MapUiState
 }
 
 @Immutable
 data class FogOfWarUiState(
     val canonicalZoom: Int,
+    val visibleTileRange: ExplorationTileRange?,
     val fogRanges: List<ExplorationTileRange>,
     val visibleTileCount: Long,
     val exploredVisibleTileCount: Int,

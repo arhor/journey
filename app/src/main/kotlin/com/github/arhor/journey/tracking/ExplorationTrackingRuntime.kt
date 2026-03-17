@@ -6,6 +6,7 @@ import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
+import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.tracking.location.UserLocationSource
 import com.github.arhor.journey.tracking.location.UserLocationUpdate
@@ -25,6 +26,7 @@ class ExplorationTrackingRuntime @Inject constructor(
     @AppCoroutineScope private val appScope: CoroutineScope,
     private val userLocationSource: UserLocationSource,
     private val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
+    private val configHolder: ExplorationTileRuntimeConfigHolder,
 ) {
     private val cadence = MutableStateFlow(ExplorationTrackingCadence.BACKGROUND)
     private val session = MutableStateFlow(
@@ -147,7 +149,12 @@ class ExplorationTrackingRuntime @Inject constructor(
             )
         }
 
-        val revealTiles = ExplorationTileGrid.revealTilesAround(update.location)
+        val config = configHolder.snapshot()
+        val revealTiles = ExplorationTileGrid.revealTilesAround(
+            point = update.location,
+            radiusMeters = config.revealRadiusMeters,
+            zoom = config.canonicalZoom,
+        )
         if (revealTiles == lastRevealedTiles) {
             return
         }

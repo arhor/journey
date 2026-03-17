@@ -8,6 +8,35 @@ import com.github.arhor.journey.feature.map.model.LatLng
 sealed interface MapIntent {
     data object MapOpened : MapIntent
 
+    data object DebugControlsClicked : MapIntent
+
+    data object DebugControlsDismissed : MapIntent
+
+    data class DebugInfoVisibilityChanged(
+        val item: MapDebugInfoItem,
+        val isVisible: Boolean,
+    ) : MapIntent
+
+    data class FogOfWarOverlayToggled(
+        val isEnabled: Boolean,
+    ) : MapIntent
+
+    data class TilesGridOverlayToggled(
+        val isEnabled: Boolean,
+    ) : MapIntent
+
+    data class CanonicalZoomChanged(
+        val value: Int,
+    ) : MapIntent
+
+    data class RevealRadiusMetersChanged(
+        val value: Int,
+    ) : MapIntent
+
+    data class MapRenderModeSelected(
+        val mode: MapRenderMode,
+    ) : MapIntent
+
     data object ResumeTrackingClicked : MapIntent
 
     data object StopTrackingClicked : MapIntent
@@ -39,7 +68,7 @@ sealed interface MapIntent {
 
     data object AddPoiClicked : MapIntent
 
-    data object ClearExploredTilesClicked : MapIntent
+    data object ResetExploredTilesClicked : MapIntent
 
     data class MapLoadFailed(
         val message: String? = null,

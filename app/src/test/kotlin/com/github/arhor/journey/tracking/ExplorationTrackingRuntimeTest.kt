@@ -2,6 +2,7 @@ package com.github.arhor.journey.tracking
 
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
+import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.testing.MainDispatcherRule
@@ -33,6 +34,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
         coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
@@ -59,6 +61,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = mockk(relaxed = true),
+            configHolder = ExplorationTileRuntimeConfigHolder(),
         )
 
         // When
@@ -79,6 +82,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = FakeUserLocationSource(),
             revealExplorationTilesAtLocation = mockk(relaxed = true),
+            configHolder = ExplorationTileRuntimeConfigHolder(),
         )
 
         // When
@@ -92,6 +96,34 @@ class ExplorationTrackingRuntimeTest {
         runtime.snapshot().isActive shouldBe false
         runtime.snapshot().status shouldBe ExplorationTrackingStatus.INACTIVE
         runtime.snapshot().cadence shouldBe ExplorationTrackingCadence.FOREGROUND
+    }
+
+    @Test
+    fun `startIfNeeded should reveal again for the same location after canonical zoom changes`() = runTest {
+        // Given
+        val userLocationSource = FakeUserLocationSource()
+        val configHolder = ExplorationTileRuntimeConfigHolder()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
+        val runtime = ExplorationTrackingRuntime(
+            appScope = backgroundScope,
+            userLocationSource = userLocationSource,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            configHolder = configHolder,
+        )
+        val location = GeoPoint(lat = 40.7128, lon = -74.0060)
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
+
+        // When
+        runtime.startIfNeeded()
+        runCurrent()
+        userLocationSource.emit(UserLocationUpdate.Available(location))
+        runCurrent()
+        configHolder.setCanonicalZoom(18)
+        userLocationSource.emit(UserLocationUpdate.Available(location))
+        runCurrent()
+
+        // Then
+        coVerify(exactly = 2) { revealExplorationTilesAtLocation.invoke(location) }
     }
 
     private class FakeUserLocationSource : UserLocationSource {

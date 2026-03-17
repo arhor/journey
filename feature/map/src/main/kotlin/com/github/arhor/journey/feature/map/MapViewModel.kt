@@ -10,9 +10,8 @@ import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
-import com.github.arhor.journey.domain.model.ExplorationTilePrototype
+import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTileRange
-import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
@@ -21,11 +20,14 @@ import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUseCase
+import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.model.CameraPositionState
@@ -56,6 +58,14 @@ private data class State(
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
     val recenterRequestToken: Int = 0,
     val isAwaitingLocationPermissionResult: Boolean = false,
+    val isDebugControlsSheetVisible: Boolean = false,
+    val enabledDebugInfoItems: Set<MapDebugInfoItem> = emptySet(),
+    val isFogOfWarOverlayEnabled: Boolean = true,
+    val isTilesGridOverlayEnabled: Boolean = false,
+    val canonicalZoom: Int,
+    val revealRadiusMeters: Int,
+    val mapRenderMode: MapRenderMode = MapRenderMode.Standard,
+    val visibleBounds: GeoBounds? = null,
     val visibleTileRange: ExplorationTileRange? = null,
     val fogTileRange: ExplorationTileRange? = null,
     val visibleTileCount: Long = 0,
@@ -72,13 +82,22 @@ class MapViewModel @Inject constructor(
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
     private val clearExploredTiles: ClearExploredTilesUseCase,
+    private val getExplorationTileRuntimeConfig: GetExplorationTileRuntimeConfigUseCase,
+    private val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
+    private val setExplorationTileRevealRadius: SetExplorationTileRevealRadiusUseCase,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
     private val stopExplorationTrackingSession: StopExplorationTrackingSessionUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
-    private val _state = MutableStateFlow(State())
+    private val initialTileRuntimeConfig = getExplorationTileRuntimeConfig()
+    private val _state = MutableStateFlow(
+        State(
+            canonicalZoom = initialTileRuntimeConfig.canonicalZoom,
+            revealRadiusMeters = initialTileRuntimeConfig.revealRadiusMeters.toInt(),
+        ),
+    )
     private val trackingSession = observeExplorationTrackingSession()
         .stateIn(
             scope = viewModelScope,
@@ -124,6 +143,14 @@ class MapViewModel @Inject constructor(
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
             MapIntent.MapOpened -> onMapOpened()
+            MapIntent.DebugControlsClicked -> onDebugControlsClicked()
+            MapIntent.DebugControlsDismissed -> onDebugControlsDismissed()
+            is MapIntent.DebugInfoVisibilityChanged -> onDebugInfoVisibilityChanged(intent)
+            is MapIntent.FogOfWarOverlayToggled -> onFogOfWarOverlayToggled(intent)
+            is MapIntent.TilesGridOverlayToggled -> onTilesGridOverlayToggled(intent)
+            is MapIntent.CanonicalZoomChanged -> onCanonicalZoomChanged(intent)
+            is MapIntent.RevealRadiusMetersChanged -> onRevealRadiusMetersChanged(intent)
+            is MapIntent.MapRenderModeSelected -> onMapRenderModeSelected(intent)
             MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
             MapIntent.StopTrackingClicked -> onStopTrackingClicked()
             is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
@@ -134,7 +161,7 @@ class MapViewModel @Inject constructor(
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
             MapIntent.AddPoiClicked -> onAddPoiClicked()
-            is MapIntent.ClearExploredTilesClicked -> onClearExploredTilesClicked()
+            is MapIntent.ResetExploredTilesClicked -> onClearExploredTilesClicked()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
@@ -151,6 +178,82 @@ class MapViewModel @Inject constructor(
 
     private suspend fun onMapOpened() {
         startTrackingSessionIfNeeded()
+    }
+
+    private fun onDebugControlsClicked() {
+        _state.update {
+            it.copy(isDebugControlsSheetVisible = true)
+        }
+    }
+
+    private fun onDebugControlsDismissed() {
+        _state.update {
+            it.copy(isDebugControlsSheetVisible = false)
+        }
+    }
+
+    private fun onDebugInfoVisibilityChanged(intent: MapIntent.DebugInfoVisibilityChanged) {
+        _state.update { state ->
+            val enabledItems = state.enabledDebugInfoItems.toMutableSet().apply {
+                if (intent.isVisible) {
+                    add(intent.item)
+                } else {
+                    remove(intent.item)
+                }
+            }
+
+            state.copy(enabledDebugInfoItems = enabledItems.toSet())
+        }
+    }
+
+    private fun onFogOfWarOverlayToggled(intent: MapIntent.FogOfWarOverlayToggled) {
+        _state.update {
+            it.copy(isFogOfWarOverlayEnabled = intent.isEnabled)
+        }
+    }
+
+    private fun onTilesGridOverlayToggled(intent: MapIntent.TilesGridOverlayToggled) {
+        _state.update {
+            it.copy(isTilesGridOverlayEnabled = intent.isEnabled)
+        }
+    }
+
+    private fun onCanonicalZoomChanged(intent: MapIntent.CanonicalZoomChanged) {
+        val canonicalZoom = intent.value.coerceIn(
+            minimumValue = ExplorationTileRuntimeConfig.MIN_CANONICAL_ZOOM,
+            maximumValue = ExplorationTileRuntimeConfig.MAX_CANONICAL_ZOOM,
+        )
+        setExplorationTileCanonicalZoom(canonicalZoom)
+
+        _state.update { state ->
+            val updatedState = state.copy(canonicalZoom = canonicalZoom)
+            val visibleBounds = state.visibleBounds ?: return@update updatedState
+
+            updatedState.withFogViewport(
+                visibleBounds = visibleBounds,
+                fogViewport = fogViewport(
+                    visibleBounds = visibleBounds,
+                    canonicalZoom = canonicalZoom,
+                ),
+            )
+        }
+    }
+
+    private fun onRevealRadiusMetersChanged(intent: MapIntent.RevealRadiusMetersChanged) {
+        val revealRadiusMeters = intent.value.coerceAtLeast(
+            minimumValue = ExplorationTileRuntimeConfig.MIN_REVEAL_RADIUS_METERS.toInt(),
+        )
+        setExplorationTileRevealRadius(revealRadiusMeters.toDouble())
+
+        _state.update {
+            it.copy(revealRadiusMeters = revealRadiusMeters)
+        }
+    }
+
+    private fun onMapRenderModeSelected(intent: MapIntent.MapRenderModeSelected) {
+        _state.update {
+            it.copy(mapRenderMode = intent.mode)
+        }
     }
 
     private suspend fun onResumeTrackingClicked() {
@@ -213,6 +316,15 @@ class MapViewModel @Inject constructor(
                         state = state,
                         exploredTiles = exploredTiles,
                     ),
+                    debug = MapDebugUiState(
+                        isSheetVisible = state.isDebugControlsSheetVisible,
+                        enabledInfoItems = state.enabledDebugInfoItems,
+                        isFogOfWarOverlayEnabled = state.isFogOfWarOverlayEnabled,
+                        isTilesGridOverlayEnabled = state.isTilesGridOverlayEnabled,
+                        canonicalZoom = state.canonicalZoom,
+                        revealRadiusMeters = state.revealRadiusMeters,
+                        renderMode = state.mapRenderMode,
+                    ),
                 )
             },
             onFailure = {
@@ -237,7 +349,8 @@ class MapViewModel @Inject constructor(
         )
 
         return FogOfWarUiState(
-            canonicalZoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            canonicalZoom = state.canonicalZoom,
+            visibleTileRange = state.visibleTileRange,
             fogRanges = fogRanges,
             visibleTileCount = state.visibleTileCount,
             exploredVisibleTileCount = state.visibleTileRange?.let { visibleRange ->
@@ -333,26 +446,26 @@ class MapViewModel @Inject constructor(
     }
 
     private fun updateFogViewport(visibleBounds: GeoBounds) {
-        val fogViewport = fogViewport(visibleBounds)
+        val fogViewport = fogViewport(
+            visibleBounds = visibleBounds,
+            canonicalZoom = _state.value.canonicalZoom,
+        )
 
         _state.update {
-            if (it.matches(fogViewport)) {
-                it
-            } else {
-                it.copy(
-                    visibleTileRange = fogViewport.visibleTileRange,
-                    fogTileRange = fogViewport.fogTileRange,
-                    visibleTileCount = fogViewport.visibleTileCount,
-                    isFogSuppressedByVisibleTileLimit = fogViewport.isSuppressedByVisibleTileLimit,
-                )
-            }
+            it.withFogViewport(
+                visibleBounds = visibleBounds,
+                fogViewport = fogViewport,
+            )
         }
     }
 
-    private fun fogViewport(visibleBounds: GeoBounds): FogViewport {
+    private fun fogViewport(
+        visibleBounds: GeoBounds,
+        canonicalZoom: Int,
+    ): FogViewport {
         val visibleTileRange = ExplorationTileGrid.tileRange(
             bounds = visibleBounds,
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = canonicalZoom,
         )
         val visibleTileWidth = visibleTileRange.widthInTiles()
         val visibleTileHeight = visibleTileRange.heightInTiles()
@@ -482,6 +595,23 @@ class MapViewModel @Inject constructor(
             && fogTileRange == fogViewport.fogTileRange
             && visibleTileCount == fogViewport.visibleTileCount
             && isFogSuppressedByVisibleTileLimit == fogViewport.isSuppressedByVisibleTileLimit
+    }
+
+    private fun State.withFogViewport(
+        visibleBounds: GeoBounds,
+        fogViewport: FogViewport,
+    ): State {
+        if (this.visibleBounds == visibleBounds && matches(fogViewport)) {
+            return copy(visibleBounds = visibleBounds)
+        }
+
+        return copy(
+            visibleBounds = visibleBounds,
+            visibleTileRange = fogViewport.visibleTileRange,
+            fogTileRange = fogViewport.fogTileRange,
+            visibleTileCount = fogViewport.visibleTileCount,
+            isFogSuppressedByVisibleTileLimit = fogViewport.isSuppressedByVisibleTileLimit,
+        )
     }
 
     private fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1

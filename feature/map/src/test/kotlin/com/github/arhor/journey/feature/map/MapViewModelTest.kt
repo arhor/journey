@@ -7,6 +7,7 @@ import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTilePrototype
+import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
@@ -19,14 +20,16 @@ import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUseCase
+import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
-import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import io.kotest.matchers.shouldBe
@@ -36,6 +39,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -91,6 +95,30 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `uiState should expose clean debug defaults by default`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            // When
+            val actual = fixture.viewModel.awaitContent()
+
+            // Then
+            actual.debug.isSheetVisible shouldBe false
+            actual.debug.enabledInfoItems shouldBe emptySet()
+            actual.debug.isFogOfWarOverlayEnabled shouldBe true
+            actual.debug.isTilesGridOverlayEnabled shouldBe false
+            actual.debug.canonicalZoom shouldBe ExplorationTilePrototype.CANONICAL_ZOOM
+            actual.debug.revealRadiusMeters shouldBe ExplorationTilePrototype.REVEAL_RADIUS_METERS.toInt()
+            actual.debug.renderMode shouldBe MapRenderMode.Standard
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `uiState should emit failure when selected map style output fails with message`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -107,6 +135,142 @@ class MapViewModelTest {
 
             // Then
             actual shouldBe MapUiState.Failure(errorMessage = "Map styles unavailable.")
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should toggle debug sheet visibility without affecting camera state`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            val initial = fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.DebugControlsClicked)
+            advanceUntilIdle()
+            val opened = fixture.viewModel.awaitContent { it.debug.isSheetVisible }
+
+            fixture.viewModel.dispatch(MapIntent.DebugControlsDismissed)
+            advanceUntilIdle()
+            val closed = fixture.viewModel.awaitContent { !it.debug.isSheetVisible }
+
+            // Then
+            opened.cameraPosition shouldBe initial.cameraPosition
+            closed.cameraPosition shouldBe initial.cameraPosition
+            closed.debug.enabledInfoItems shouldBe emptySet()
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should keep debug info items independent when one item is enabled`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.DebugInfoVisibilityChanged(
+                    item = MapDebugInfoItem.VisibleTiles,
+                    isVisible = true,
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                MapDebugInfoItem.VisibleTiles in it.debug.enabledInfoItems
+            }
+            actual.debug.enabledInfoItems shouldBe setOf(MapDebugInfoItem.VisibleTiles)
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should update local rendering toggles without invoking actions`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.FogOfWarOverlayToggled(isEnabled = false))
+            fixture.viewModel.dispatch(MapIntent.TilesGridOverlayToggled(isEnabled = true))
+            fixture.viewModel.dispatch(MapIntent.MapRenderModeSelected(mode = MapRenderMode.Debug))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                !it.debug.isFogOfWarOverlayEnabled &&
+                    it.debug.isTilesGridOverlayEnabled &&
+                    it.debug.renderMode == MapRenderMode.Debug
+            }
+            actual.debug.isFogOfWarOverlayEnabled shouldBe false
+            actual.debug.isTilesGridOverlayEnabled shouldBe true
+            actual.debug.renderMode shouldBe MapRenderMode.Debug
+            coVerify(exactly = 0) { fixture.clearExploredTiles.invoke() }
+            coVerify(exactly = 0) { fixture.startTrackingSession.invoke() }
+            coVerify(exactly = 0) { fixture.stopTrackingSession.invoke() }
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should update exploration prototype values without invoking actions`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(initialVisibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.CanonicalZoomChanged(value = 18))
+            fixture.viewModel.dispatch(MapIntent.RevealRadiusMetersChanged(value = 42))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.debug.canonicalZoom == 18 && it.debug.revealRadiusMeters == 42
+            }
+            actual.debug.canonicalZoom shouldBe 18
+            actual.debug.revealRadiusMeters shouldBe 42
+            actual.fogOfWar.canonicalZoom shouldBe 18
+            actual.fogOfWar.visibleTileRange?.zoom shouldBe 18
+            coVerify(exactly = 0) { fixture.clearExploredTiles.invoke() }
+            coVerify(exactly = 0) { fixture.startTrackingSession.invoke() }
+            coVerify(exactly = 0) { fixture.stopTrackingSession.invoke() }
+            verify(exactly = 1) { fixture.setExplorationTileCanonicalZoom.invoke(18) }
+            verify(exactly = 1) { fixture.setExplorationTileRevealRadius.invoke(42.0) }
         } finally {
             tearDownMainDispatcher()
         }
@@ -350,7 +514,7 @@ class MapViewModelTest {
             fixture.viewModel.awaitContent()
 
             // When
-            fixture.viewModel.dispatch(MapIntent.ClearExploredTilesClicked)
+            fixture.viewModel.dispatch(MapIntent.ResetExploredTilesClicked)
             advanceUntilIdle()
 
             // Then
@@ -381,6 +545,8 @@ class MapViewModelTest {
         val mapStyle: MapStyle,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
         val clearExploredTiles: ClearExploredTilesUseCase,
+        val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
+        val setExplorationTileRevealRadius: SetExplorationTileRevealRadiusUseCase,
         val startTrackingSession: StartExplorationTrackingSessionUseCase,
         val stopTrackingSession: StopExplorationTrackingSessionUseCase,
     )
@@ -393,6 +559,7 @@ class MapViewModelTest {
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<ExplorationTile> = emptySet(),
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
+        tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: StartExplorationTrackingSessionResult =
             StartExplorationTrackingSessionResult.AlreadyActive,
     ): Fixture {
@@ -402,6 +569,9 @@ class MapViewModelTest {
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
         val clearExploredTiles = mockk<ClearExploredTilesUseCase>()
+        val getExplorationTileRuntimeConfig = mockk<GetExplorationTileRuntimeConfigUseCase>()
+        val setExplorationTileCanonicalZoom = mockk<SetExplorationTileCanonicalZoomUseCase>()
+        val setExplorationTileRevealRadius = mockk<SetExplorationTileRevealRadiusUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
         val stopTrackingSession = mockk<StopExplorationTrackingSessionUseCase>()
@@ -418,7 +588,10 @@ class MapViewModelTest {
         every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
             mapStyleOutput ?: Output.Success(mapStyle),
         )
+        every { getExplorationTileRuntimeConfig.invoke() } returns tileRuntimeConfig
         every { observeExplorationTrackingSession.invoke() } returns MutableStateFlow(trackingSession)
+        every { setExplorationTileCanonicalZoom.invoke(any()) } just runs
+        every { setExplorationTileRevealRadius.invoke(any()) } just runs
 
         coEvery { discoverPointOfInterest.invoke(any()) } just runs
         coEvery { clearExploredTiles.invoke() } just runs
@@ -433,6 +606,9 @@ class MapViewModelTest {
                 observeSelectedMapStyle = observeSelectedMapStyle,
                 discoverPointOfInterest = discoverPointOfInterest,
                 clearExploredTiles = clearExploredTiles,
+                getExplorationTileRuntimeConfig = getExplorationTileRuntimeConfig,
+                setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
+                setExplorationTileRevealRadius = setExplorationTileRevealRadius,
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 stopExplorationTrackingSession = stopTrackingSession,
@@ -440,6 +616,8 @@ class MapViewModelTest {
             mapStyle = mapStyle,
             discoverPointOfInterest = discoverPointOfInterest,
             clearExploredTiles = clearExploredTiles,
+            setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
+            setExplorationTileRevealRadius = setExplorationTileRevealRadius,
             startTrackingSession = startTrackingSession,
             stopTrackingSession = stopTrackingSession,
         )

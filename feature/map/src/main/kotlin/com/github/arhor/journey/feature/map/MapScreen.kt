@@ -5,7 +5,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -14,10 +13,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +32,7 @@ import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.renderer.FogOfWarRendererAdapter
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
+import com.github.arhor.journey.feature.map.renderer.TilesGridRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -200,7 +196,7 @@ internal fun MapContent(
                     cameraState = cameraState,
                     styleState = styleState,
                     options = MapOptions(
-                        renderOptions = RenderOptions.Debug,
+                        renderOptions = state.debug.renderMode.toRenderOptions(),
                         gestureOptions = GestureOptions.Standard,
                         ornamentOptions = OrnamentOptions.AllDisabled,
                     ),
@@ -225,9 +221,20 @@ internal fun MapContent(
                         )
                     }
 
-                    FogOfWarRendererAdapter(
-                        fogRanges = state.fogOfWar.fogRanges,
-                    )
+                    if (state.debug.isFogOfWarOverlayEnabled) {
+                        FogOfWarRendererAdapter(
+                            fogRanges = state.fogOfWar.fogRanges,
+                        )
+                    }
+
+                    if (
+                        state.debug.isTilesGridOverlayEnabled &&
+                        !state.fogOfWar.isSuppressedByVisibleTileLimit
+                    ) {
+                        TilesGridRendererAdapter(
+                            tileRange = state.fogOfWar.visibleTileRange,
+                        )
+                    }
 
                     MapObjectsRendererAdapter(
                         objects = state.visibleObjects,
@@ -239,31 +246,23 @@ internal fun MapContent(
             }
         }
 
-        FogOfWarDebugPanel(
-            fogOfWar = state.fogOfWar,
-            onClearExploredTiles = {
-                dispatch(MapIntent.ClearExploredTilesClicked)
-            },
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp),
-        )
+        if (BuildConfig.DEBUG) {
+            MapDebugInfoOverlay(
+                state = state,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp),
+            )
 
-        TrackingStatusPanel(
-            state = state,
-            onPrimaryAction = {
-                dispatch(
-                    if (state.isExplorationTrackingActive) {
-                        MapIntent.StopTrackingClicked
-                    } else {
-                        MapIntent.ResumeTrackingClicked
-                    },
-                )
-            },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
-        )
+            MapDebugButton(
+                onClick = {
+                    dispatch(MapIntent.DebugControlsClicked)
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+            )
+        }
 
         FloatingActionButton(
             onClick = {
@@ -314,89 +313,12 @@ internal fun MapContent(
                 modifier = Modifier.align(Alignment.Center),
             )
         }
-    }
-}
 
-@Composable
-private fun FogOfWarDebugPanel(
-    fogOfWar: FogOfWarUiState,
-    onClearExploredTiles: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-        tonalElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Text(
-                text = "Fog z${fogOfWar.canonicalZoom}",
-                style = MaterialTheme.typography.labelLarge,
+        if (BuildConfig.DEBUG && state.debug.isSheetVisible) {
+            MapDebugControlsSheet(
+                state = state,
+                dispatch = dispatch,
             )
-            Text(
-                text = "Visible tiles: ${fogOfWar.visibleTileCount}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = "Explored here: ${fogOfWar.exploredVisibleTileCount}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            Text(
-                text = if (fogOfWar.isSuppressedByVisibleTileLimit) {
-                    "Fog hidden for current viewport size"
-                } else {
-                    "Fog regions: ${fogOfWar.fogRanges.size}"
-                },
-                style = MaterialTheme.typography.bodySmall,
-            )
-            TextButton(
-                onClick = onClearExploredTiles,
-            ) {
-                Text(text = stringResource(R.string.map_clear_fog_button_label))
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrackingStatusPanel(
-    state: MapUiState.Content,
-    onPrimaryAction: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-        tonalElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.map_tracking_panel_title),
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Text(
-                text = stringResource(state.trackingStatusMessageRes()),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            TextButton(
-                onClick = onPrimaryAction,
-            ) {
-                Text(
-                    text = stringResource(
-                        if (state.isExplorationTrackingActive) {
-                            R.string.map_tracking_stop_button_label
-                        } else {
-                            R.string.map_tracking_resume_button_label
-                        },
-                    ),
-                )
-            }
         }
     }
 }
@@ -460,13 +382,8 @@ private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosit
     zoom = zoom,
 )
 
-private fun MapUiState.Content.trackingStatusMessageRes(): Int {
-    return when (explorationTrackingStatus) {
-        ExplorationTrackingStatus.INACTIVE -> R.string.map_tracking_status_inactive
-        ExplorationTrackingStatus.STARTING -> R.string.map_tracking_status_starting
-        ExplorationTrackingStatus.TRACKING -> R.string.map_tracking_status_active
-        ExplorationTrackingStatus.PERMISSION_DENIED -> R.string.map_tracking_status_permission_denied
-        ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED -> R.string.map_tracking_status_location_disabled
-        ExplorationTrackingStatus.TEMPORARILY_UNAVAILABLE -> R.string.map_tracking_status_waiting
+private fun MapRenderMode.toRenderOptions(): RenderOptions =
+    when (this) {
+        MapRenderMode.Standard -> RenderOptions.Standard
+        MapRenderMode.Debug -> RenderOptions.Debug
     }
-}

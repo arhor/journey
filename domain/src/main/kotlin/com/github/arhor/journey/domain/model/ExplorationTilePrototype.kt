@@ -6,7 +6,7 @@ object ExplorationTilePrototype {
      *
      * Exploration storage stays at this zoom regardless of the visual map zoom.
      */
-    const val CANONICAL_ZOOM = 20
+    const val CANONICAL_ZOOM = 19
 
     /**
      * Prototype reveal radius around the live user location.
@@ -14,5 +14,5 @@ object ExplorationTilePrototype {
      * The current implementation expands this into a simple north-aligned geographic bounds before
      * enumerating intersecting canonical tiles.
      */
-    const val REVEAL_RADIUS_METERS = 20.0
+    const val REVEAL_RADIUS_METERS = 10.0
 }
