@@ -24,7 +24,10 @@ fun AppNavGraph(
         modifier = Modifier.padding(innerPadding),
     ) {
         heroGraph(snackbarHostState = snackbarHostState)
-        mapGraph(snackbarHostState = snackbarHostState)
+        mapGraph(
+            navController = navController,
+            snackbarHostState = snackbarHostState,
+        )
         settingsGraph(snackbarHostState = snackbarHostState)
     }
 }

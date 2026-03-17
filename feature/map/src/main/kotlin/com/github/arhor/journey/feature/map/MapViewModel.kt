@@ -106,6 +106,7 @@ class MapViewModel @Inject constructor(
             is MapIntent.MapTapped -> onMapTapped(intent)
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
+            MapIntent.AddPoiClicked -> onAddPoiClicked()
             is MapIntent.ClearExploredTilesClicked -> onClearExploredTilesClicked()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
@@ -209,8 +210,10 @@ class MapViewModel @Inject constructor(
     ): MapUiState = if (state.failureMessage == null) {
         mapStyleOutput.fold(
             onSuccess = {
+                val resolvedCameraPosition = state.cameraPosition.centerOn(pointsOfInterest)
+
                 MapUiState.Content(
-                    cameraPosition = state.cameraPosition,
+                    cameraPosition = resolvedCameraPosition,
                     cameraUpdateOrigin = state.cameraUpdateOrigin,
                     recenterRequestToken = state.recenterRequestToken,
                     userLocation = state.userLocation,
@@ -304,6 +307,20 @@ class MapViewModel @Inject constructor(
         }
     }
 
+    private fun onAddPoiClicked() {
+        val target = _state.value.cameraPosition.target
+        emitEffect(
+            MapEffect.OpenAddPoi(
+                latitude = target.latitude,
+                longitude = target.longitude,
+            ),
+        )
+    }
+
+    private fun onCameraSettled(intent: MapIntent.CameraSettled) {
+        val fogViewport = fogViewport(intent.visibleBounds)
+    }
+    
     private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
         updateFogViewport(intent.visibleBounds)
     }
@@ -420,6 +437,27 @@ class MapViewModel @Inject constructor(
             latitude = lat,
             longitude = lon,
         )
+
+    private fun CameraPositionState.centerOn(pointsOfInterest: List<PointOfInterest>): CameraPositionState {
+        if (
+            target != DEFAULT_CAMERA_TARGET ||
+            pointsOfInterest.isEmpty()
+        ) {
+            return this
+        }
+
+        val minLatitude = pointsOfInterest.minOf { it.location.lat }
+        val maxLatitude = pointsOfInterest.maxOf { it.location.lat }
+        val minLongitude = pointsOfInterest.minOf { it.location.lon }
+        val maxLongitude = pointsOfInterest.maxOf { it.location.lon }
+
+        return copy(
+            target = LatLng(
+                latitude = (minLatitude + maxLatitude) / 2.0,
+                longitude = (minLongitude + maxLongitude) / 2.0,
+            ),
+        )
+    }
 
     @Immutable
     private data class FogViewport(

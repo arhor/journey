@@ -53,24 +53,6 @@ import java.time.Instant
 class MapViewModelTest {
 
     @Test
-    fun `uiState should not expose a startup camera before the first location fix`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture()
-
-        try {
-            // When
-            val actual = fixture.viewModel.awaitContent()
-
-            // Then
-            actual.cameraPosition shouldBe null
-        } finally {
-            tearDownMainDispatcher()
-        }
-    }
-
-    @Test
     fun `uiState should map discovery flags when exploration progress contains discovered points of interest`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -430,6 +412,43 @@ class MapViewModelTest {
             // Then
             effectDeferred.await() shouldBe MapEffect.ShowMessage(
                 message = "Current location is not available yet.",
+            )
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should open add poi flow using current camera target when add poi is clicked`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = com.github.arhor.journey.feature.map.model.CameraPositionState(
+                        target = LatLng(latitude = 52.1, longitude = 21.2),
+                        zoom = 12.0,
+                    ),
+                    origin = CameraUpdateOrigin.USER,
+                    visibleBounds = null,
+                ),
+            )
+            advanceUntilIdle()
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.AddPoiClicked)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.OpenAddPoi(
+                latitude = 52.1,
+                longitude = 21.2,
             )
         } finally {
             tearDownMainDispatcher()

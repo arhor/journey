@@ -84,6 +84,50 @@ class RoomPointOfInterestRepositoryTest {
         actual.last().category.name shouldBe "LANDMARK"
     }
 
+    @Test
+    fun `getById should map dao entity when point of interest exists`() = runTest {
+        // Given
+        val dao = FakePoiDao(
+            countValue = 1,
+            observedItems = listOf(
+                PoiEntity(
+                    id = "poi-1",
+                    name = "Known",
+                    description = "Known description",
+                    category = "LANDMARK",
+                    lat = 52.0,
+                    lon = 21.0,
+                    radiusMeters = 80,
+                ),
+            ),
+        )
+        val subject = RoomPointOfInterestRepository(dao = dao)
+
+        // When
+        val actual = subject.getById("poi-1")
+
+        // Then
+        actual?.id shouldBe "poi-1"
+        actual?.name shouldBe "Known"
+    }
+
+    @Test
+    fun `upsert should map point of interest and pass entity to dao`() = runTest {
+        // Given
+        val dao = FakePoiDao(
+            countValue = 1,
+            observedItems = emptyList(),
+        )
+        val subject = RoomPointOfInterestRepository(dao = dao)
+        val pointOfInterest = PointOfInterestSeed.items.first()
+
+        // When
+        subject.upsert(pointOfInterest)
+
+        // Then
+        dao.upsertedEntity shouldBe pointOfInterest.toEntity()
+    }
+
     private suspend fun <T> Flow<T>.firstValue(): T = first()
 
     private class FakePoiDao(
@@ -91,6 +135,7 @@ class RoomPointOfInterestRepositoryTest {
         private val observedItems: List<PoiEntity>,
     ) : PoiDao {
         var upsertedEntities: List<PoiEntity>? = null
+        var upsertedEntity: PoiEntity? = null
 
         override fun observeAll(): Flow<List<PoiEntity>> = flowOf(observedItems)
 
@@ -98,6 +143,10 @@ class RoomPointOfInterestRepositoryTest {
             observedItems.firstOrNull { it.id == id }
 
         override suspend fun count(): Int = countValue
+
+        override suspend fun upsert(entity: PoiEntity) {
+            upsertedEntity = entity
+        }
 
         override suspend fun upsertAll(entities: List<PoiEntity>) {
             upsertedEntities = entities

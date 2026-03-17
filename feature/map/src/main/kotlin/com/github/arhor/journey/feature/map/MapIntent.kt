@@ -35,6 +35,8 @@ sealed interface MapIntent {
         val objectId: String,
     ) : MapIntent
 
+    data object AddPoiClicked : MapIntent
+
     data object ClearExploredTilesClicked : MapIntent
 
     data class MapLoadFailed(
