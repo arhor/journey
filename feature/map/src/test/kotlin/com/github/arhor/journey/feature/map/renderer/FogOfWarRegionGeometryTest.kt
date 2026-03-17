@@ -107,6 +107,59 @@ class FogOfWarRegionGeometryTest {
         actual.containsPointNear(x = 0.073_223_304_7, y = 0.073_223_304_7, tolerance = 1e-6) shouldBe true
         actual.containsPointNear(x = 1.073_223_304_7, y = 1.073_223_304_7, tolerance = 1e-6) shouldBe true
     }
+
+    @Test
+    fun `toTileRegionGeometries should preserve rounded corners for an interior fog tile`() {
+        // Given
+        val fogRanges = listOf(
+            ExplorationTileRange(
+                zoom = 16,
+                minX = 10,
+                maxX = 10,
+                minY = 20,
+                maxY = 20,
+            ),
+        )
+
+        // When
+        val actual = fogRanges.toTileRegionGeometries(
+            cornerRadiusTiles = 0.25,
+            arcSegmentsPerCorner = 2,
+        )
+
+        // Then
+        val outerRing = actual.single().outerRing.points
+        outerRing.containsPointNear(x = 10.0, y = 20.0) shouldBe false
+        outerRing.containsPointNear(x = 10.073_223_304_7, y = 20.073_223_304_7, tolerance = 1e-6) shouldBe true
+    }
+
+    @Test
+    fun `toTileRegionGeometries should keep the original corner only when rounding is disabled`() {
+        // Given
+        val fogRanges = listOf(
+            ExplorationTileRange(
+                zoom = 16,
+                minX = 10,
+                maxX = 10,
+                minY = 20,
+                maxY = 20,
+            ),
+        )
+
+        // When
+        val rounded = fogRanges.toTileRegionGeometries(
+            cornerRadiusTiles = 0.25,
+            arcSegmentsPerCorner = 2,
+        ).single().outerRing.points
+        val unrounded = fogRanges.toTileRegionGeometries(
+            cornerRadiusTiles = 0.0,
+            arcSegmentsPerCorner = 2,
+        ).single().outerRing.points
+
+        // Then
+        rounded.containsPointNear(x = 10.0, y = 20.0) shouldBe false
+        unrounded.containsPointNear(x = 10.0, y = 20.0) shouldBe true
+    }
 }
 
 private fun List<GridPoint>.containsPointNear(

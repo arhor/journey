@@ -35,4 +35,31 @@ data class ExplorationTileRange(
             }
         }
     }
+
+    fun expandedBy(tilePadding: Int): ExplorationTileRange =
+        expandedBy(
+            horizontalTilePadding = tilePadding,
+            verticalTilePadding = tilePadding,
+        )
+
+    fun expandedBy(
+        horizontalTilePadding: Int,
+        verticalTilePadding: Int,
+    ): ExplorationTileRange {
+        require(horizontalTilePadding >= 0) { "horizontalTilePadding must be >= 0" }
+        require(verticalTilePadding >= 0) { "verticalTilePadding must be >= 0" }
+
+        if (horizontalTilePadding == 0 && verticalTilePadding == 0) {
+            return this
+        }
+
+        val maxTileIndex = (1 shl zoom) - 1
+
+        return copy(
+            minX = (minX - horizontalTilePadding).coerceAtLeast(0),
+            maxX = (maxX + horizontalTilePadding).coerceAtMost(maxTileIndex),
+            minY = (minY - verticalTilePadding).coerceAtLeast(0),
+            maxY = (maxY + verticalTilePadding).coerceAtMost(maxTileIndex),
+        )
+    }
 }
