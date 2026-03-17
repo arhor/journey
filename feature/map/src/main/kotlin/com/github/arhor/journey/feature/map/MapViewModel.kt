@@ -44,6 +44,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val DEFAULT_CAMERA_ZOOM = 15.0
+private const val FOG_TILE_RANGE_PADDING = 1
 private const val MAX_VISIBLE_FOG_TILE_COUNT = 8_192L
 
 @Immutable
@@ -55,6 +56,7 @@ private data class State(
     val userLocationTrackingStatus: UserLocationTrackingStatus = UserLocationTrackingStatus.INACTIVE,
     val isAwaitingLocationPermissionResult: Boolean = false,
     val visibleTileRange: ExplorationTileRange? = null,
+    val fogTileRange: ExplorationTileRange? = null,
     val visibleTileCount: Long = 0,
     val isFogSuppressedByVisibleTileLimit: Boolean = false,
     val failureMessage: String? = null,
@@ -83,7 +85,7 @@ class MapViewModel @Inject constructor(
         observeSelectedMapStyle(),
         observePointsOfInterest(),
         observeExplorationProgress(),
-        observeVisibleExploredTiles(),
+        observeFogExploredTiles(),
         ::intoUiState,
     ).catch {
         emit(
@@ -110,10 +112,10 @@ class MapViewModel @Inject constructor(
 
     /* ------------------------------------------ Internal implementation ------------------------------------------- */
 
-    private fun observeVisibleExploredTiles(): Flow<Set<ExplorationTile>> =
+    private fun observeFogExploredTiles(): Flow<Set<ExplorationTile>> =
         _state
             .map { state ->
-                state.visibleTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit }
+                state.fogTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit }
             }
             .distinctUntilChanged()
             .flatMapLatest { range ->
@@ -237,7 +239,7 @@ class MapViewModel @Inject constructor(
         exploredTiles: Set<ExplorationTile>,
     ): FogOfWarUiState {
         val fogRanges = calculateUnexploredFogRanges(
-            visibleRange = state.visibleTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit },
+            tileRange = state.fogTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit },
             exploredTiles = exploredTiles,
         )
 
@@ -245,7 +247,9 @@ class MapViewModel @Inject constructor(
             canonicalZoom = ExplorationTilePrototype.CANONICAL_ZOOM,
             fogRanges = fogRanges,
             visibleTileCount = state.visibleTileCount,
-            exploredVisibleTileCount = exploredTiles.size,
+            exploredVisibleTileCount = state.visibleTileRange?.let { visibleRange ->
+                exploredTiles.count(visibleRange::contains)
+            } ?: 0,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
         )
     }
@@ -307,6 +311,7 @@ class MapViewModel @Inject constructor(
                 cameraPosition = intent.position,
                 cameraUpdateOrigin = intent.origin,
                 visibleTileRange = fogViewport.visibleTileRange,
+                fogTileRange = fogViewport.fogTileRange,
                 visibleTileCount = fogViewport.visibleTileCount,
                 isFogSuppressedByVisibleTileLimit = fogViewport.isSuppressedByVisibleTileLimit,
             )
@@ -320,10 +325,13 @@ class MapViewModel @Inject constructor(
                 zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
             )
         }
+        // Keep rounded fog corners off-screen instead of trimming them against the viewport cut line.
+        val fogTileRange = visibleTileRange?.expandedBy(FOG_TILE_RANGE_PADDING)
         val visibleTileCount = visibleTileRange?.tileCount ?: 0
 
         return FogViewport(
             visibleTileRange = visibleTileRange,
+            fogTileRange = fogTileRange,
             visibleTileCount = visibleTileCount,
             isSuppressedByVisibleTileLimit = visibleTileCount > MAX_VISIBLE_FOG_TILE_COUNT,
         )
@@ -396,6 +404,7 @@ class MapViewModel @Inject constructor(
     @Immutable
     private data class FogViewport(
         val visibleTileRange: ExplorationTileRange?,
+        val fogTileRange: ExplorationTileRange?,
         val visibleTileCount: Long,
         val isSuppressedByVisibleTileLimit: Boolean,
     )

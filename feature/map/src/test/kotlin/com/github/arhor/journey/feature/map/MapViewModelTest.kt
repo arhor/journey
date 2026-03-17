@@ -8,6 +8,7 @@ import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTilePrototype
 import com.github.arhor.journey.domain.model.ExplorationTileRange
+import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PoiCategory
@@ -551,7 +552,7 @@ class MapViewModelTest {
                         zoom = 12.0,
                     ),
                     origin = CameraUpdateOrigin.USER,
-                    visibleBounds = ExplorationTileGrid.bounds(visibleRange),
+                    visibleBounds = visibleBoundsInside(visibleRange),
                 ),
             )
             advanceUntilIdle()
@@ -560,7 +561,74 @@ class MapViewModelTest {
             val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 4L }
             actual.fogOfWar.visibleTileCount shouldBe 4L
             actual.fogOfWar.exploredVisibleTileCount shouldBe 1
-            actual.fogOfWar.fogRanges.size shouldBe 2
+            actual.fogOfWar.fogRanges.any { fogRange ->
+                fogRange.minX < visibleRange.minX ||
+                    fogRange.maxX > visibleRange.maxX ||
+                    fogRange.minY < visibleRange.minY ||
+                    fogRange.maxY > visibleRange.maxY
+            } shouldBe true
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should pad the fog query by one tile while keeping explored stats scoped to the visible viewport`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val observedFogRanges = mutableListOf<ExplorationTileRange>()
+        val fixture = createFixture(
+            exploredTiles = setOf(
+                ExplorationTile(
+                    zoom = visibleRange.zoom,
+                    x = 9,
+                    y = 19,
+                ),
+                ExplorationTile(
+                    zoom = visibleRange.zoom,
+                    x = 10,
+                    y = 20,
+                ),
+            ),
+            observedTileRanges = observedFogRanges,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = com.github.arhor.journey.feature.map.model.CameraPositionState(
+                        target = LatLng(latitude = 0.0, longitude = 0.0),
+                        zoom = 12.0,
+                    ),
+                    origin = CameraUpdateOrigin.USER,
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            observedFogRanges.last() shouldBe visibleRange.expandedBy(tilePadding = 1)
+
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 4L }
+            actual.fogOfWar.visibleTileCount shouldBe 4L
+            actual.fogOfWar.exploredVisibleTileCount shouldBe 1
+            actual.fogOfWar.fogRanges.any { fogRange ->
+                fogRange.minX < visibleRange.minX ||
+                    fogRange.maxX > visibleRange.maxX ||
+                    fogRange.minY < visibleRange.minY ||
+                    fogRange.maxY > visibleRange.maxY
+            } shouldBe true
         } finally {
             tearDownMainDispatcher()
         }
@@ -618,6 +686,7 @@ class MapViewModelTest {
         ),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<ExplorationTile> = emptySet(),
+        observedTileRanges: MutableList<ExplorationTileRange>? = null,
         discoverError: Throwable? = null,
         revealTilesResult: Set<ExplorationTile> = emptySet(),
         userLocationUpdates: kotlinx.coroutines.flow.Flow<UserLocationUpdate> =
@@ -640,7 +709,14 @@ class MapViewModelTest {
 
         every { observePointsOfInterest.invoke() } returns MutableStateFlow(pointsOfInterest)
         every { observeExplorationProgress.invoke() } returns MutableStateFlow(explorationProgress)
-        every { observeExploredTiles.invoke(any()) } returns MutableStateFlow(exploredTiles)
+        if (observedTileRanges != null) {
+            every { observeExploredTiles.invoke(any()) } answers {
+                observedTileRanges += invocation.args.first() as ExplorationTileRange
+                MutableStateFlow(exploredTiles)
+            }
+        } else {
+            every { observeExploredTiles.invoke(any()) } returns MutableStateFlow(exploredTiles)
+        }
         every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
             mapStyleOutput ?: Output.Success(mapStyle),
         )
@@ -687,8 +763,22 @@ class MapViewModelTest {
         radiusMeters = 100,
     )
 
+    private fun visibleBoundsInside(range: ExplorationTileRange): GeoBounds =
+        ExplorationTileGrid.bounds(range).let { bounds ->
+            GeoBounds(
+                south = bounds.south + VIEWPORT_BOUNDS_EPSILON,
+                west = bounds.west + VIEWPORT_BOUNDS_EPSILON,
+                north = bounds.north - VIEWPORT_BOUNDS_EPSILON,
+                east = bounds.east - VIEWPORT_BOUNDS_EPSILON,
+            )
+        }
+
     private data class TestDomainError(
         override val message: String? = null,
         override val cause: Throwable? = null,
     ) : DomainError
+
+    private companion object {
+        const val VIEWPORT_BOUNDS_EPSILON = 1e-6
+    }
 }

@@ -35,4 +35,21 @@ data class ExplorationTileRange(
             }
         }
     }
+
+    fun expandedBy(tilePadding: Int): ExplorationTileRange {
+        require(tilePadding >= 0) { "tilePadding must be >= 0" }
+
+        if (tilePadding == 0) {
+            return this
+        }
+
+        val maxTileIndex = (1 shl zoom) - 1
+
+        return copy(
+            minX = (minX - tilePadding).coerceAtLeast(0),
+            maxX = (maxX + tilePadding).coerceAtMost(maxTileIndex),
+            minY = (minY - tilePadding).coerceAtLeast(0),
+            maxY = (maxY + tilePadding).coerceAtMost(maxTileIndex),
+        )
+    }
 }

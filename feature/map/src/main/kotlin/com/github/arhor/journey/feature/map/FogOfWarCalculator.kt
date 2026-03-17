@@ -4,18 +4,18 @@ import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 
 internal fun calculateUnexploredFogRanges(
-    visibleRange: ExplorationTileRange?,
+    tileRange: ExplorationTileRange?,
     exploredTiles: Set<ExplorationTile>,
 ): List<ExplorationTileRange> {
-    visibleRange ?: return emptyList()
+    tileRange ?: return emptyList()
 
     val completedRanges = mutableListOf<ExplorationTileRange>()
     var activeRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
-    for (y in visibleRange.minY..visibleRange.maxY) {
+    for (y in tileRange.minY..tileRange.maxY) {
         val currentRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
-        for (span in rowSpans(visibleRange, exploredTiles, y)) {
+        for (span in rowSpans(tileRange, exploredTiles, y)) {
             val continuedRange = activeRanges.remove(span)
 
             if (continuedRange != null) {
@@ -31,11 +31,11 @@ internal fun calculateUnexploredFogRanges(
             }
         }
 
-        completedRanges += activeRanges.values.map { it.toRange(visibleRange.zoom) }
+        completedRanges += activeRanges.values.map { it.toRange(tileRange.zoom) }
         activeRanges = currentRanges
     }
 
-    completedRanges += activeRanges.values.map { it.toRange(visibleRange.zoom) }
+    completedRanges += activeRanges.values.map { it.toRange(tileRange.zoom) }
 
     return completedRanges
 }
