@@ -14,7 +14,15 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import com.github.arhor.journey.ui.navigation.bottomNavDestinations
+import com.github.arhor.journey.feature.hero.HeroBottomNavDestination
+import com.github.arhor.journey.feature.map.mapBottomNavDestination
+import com.github.arhor.journey.feature.settings.settingsBottomNavDestination
+
+val bottomNavDestinations = listOf(
+    HeroBottomNavDestination,
+    mapBottomNavDestination,
+    settingsBottomNavDestination,
+)
 
 @Composable
 fun AppBottomBar(navController: NavHostController) {

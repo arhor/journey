@@ -1,7 +1,6 @@
 package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
-import com.github.arhor.journey.data.local.db.entity.ExplorationTileEntity
 import com.github.arhor.journey.data.mapper.toDomain
 import com.github.arhor.journey.data.mapper.toEntity
 import com.github.arhor.journey.domain.model.ExplorationTile
@@ -24,8 +23,9 @@ class RoomExplorationTileRepository @Inject constructor(
             maxX = range.maxX,
             minY = range.minY,
             maxY = range.maxY,
-        ).map { items ->
-            items.map { it.toDomain() }.toSet()
+        ).map { data ->
+            data.map { it.toDomain() }
+                .toSet()
         }
 
     override suspend fun markExplored(tiles: Set<ExplorationTile>) {
@@ -36,7 +36,7 @@ class RoomExplorationTileRepository @Inject constructor(
         dao.insert(
             entities = tiles
                 .map { it.toEntity() }
-                .sortedWith(compareBy(ExplorationTileEntity::zoom, ExplorationTileEntity::y, ExplorationTileEntity::x)),
+                .sorted(),
         )
     }
 

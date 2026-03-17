@@ -20,7 +20,7 @@ sealed interface MapUiState {
 
     @Immutable
     data class Content(
-        val cameraPosition: CameraPositionState,
+        val cameraPosition: CameraPositionState?,
         val cameraUpdateOrigin: CameraUpdateOrigin,
         val recenterRequestToken: Int,
         val userLocation: LatLng?,

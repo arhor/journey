@@ -43,26 +43,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private val DEFAULT_CAMERA_TARGET = LatLng(
-    latitude = 37.7749,
-    longitude = -122.4194,
-)
-
-private const val DEFAULT_ZOOM = 12.0
+private const val DEFAULT_CAMERA_ZOOM = 15.0
 private const val MAX_VISIBLE_FOG_TILE_COUNT = 8_192L
+private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
 
 @Immutable
 private data class State(
-    val cameraPosition: CameraPositionState = CameraPositionState(
-        target = DEFAULT_CAMERA_TARGET,
-        zoom = DEFAULT_ZOOM,
-    ),
+    val cameraPosition: CameraPositionState? = null,
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
     val recenterRequestToken: Int = 0,
     val userLocation: LatLng? = null,
     val userLocationTrackingStatus: UserLocationTrackingStatus = UserLocationTrackingStatus.INACTIVE,
     val isAwaitingLocationPermissionResult: Boolean = false,
     val visibleTileRange: ExplorationTileRange? = null,
+    val fogTileRange: ExplorationTileRange? = null,
     val visibleTileCount: Long = 0,
     val isFogSuppressedByVisibleTileLimit: Boolean = false,
     val failureMessage: String? = null,
@@ -91,7 +85,7 @@ class MapViewModel @Inject constructor(
         observeSelectedMapStyle(),
         observePointsOfInterest(),
         observeExplorationProgress(),
-        observeVisibleExploredTiles(),
+        observeFogExploredTiles(),
         ::intoUiState,
     ).catch {
         emit(
@@ -105,6 +99,7 @@ class MapViewModel @Inject constructor(
         when (intent) {
             is MapIntent.StartLocationTracking -> onStartLocationTracking()
             is MapIntent.StopLocationTracking -> onStopLocationTracking()
+            is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
             is MapIntent.CameraSettled -> onCameraSettled(intent)
             is MapIntent.CurrentLocationUnavailable -> onCurrentLocationUnavailable()
             is MapIntent.LocationPermissionResult -> onLocationPermissionResult(intent)
@@ -119,10 +114,10 @@ class MapViewModel @Inject constructor(
 
     /* ------------------------------------------ Internal implementation ------------------------------------------- */
 
-    private fun observeVisibleExploredTiles(): Flow<Set<ExplorationTile>> =
+    private fun observeFogExploredTiles(): Flow<Set<ExplorationTile>> =
         _state
             .map { state ->
-                state.visibleTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit }
+                state.fogTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit }
             }
             .distinctUntilChanged()
             .flatMapLatest { range ->
@@ -166,9 +161,20 @@ class MapViewModel @Inject constructor(
     }
 
     private suspend fun onUserLocationAvailable(location: GeoPoint) {
-        _state.update {
-            it.copy(
-                userLocation = location.toLatLng(),
+        _state.update { state ->
+            val userLocation = location.toLatLng()
+
+            state.copy(
+                cameraPosition = state.cameraPosition ?: CameraPositionState(
+                    target = userLocation,
+                    zoom = DEFAULT_CAMERA_ZOOM,
+                ),
+                cameraUpdateOrigin = if (state.cameraPosition == null) {
+                    CameraUpdateOrigin.PROGRAMMATIC
+                } else {
+                    state.cameraUpdateOrigin
+                },
+                userLocation = userLocation,
                 userLocationTrackingStatus = UserLocationTrackingStatus.TRACKING,
             )
         }
@@ -237,7 +243,7 @@ class MapViewModel @Inject constructor(
         exploredTiles: Set<ExplorationTile>,
     ): FogOfWarUiState {
         val fogRanges = calculateUnexploredFogRanges(
-            visibleRange = state.visibleTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit },
+            tileRange = state.fogTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit },
             exploredTiles = exploredTiles,
         )
 
@@ -245,7 +251,9 @@ class MapViewModel @Inject constructor(
             canonicalZoom = ExplorationTilePrototype.CANONICAL_ZOOM,
             fogRanges = fogRanges,
             visibleTileCount = state.visibleTileCount,
-            exploredVisibleTileCount = exploredTiles.size,
+            exploredVisibleTileCount = state.visibleTileRange?.let { visibleRange ->
+                exploredTiles.count(visibleRange::contains)
+            } ?: 0,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
         )
     }
@@ -263,24 +271,22 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onLocationPermissionResult(intent: MapIntent.LocationPermissionResult) {
-        val isAwaitingLocationPermissionResult = _state.value.isAwaitingLocationPermissionResult
+        val wasAwaitingLocationPermissionResult = _state.value.isAwaitingLocationPermissionResult
 
         _state.update {
             it.copy(isAwaitingLocationPermissionResult = false)
         }
 
-        if (!isAwaitingLocationPermissionResult) {
-            return
-        }
-
         if (intent.isGranted) {
-            _state.update {
-                it.copy(recenterRequestToken = it.recenterRequestToken + 1)
+            if (wasAwaitingLocationPermissionResult) {
+                _state.update {
+                    it.copy(recenterRequestToken = it.recenterRequestToken + 1)
+                }
             }
 
             onStopLocationTracking()
             onStartLocationTracking()
-        } else {
+        } else if (wasAwaitingLocationPermissionResult) {
             emitEffect(MapEffect.ShowMessage(LOCATION_PERMISSION_DENIED_MESSAGE))
         }
     }
@@ -294,7 +300,7 @@ class MapViewModel @Inject constructor(
             it.copy(
                 cameraPosition = CameraPositionState(
                     target = intent.target,
-                    zoom = it.cameraPosition.zoom,
+                    zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
                 ),
                 cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
             )
@@ -313,31 +319,58 @@ class MapViewModel @Inject constructor(
 
     private fun onCameraSettled(intent: MapIntent.CameraSettled) {
         val fogViewport = fogViewport(intent.visibleBounds)
+    }
+    
+    private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
+        updateFogViewport(intent.visibleBounds)
+    }
 
+    private fun onCameraSettled(intent: MapIntent.CameraSettled) {
         _state.update {
             it.copy(
                 cameraPosition = intent.position,
                 cameraUpdateOrigin = intent.origin,
-                visibleTileRange = fogViewport.visibleTileRange,
-                visibleTileCount = fogViewport.visibleTileCount,
-                isFogSuppressedByVisibleTileLimit = fogViewport.isSuppressedByVisibleTileLimit,
             )
         }
     }
 
-    private fun fogViewport(visibleBounds: GeoBounds?): FogViewport {
-        val visibleTileRange = visibleBounds?.let {
-            ExplorationTileGrid.tileRange(
-                bounds = it,
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-            )
+    private fun updateFogViewport(visibleBounds: GeoBounds) {
+        val fogViewport = fogViewport(visibleBounds)
+
+        _state.update {
+            if (it.matches(fogViewport)) {
+                it
+            } else {
+                it.copy(
+                    visibleTileRange = fogViewport.visibleTileRange,
+                    fogTileRange = fogViewport.fogTileRange,
+                    visibleTileCount = fogViewport.visibleTileCount,
+                    isFogSuppressedByVisibleTileLimit = fogViewport.isSuppressedByVisibleTileLimit,
+                )
+            }
         }
-        val visibleTileCount = visibleTileRange?.tileCount ?: 0
+    }
+
+    private fun fogViewport(visibleBounds: GeoBounds): FogViewport {
+        val visibleTileRange = ExplorationTileGrid.tileRange(
+            bounds = visibleBounds,
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+        )
+        val visibleTileWidth = visibleTileRange.widthInTiles()
+        val visibleTileHeight = visibleTileRange.heightInTiles()
+        val fogTileRange = visibleTileRange.expandedBy(
+            horizontalTilePadding = visibleTileWidth,
+            verticalTilePadding = visibleTileHeight,
+        )
+        val visibleTileCount = visibleTileRange.tileCount
+        val isSuppressedByVisibleTileLimit = visibleTileCount > MAX_VISIBLE_FOG_TILE_COUNT
+        val isSuppressedByBufferedTileLimit = fogTileRange.tileCount > MAX_BUFFERED_FOG_TILE_COUNT
 
         return FogViewport(
             visibleTileRange = visibleTileRange,
+            fogTileRange = fogTileRange,
             visibleTileCount = visibleTileCount,
-            isSuppressedByVisibleTileLimit = visibleTileCount > MAX_VISIBLE_FOG_TILE_COUNT,
+            isSuppressedByVisibleTileLimit = isSuppressedByVisibleTileLimit || isSuppressedByBufferedTileLimit,
         )
     }
 
@@ -352,7 +385,7 @@ class MapViewModel @Inject constructor(
                         it.copy(
                             cameraPosition = CameraPositionState(
                                 target = objectUiModel.position,
-                                zoom = it.cameraPosition.zoom,
+                                zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
                             ),
                             cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
                         )
@@ -428,10 +461,22 @@ class MapViewModel @Inject constructor(
 
     @Immutable
     private data class FogViewport(
-        val visibleTileRange: ExplorationTileRange?,
+        val visibleTileRange: ExplorationTileRange,
+        val fogTileRange: ExplorationTileRange,
         val visibleTileCount: Long,
         val isSuppressedByVisibleTileLimit: Boolean,
     )
+
+    private fun State.matches(fogViewport: FogViewport): Boolean {
+        return visibleTileRange == fogViewport.visibleTileRange
+            && fogTileRange == fogViewport.fogTileRange
+            && visibleTileCount == fogViewport.visibleTileCount
+            && isFogSuppressedByVisibleTileLimit == fogViewport.isSuppressedByVisibleTileLimit
+    }
+
+    private fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
+
+    private fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
 
     private companion object {
         const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."

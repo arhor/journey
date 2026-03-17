@@ -50,7 +50,7 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":core:common"))
     implementation(project(":core:navigation"))
-    implementation(project(":feature:home"))
+    implementation(project(":feature:hero"))
     implementation(project(":feature:map"))
     implementation(project(":feature:settings"))
 

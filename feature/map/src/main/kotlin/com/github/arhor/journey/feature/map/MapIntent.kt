@@ -10,10 +10,13 @@ sealed interface MapIntent {
 
     data object StopLocationTracking : MapIntent
 
+    data class CameraViewportChanged(
+        val visibleBounds: GeoBounds,
+    ) : MapIntent
+
     data class CameraSettled(
         val position: CameraPositionState,
         val origin: CameraUpdateOrigin,
-        val visibleBounds: GeoBounds?,
     ) : MapIntent
 
     data class MapTapped(

@@ -22,7 +22,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +57,6 @@ import org.maplibre.compose.map.GestureOptions
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
-import org.maplibre.compose.map.RenderOptions
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.BoundingBox
@@ -84,15 +87,12 @@ internal fun MapContent(
 ) {
     val context = LocalContext.current
     val userLocationState = rememberUserLocationStateInternal(context)
-    val cameraState = rememberCameraState(
-        firstPosition = CameraPosition(
-            target = Position(
-                latitude = state.cameraPosition.target.latitude,
-                longitude = state.cameraPosition.target.longitude,
-            ),
-            zoom = state.cameraPosition.zoom,
-        ),
-    )
+    var hasRequestedInitialLocationPermission by rememberSaveable { mutableStateOf(false) }
+    val cameraState = key(state.cameraPosition == null) {
+        rememberCameraState(
+            firstPosition = state.cameraPosition?.toCameraPosition() ?: CameraPosition(),
+        )
+    }
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -107,51 +107,78 @@ internal fun MapContent(
     )
 
     LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
+        val cameraPosition = state.cameraPosition ?: return@LaunchedEffect
+
         if (state.cameraUpdateOrigin != CameraUpdateOrigin.PROGRAMMATIC) {
             return@LaunchedEffect
         }
 
         val current = cameraState.position
         if (
-            current.target.latitude != state.cameraPosition.target.latitude ||
-            current.target.longitude != state.cameraPosition.target.longitude ||
-            current.zoom != state.cameraPosition.zoom
+            current.target.latitude != cameraPosition.target.latitude ||
+            current.target.longitude != cameraPosition.target.longitude ||
+            current.zoom != cameraPosition.zoom
         ) {
             cameraState.position = current.copy(
                 target = Position(
-                    latitude = state.cameraPosition.target.latitude,
-                    longitude = state.cameraPosition.target.longitude,
+                    latitude = cameraPosition.target.latitude,
+                    longitude = cameraPosition.target.longitude,
                 ),
-                zoom = state.cameraPosition.zoom,
+                zoom = cameraPosition.zoom,
             )
         }
     }
 
-    LaunchedEffect(cameraState) {
-        snapshotFlow {
-            val projection = cameraState.projection
+    LaunchedEffect(state.cameraPosition, cameraState) {
+        if (state.cameraPosition == null) {
+            return@LaunchedEffect
+        }
 
-            CameraViewportSnapshot(
-                position = cameraState.position,
-                visibleBounds = projection?.queryVisibleBoundingBox()?.toGeoBounds(),
-            )
-        }.debounce(CAMERA_SETTLE_DEBOUNCE_MS)
-            .distinctUntilChanged(::areCameraViewportSnapshotsEquivalent)
-            .collectLatest { snapshot ->
+        snapshotFlow {
+            cameraState.position
+            cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()
+        }.filterNotNull()
+            .distinctUntilChanged(::areGeoBoundsEquivalent)
+            .collectLatest { visibleBounds ->
+                dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBounds,
+                    ),
+                )
+            }
+    }
+
+    LaunchedEffect(state.cameraPosition, cameraState) {
+        if (state.cameraPosition == null) {
+            return@LaunchedEffect
+        }
+
+        snapshotFlow { cameraState.position }
+            .debounce(CAMERA_SETTLE_DEBOUNCE_MS)
+            .distinctUntilChanged(::areCameraPositionsEquivalent)
+            .collectLatest { position ->
                 dispatch(
                     MapIntent.CameraSettled(
                         position = CameraPositionState(
                             target = LatLng(
-                                latitude = snapshot.position.target.latitude,
-                                longitude = snapshot.position.target.longitude,
+                                latitude = position.target.latitude,
+                                longitude = position.target.longitude,
                             ),
-                            zoom = snapshot.position.zoom,
+                            zoom = position.zoom,
                         ),
                         origin = CameraUpdateOrigin.USER,
-                        visibleBounds = snapshot.visibleBounds,
                     ),
                 )
             }
+    }
+
+    LaunchedEffect(state.cameraPosition) {
+        if (state.cameraPosition != null || context.checkPermission() || hasRequestedInitialLocationPermission) {
+            return@LaunchedEffect
+        }
+
+        hasRequestedInitialLocationPermission = true
+        locationPermissionLauncher.launch(LOCATION_PERMISSION)
     }
 
     LaunchedEffect(state.recenterRequestToken) {
@@ -171,7 +198,10 @@ internal fun MapContent(
         }
 
         cameraState.animateTo(
-            finalPosition = cameraState.position.copy(target = location.position),
+            finalPosition = cameraState.position.copy(
+                target = location.position,
+                zoom = state.cameraPosition?.zoom ?: cameraState.position.zoom,
+            ),
             duration = USER_LOCATION_RECENTER_ANIMATION_DURATION,
         )
     }
@@ -188,7 +218,6 @@ internal fun MapContent(
                     cameraState = cameraState,
                     styleState = styleState,
                     options = MapOptions(
-                        renderOptions = RenderOptions.Debug,
                         gestureOptions = GestureOptions.Standard,
                         ornamentOptions = OrnamentOptions.AllDisabled,
                     ),
@@ -275,6 +304,18 @@ internal fun MapContent(
                 contentDescription = stringResource(R.string.map_recenter_content_description),
             )
         }
+
+        if (
+            state.cameraPosition == null &&
+            state.userLocationTrackingStatus !in setOf(
+                UserLocationTrackingStatus.PERMISSION_DENIED,
+                UserLocationTrackingStatus.LOCATION_SERVICES_DISABLED,
+            )
+        ) {
+            LoadingIndicator(
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
     }
 }
 
@@ -307,7 +348,7 @@ private fun FogOfWarDebugPanel(
             )
             Text(
                 text = if (fogOfWar.isSuppressedByVisibleTileLimit) {
-                    "Fog hidden while zoomed out"
+                    "Fog hidden for current viewport size"
                 } else {
                     "Fog regions: ${fogOfWar.fogRanges.size}"
                 },
@@ -322,7 +363,7 @@ private fun FogOfWarDebugPanel(
     }
 }
 
-private const val CAMERA_SETTLE_DEBOUNCE_MS = 300L
+private const val CAMERA_SETTLE_DEBOUNCE_MS = 100L
 private const val USER_LOCATION_PUCK_ID_PREFIX = "user-location"
 private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
 private const val CAMERA_SETTLE_ZOOM_THRESHOLD = 0.01
@@ -343,14 +384,6 @@ private fun rememberUserLocationStateInternal(ctx: Context): UserLocationState {
             rememberNullLocationProvider()
         }
     )
-}
-
-private fun areCameraViewportSnapshotsEquivalent(
-    a: CameraViewportSnapshot,
-    b: CameraViewportSnapshot,
-): Boolean {
-    return areCameraPositionsEquivalent(a.position, b.position)
-        && areGeoBoundsEquivalent(a.visibleBounds, b.visibleBounds)
 }
 
 private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): Boolean {
@@ -382,7 +415,10 @@ private fun BoundingBox.toGeoBounds(): GeoBounds = GeoBounds(
 private fun Context.checkPermission(permission: String = LOCATION_PERMISSION): Boolean =
     checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
-private data class CameraViewportSnapshot(
-    val position: CameraPosition,
-    val visibleBounds: GeoBounds?,
+private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosition(
+    target = Position(
+        latitude = target.latitude,
+        longitude = target.longitude,
+    ),
+    zoom = zoom,
 )
