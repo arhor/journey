@@ -45,6 +45,10 @@ sealed interface MapIntent {
         val visibleBounds: GeoBounds,
     ) : MapIntent
 
+    data class CameraGestureStarted(
+        val position: CameraPositionState,
+    ) : MapIntent
+
     data class CameraSettled(
         val position: CameraPositionState,
         val origin: CameraUpdateOrigin,

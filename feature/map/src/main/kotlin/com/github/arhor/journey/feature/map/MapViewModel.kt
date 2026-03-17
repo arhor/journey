@@ -56,6 +56,7 @@ private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
 private data class State(
     val cameraPosition: CameraPositionState? = null,
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+    val isFollowingUserLocation: Boolean = true,
     val recenterRequestToken: Int = 0,
     val isAwaitingLocationPermissionResult: Boolean = false,
     val isDebugControlsSheetVisible: Boolean = false,
@@ -154,6 +155,7 @@ class MapViewModel @Inject constructor(
             MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
             MapIntent.StopTrackingClicked -> onStopTrackingClicked()
             is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
+            is MapIntent.CameraGestureStarted -> onCameraGestureStarted(intent)
             is MapIntent.CameraSettled -> onCameraSettled(intent)
             is MapIntent.CurrentLocationUnavailable -> onCurrentLocationUnavailable()
             is MapIntent.LocationPermissionResult -> onLocationPermissionResult(intent)
@@ -298,13 +300,25 @@ class MapViewModel @Inject constructor(
         mapStyleOutput.fold(
             onSuccess = {
                 val userLocation = trackingSession.lastKnownLocation?.toLatLng()
-                val resolvedCameraPosition = state.cameraPosition
+                val isCameraFollowingUserLocation = state.isFollowingUserLocation && userLocation != null
+                val resolvedCameraPosition = if (isCameraFollowingUserLocation) {
+                    userLocation.toCameraPosition(
+                        zoom = state.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
+                    )
+                } else {
+                    state.cameraPosition
+                }
                     ?: userLocation?.toCameraPosition()
                     ?: pointsOfInterest.defaultCameraPosition()
+                val resolvedCameraUpdateOrigin = if (isCameraFollowingUserLocation) {
+                    CameraUpdateOrigin.PROGRAMMATIC
+                } else {
+                    state.cameraUpdateOrigin
+                }
 
                 MapUiState.Content(
                     cameraPosition = resolvedCameraPosition,
-                    cameraUpdateOrigin = state.cameraUpdateOrigin,
+                    cameraUpdateOrigin = resolvedCameraUpdateOrigin,
                     recenterRequestToken = state.recenterRequestToken,
                     userLocation = userLocation,
                     isExplorationTrackingActive = trackingSession.isActive,
@@ -386,7 +400,11 @@ class MapViewModel @Inject constructor(
 
             if (wasAwaitingLocationPermissionResult) {
                 _state.update {
-                    it.copy(recenterRequestToken = it.recenterRequestToken + 1)
+                    it.copy(
+                        cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+                        isFollowingUserLocation = true,
+                        recenterRequestToken = it.recenterRequestToken + 1,
+                    )
                 }
             }
         } else {
@@ -414,6 +432,7 @@ class MapViewModel @Inject constructor(
                     zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
                 ),
                 cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+                isFollowingUserLocation = false,
             )
         }
     }
@@ -436,11 +455,30 @@ class MapViewModel @Inject constructor(
         updateFogViewport(intent.visibleBounds)
     }
 
+    private fun onCameraGestureStarted(intent: MapIntent.CameraGestureStarted) {
+        _state.update { state ->
+            if (!state.isFollowingUserLocation) {
+                state
+            } else {
+                state.copy(
+                    cameraPosition = intent.position,
+                    cameraUpdateOrigin = CameraUpdateOrigin.USER,
+                    isFollowingUserLocation = false,
+                )
+            }
+        }
+    }
+
     private fun onCameraSettled(intent: MapIntent.CameraSettled) {
         _state.update {
             it.copy(
                 cameraPosition = intent.position,
                 cameraUpdateOrigin = intent.origin,
+                isFollowingUserLocation = if (intent.origin == CameraUpdateOrigin.USER) {
+                    false
+                } else {
+                    it.isFollowingUserLocation
+                },
             )
         }
     }
@@ -499,6 +537,7 @@ class MapViewModel @Inject constructor(
                                 zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
                             ),
                             cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+                            isFollowingUserLocation = false,
                         )
                     }
                 }
@@ -548,10 +587,10 @@ class MapViewModel @Inject constructor(
             longitude = lon,
         )
 
-    private fun LatLng.toCameraPosition(): CameraPositionState =
+    private fun LatLng.toCameraPosition(zoom: Double = DEFAULT_CAMERA_ZOOM): CameraPositionState =
         CameraPositionState(
             target = this,
-            zoom = DEFAULT_CAMERA_ZOOM,
+            zoom = zoom,
         )
 
     private fun List<PointOfInterest>.defaultCameraPosition(): CameraPositionState? {

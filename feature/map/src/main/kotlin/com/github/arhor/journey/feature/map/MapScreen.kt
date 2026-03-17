@@ -36,9 +36,11 @@ import com.github.arhor.journey.feature.map.renderer.TilesGridRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import org.maplibre.compose.camera.CameraMoveReason
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.location.LocationPuck
@@ -90,10 +92,19 @@ internal fun MapContent(
     val currentUserLocation = userLocationState.location
     val latestUserLocation by rememberUpdatedState(state.userLocation)
 
-    LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
+    LaunchedEffect(
+        state.cameraPosition,
+        state.cameraUpdateOrigin,
+        cameraState.isCameraMoving,
+        cameraState.moveReason,
+    ) {
         val cameraPosition = state.cameraPosition ?: return@LaunchedEffect
 
         if (state.cameraUpdateOrigin != CameraUpdateOrigin.PROGRAMMATIC) {
+            return@LaunchedEffect
+        }
+
+        if (cameraState.isCameraMoving && cameraState.moveReason == CameraMoveReason.GESTURE) {
             return@LaunchedEffect
         }
 
@@ -111,6 +122,25 @@ internal fun MapContent(
                 zoom = cameraPosition.zoom,
             )
         }
+    }
+
+    LaunchedEffect(state.cameraPosition, cameraState) {
+        if (state.cameraPosition == null) {
+            return@LaunchedEffect
+        }
+
+        snapshotFlow { cameraState.isCameraMoving to cameraState.moveReason }
+            .distinctUntilChanged()
+            .filter { (isCameraMoving, moveReason) ->
+                isCameraMoving && moveReason == CameraMoveReason.GESTURE
+            }
+            .collectLatest {
+                dispatch(
+                    MapIntent.CameraGestureStarted(
+                        position = cameraState.position.toCameraPositionState(),
+                    ),
+                )
+            }
     }
 
     LaunchedEffect(state.cameraPosition, cameraState) {
@@ -137,20 +167,21 @@ internal fun MapContent(
             return@LaunchedEffect
         }
 
-        snapshotFlow { cameraState.position }
+        snapshotFlow {
+            CameraSettledSnapshot(
+                position = cameraState.position,
+                origin = cameraState.moveReason.toCameraUpdateOrigin(),
+                isCameraMoving = cameraState.isCameraMoving,
+            )
+        }
             .debounce(CAMERA_SETTLE_DEBOUNCE_MS)
-            .distinctUntilChanged(::areCameraPositionsEquivalent)
-            .collectLatest { position ->
+            .filter { !it.isCameraMoving }
+            .distinctUntilChanged(::areCameraSettledSnapshotsEquivalent)
+            .collectLatest { settled ->
                 dispatch(
                     MapIntent.CameraSettled(
-                        position = CameraPositionState(
-                            target = LatLng(
-                                latitude = position.target.latitude,
-                                longitude = position.target.longitude,
-                            ),
-                            zoom = position.zoom,
-                        ),
-                        origin = CameraUpdateOrigin.USER,
+                        position = settled.position.toCameraPositionState(),
+                        origin = settled.origin,
                     ),
                 )
             }
@@ -352,6 +383,15 @@ private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): 
         && abs(a.tilt - b.tilt) < CAMERA_SETTLE_TILT_THRESHOLD
 }
 
+private fun areCameraSettledSnapshotsEquivalent(
+    a: CameraSettledSnapshot,
+    b: CameraSettledSnapshot,
+): Boolean {
+    return a.origin == b.origin &&
+        a.isCameraMoving == b.isCameraMoving &&
+        areCameraPositionsEquivalent(a.position, b.position)
+}
+
 private fun areGeoBoundsEquivalent(a: GeoBounds?, b: GeoBounds?): Boolean {
     if (a == null || b == null) {
         return a == b
@@ -374,12 +414,34 @@ private fun Context.checkPermission(): Boolean =
     checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
         checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
+private fun CameraPosition.toCameraPositionState(): CameraPositionState =
+    CameraPositionState(
+        target = LatLng(
+            latitude = target.latitude,
+            longitude = target.longitude,
+        ),
+        zoom = zoom,
+    )
+
 private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosition(
     target = Position(
         latitude = target.latitude,
         longitude = target.longitude,
     ),
     zoom = zoom,
+)
+
+private fun CameraMoveReason.toCameraUpdateOrigin(): CameraUpdateOrigin =
+    if (this == CameraMoveReason.GESTURE) {
+        CameraUpdateOrigin.USER
+    } else {
+        CameraUpdateOrigin.PROGRAMMATIC
+    }
+
+private data class CameraSettledSnapshot(
+    val position: CameraPosition,
+    val origin: CameraUpdateOrigin,
+    val isCameraMoving: Boolean,
 )
 
 private fun MapRenderMode.toRenderOptions(): RenderOptions =

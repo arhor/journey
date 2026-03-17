@@ -30,6 +30,7 @@ import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUs
 import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
+import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import io.kotest.matchers.shouldBe
@@ -374,16 +375,114 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should increment recenter token when location permission is granted after recenter click`() = runTest {
+    fun `uiState should follow updated user location by default`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
         val fixture = createFixture(
-            startTrackingResult = StartExplorationTrackingSessionResult.AlreadyActive,
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
         )
 
         try {
-            fixture.viewModel.awaitContent()
+            val initial = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+            )
+            advanceUntilIdle()
+
+            // Then
+            initial.cameraPosition?.target shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            val actual = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
+            }
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should stop following updated user location when camera settles from a user gesture`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
+        )
+        val manualCameraPosition = CameraPositionState(
+            target = LatLng(latitude = 40.7580, longitude = -73.9855),
+            zoom = 15.0,
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = manualCameraPosition,
+                    origin = CameraUpdateOrigin.USER,
+                ),
+            )
+            advanceUntilIdle()
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.cameraPosition == manualCameraPosition
+            }
+            actual.cameraPosition shouldBe manualCameraPosition
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should reenable follow mode and increment recenter token when location permission is granted after recenter click`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
+            startTrackingResult = StartExplorationTrackingSessionResult.AlreadyActive,
+        )
+        val manualCameraPosition = CameraPositionState(
+            target = LatLng(latitude = 40.7580, longitude = -73.9855),
+            zoom = 15.0,
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = manualCameraPosition,
+                    origin = CameraUpdateOrigin.USER,
+                ),
+            )
+            advanceUntilIdle()
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+            )
+            advanceUntilIdle()
+            fixture.viewModel.awaitContent { it.cameraPosition == manualCameraPosition }
 
             // When
             fixture.viewModel.dispatch(MapIntent.RecenterClicked)
@@ -391,8 +490,13 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             // Then
-            val actual = fixture.viewModel.awaitContent { it.recenterRequestToken == 1 }
+            val actual = fixture.viewModel.awaitContent {
+                it.recenterRequestToken == 1 &&
+                    it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
+            }
             actual.recenterRequestToken shouldBe 1
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
             tearDownMainDispatcher()
         }
@@ -470,11 +574,50 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `dispatch should keep tapped map position after user location updates`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
+        )
+        val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
+            advanceUntilIdle()
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == tappedLocation
+            }
+            actual.cameraPosition?.target shouldBe tappedLocation
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `dispatch should recenter camera and open object details when tapped object is present`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
         val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
             pointsOfInterest = listOf(
                 pointOfInterest(id = "poi-1", lat = 51.1, lon = 17.03),
             ),
@@ -487,6 +630,10 @@ class MapViewModelTest {
 
             // When
             fixture.viewModel.dispatch(MapIntent.ObjectTapped(objectId = "poi-1"))
+            advanceUntilIdle()
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+            )
             advanceUntilIdle()
 
             // Then
@@ -543,6 +690,7 @@ class MapViewModelTest {
     private data class Fixture(
         val viewModel: MapViewModel,
         val mapStyle: MapStyle,
+        val trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
         val clearExploredTiles: ClearExploredTilesUseCase,
         val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
@@ -581,6 +729,7 @@ class MapViewModelTest {
             name = "Remote",
             value = "https://example.com/style.json",
         )
+        val trackingSessionFlow = MutableStateFlow(trackingSession)
 
         every { observePointsOfInterest.invoke() } returns MutableStateFlow(pointsOfInterest)
         every { observeExplorationProgress.invoke() } returns MutableStateFlow(explorationProgress)
@@ -589,7 +738,7 @@ class MapViewModelTest {
             mapStyleOutput ?: Output.Success(mapStyle),
         )
         every { getExplorationTileRuntimeConfig.invoke() } returns tileRuntimeConfig
-        every { observeExplorationTrackingSession.invoke() } returns MutableStateFlow(trackingSession)
+        every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow
         every { setExplorationTileCanonicalZoom.invoke(any()) } just runs
         every { setExplorationTileRevealRadius.invoke(any()) } just runs
 
@@ -614,6 +763,7 @@ class MapViewModelTest {
                 stopExplorationTrackingSession = stopTrackingSession,
             ),
             mapStyle = mapStyle,
+            trackingSessionFlow = trackingSessionFlow,
             discoverPointOfInterest = discoverPointOfInterest,
             clearExploredTiles = clearExploredTiles,
             setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
