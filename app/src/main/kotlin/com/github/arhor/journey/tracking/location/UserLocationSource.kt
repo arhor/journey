@@ -1,10 +1,13 @@
-package com.github.arhor.journey.feature.map.location
+package com.github.arhor.journey.tracking.location
 
+import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.GeoPoint
 import kotlinx.coroutines.flow.Flow
 
-interface ForegroundUserLocationTracker {
-    fun observeLocations(): Flow<UserLocationUpdate>
+interface UserLocationSource {
+    fun observeLocations(
+        cadence: Flow<ExplorationTrackingCadence>,
+    ): Flow<UserLocationUpdate>
 }
 
 sealed interface UserLocationUpdate {

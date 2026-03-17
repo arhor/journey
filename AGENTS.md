@@ -11,14 +11,14 @@ This repository is a multi-module Android app built with Kotlin, Jetpack Compose
 
 Current Gradle modules:
 
-- `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, and app-level Hilt modules.
+- `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, app-level Hilt modules, and the foreground exploration tracking service/runtime.
 - `:domain` - pure Kotlin/JVM domain layer with models, repository contracts, use cases, and progression logic.
 - `:data` - Android data layer with Room database/DAOs/entities, DataStore-backed repositories, mappers, and seeds.
 - `:core:common` - shared non-UI primitives such as `Output`, `DomainError`, and qualifiers.
 - `:core:navigation` - shared navigation types such as `BottomNavDestination`.
 - `:core:ui` - shared UI architecture support; currently this is primarily `MviViewModel`, not a shared widget library.
 - `:feature:hero` - hero screen, route, navigation contract, and view model.
-- `:feature:map` - map flow, POI flows, map rendering helpers, location tracking bindings, and related view models.
+- `:feature:map` - map flow, POI flows, map rendering helpers, tracking session UI, and related view models.
 - `:feature:settings` - settings screen, navigation contract, Health Connect entry points, and view model.
 
 Primary source locations:
@@ -56,12 +56,14 @@ Practical rules:
 
 - Keep `:domain` Android-free.
 - Put new app wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
+- Keep long-running exploration tracking, foreground services, notifications, and platform location session orchestration in `app/src/main/kotlin/com/github/arhor/journey/tracking`.
 - Keep feature-specific platform bindings inside the owning feature module when they are not truly app-wide.
 - Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`;
   features own their typed destinations and `*Graph(...)` builders.
 - Use typed navigation contracts with `@Serializable` destinations and
   `composable<T>` routes, matching the existing feature modules.
 - Treat `app` as the composition root, not as the default place for new business logic.
+- `:feature:map` may start/stop or observe exploration tracking sessions, but it must not own the continuous location collection or tile-reveal pipeline.
 
 UI/state-management conventions:
 

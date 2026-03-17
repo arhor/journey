@@ -6,9 +6,11 @@ import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 
 sealed interface MapIntent {
-    data object StartLocationTracking : MapIntent
+    data object MapOpened : MapIntent
 
-    data object StopLocationTracking : MapIntent
+    data object ResumeTrackingClicked : MapIntent
+
+    data object StopTrackingClicked : MapIntent
 
     data class CameraViewportChanged(
         val visibleBounds: GeoBounds,

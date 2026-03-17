@@ -4,8 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -24,15 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.model.CameraPositionState
@@ -57,6 +54,7 @@ import org.maplibre.compose.map.GestureOptions
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
+import org.maplibre.compose.map.RenderOptions
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.BoundingBox
@@ -87,7 +85,6 @@ internal fun MapContent(
 ) {
     val context = LocalContext.current
     val userLocationState = rememberUserLocationStateInternal(context)
-    var hasRequestedInitialLocationPermission by rememberSaveable { mutableStateOf(false) }
     val cameraState = key(state.cameraPosition == null) {
         rememberCameraState(
             firstPosition = state.cameraPosition?.toCameraPosition() ?: CameraPosition(),
@@ -95,16 +92,7 @@ internal fun MapContent(
     }
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = {
-            dispatch(
-                MapIntent.LocationPermissionResult(
-                    isGranted = it || context.checkPermission()
-                )
-            )
-        },
-    )
+    val latestUserLocation by rememberUpdatedState(state.userLocation)
 
     LaunchedEffect(state.cameraPosition, state.cameraUpdateOrigin) {
         val cameraPosition = state.cameraPosition ?: return@LaunchedEffect
@@ -172,22 +160,13 @@ internal fun MapContent(
             }
     }
 
-    LaunchedEffect(state.cameraPosition) {
-        if (state.cameraPosition != null || context.checkPermission() || hasRequestedInitialLocationPermission) {
-            return@LaunchedEffect
-        }
-
-        hasRequestedInitialLocationPermission = true
-        locationPermissionLauncher.launch(LOCATION_PERMISSION)
-    }
-
     LaunchedEffect(state.recenterRequestToken) {
         if (state.recenterRequestToken <= 0) {
             return@LaunchedEffect
         }
 
-        val location = userLocationState.location ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
-            snapshotFlow { userLocationState.location }
+        val location = latestUserLocation ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
+            snapshotFlow { latestUserLocation }
                 .filterNotNull()
                 .first()
         }
@@ -199,7 +178,10 @@ internal fun MapContent(
 
         cameraState.animateTo(
             finalPosition = cameraState.position.copy(
-                target = location.position,
+                target = Position(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                ),
                 zoom = state.cameraPosition?.zoom ?: cameraState.position.zoom,
             ),
             duration = USER_LOCATION_RECENTER_ANIMATION_DURATION,
@@ -218,6 +200,7 @@ internal fun MapContent(
                     cameraState = cameraState,
                     styleState = styleState,
                     options = MapOptions(
+                        renderOptions = RenderOptions.Debug,
                         gestureOptions = GestureOptions.Standard,
                         ornamentOptions = OrnamentOptions.AllDisabled,
                     ),
@@ -266,6 +249,22 @@ internal fun MapContent(
                 .padding(16.dp),
         )
 
+        TrackingStatusPanel(
+            state = state,
+            onPrimaryAction = {
+                dispatch(
+                    if (state.isExplorationTrackingActive) {
+                        MapIntent.StopTrackingClicked
+                    } else {
+                        MapIntent.ResumeTrackingClicked
+                    },
+                )
+            },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp),
+        )
+
         FloatingActionButton(
             onClick = {
                 dispatch(MapIntent.AddPoiClicked)
@@ -288,7 +287,6 @@ internal fun MapContent(
         FloatingActionButton(
             onClick = {
                 dispatch(MapIntent.RecenterClicked)
-                locationPermissionLauncher.launch(LOCATION_PERMISSION)
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -307,9 +305,9 @@ internal fun MapContent(
 
         if (
             state.cameraPosition == null &&
-            state.userLocationTrackingStatus !in setOf(
-                UserLocationTrackingStatus.PERMISSION_DENIED,
-                UserLocationTrackingStatus.LOCATION_SERVICES_DISABLED,
+            state.explorationTrackingStatus !in setOf(
+                ExplorationTrackingStatus.PERMISSION_DENIED,
+                ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED,
             )
         ) {
             LoadingIndicator(
@@ -363,6 +361,46 @@ private fun FogOfWarDebugPanel(
     }
 }
 
+@Composable
+private fun TrackingStatusPanel(
+    state: MapUiState.Content,
+    onPrimaryAction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        tonalElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.map_tracking_panel_title),
+                style = MaterialTheme.typography.labelLarge,
+            )
+            Text(
+                text = stringResource(state.trackingStatusMessageRes()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(
+                onClick = onPrimaryAction,
+            ) {
+                Text(
+                    text = stringResource(
+                        if (state.isExplorationTrackingActive) {
+                            R.string.map_tracking_stop_button_label
+                        } else {
+                            R.string.map_tracking_resume_button_label
+                        },
+                    ),
+                )
+            }
+        }
+    }
+}
+
 private const val CAMERA_SETTLE_DEBOUNCE_MS = 100L
 private const val USER_LOCATION_PUCK_ID_PREFIX = "user-location"
 private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
@@ -372,8 +410,6 @@ private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 private val USER_LOCATION_TIMEOUT = 5.seconds
 private val USER_LOCATION_RECENTER_ANIMATION_DURATION = 600.milliseconds
-private const val LOCATION_PERMISSION = Manifest.permission.ACCESS_FINE_LOCATION
-
 @SuppressLint("MissingPermission")
 @Composable
 private fun rememberUserLocationStateInternal(ctx: Context): UserLocationState {
@@ -412,8 +448,9 @@ private fun BoundingBox.toGeoBounds(): GeoBounds = GeoBounds(
     east = east,
 )
 
-private fun Context.checkPermission(permission: String = LOCATION_PERMISSION): Boolean =
-    checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+private fun Context.checkPermission(): Boolean =
+    checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
 private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosition(
     target = Position(
@@ -422,3 +459,14 @@ private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosit
     ),
     zoom = zoom,
 )
+
+private fun MapUiState.Content.trackingStatusMessageRes(): Int {
+    return when (explorationTrackingStatus) {
+        ExplorationTrackingStatus.INACTIVE -> R.string.map_tracking_status_inactive
+        ExplorationTrackingStatus.STARTING -> R.string.map_tracking_status_starting
+        ExplorationTrackingStatus.TRACKING -> R.string.map_tracking_status_active
+        ExplorationTrackingStatus.PERMISSION_DENIED -> R.string.map_tracking_status_permission_denied
+        ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED -> R.string.map_tracking_status_location_disabled
+        ExplorationTrackingStatus.TEMPORARILY_UNAVAILABLE -> R.string.map_tracking_status_waiting
+    }
+}

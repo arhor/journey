@@ -3,6 +3,15 @@
     <string name="map_recenter_content_description">Center on my location</string>
     <string name="map_clear_fog_button_label">Clear fog</string>
     <string name="map_nav_label">Map</string>
+    <string name="map_tracking_panel_title">Exploration tracking</string>
+    <string name="map_tracking_stop_button_label">Stop tracking</string>
+    <string name="map_tracking_resume_button_label">Resume tracking</string>
+    <string name="map_tracking_status_inactive">Tracking is stopped.</string>
+    <string name="map_tracking_status_starting">Starting tracking session…</string>
+    <string name="map_tracking_status_active">Tracking is active and revealing exploration progress.</string>
+    <string name="map_tracking_status_permission_denied">Allow location permission to keep exploration tracking active.</string>
+    <string name="map_tracking_status_location_disabled">Turn on location services to continue revealing exploration progress.</string>
+    <string name="map_tracking_status_waiting">Tracking is active and waiting for the next location fix.</string>
     <string name="add_poi_title">Add point of interest</string>
     <string name="add_poi_name_label">Name</string>
     <string name="add_poi_description_label">Description</string>

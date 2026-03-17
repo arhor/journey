@@ -1,15 +1,22 @@
 package com.github.arhor.journey.feature.map
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.LocalLifecycleOwner
+
+private val LOCATION_PERMISSIONS = arrayOf(
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION,
+)
 
 @Composable
 fun MapRoute(
@@ -18,28 +25,21 @@ fun MapRoute(
     onOpenObjectDetails: (String) -> Unit,
     onOpenAddPoi: (Double, Double) -> Unit,
 ) {
+    val context = LocalContext.current
     val state by vm.uiState.collectAsStateWithLifecycle()
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { grants ->
+            vm.dispatch(
+                MapIntent.LocationPermissionResult(
+                    isGranted = grants.any { it.value } || context.hasLocationPermission(),
+                ),
+            )
+        },
+    )
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> vm.dispatch(MapIntent.StartLocationTracking)
-                Lifecycle.Event.ON_STOP -> vm.dispatch(MapIntent.StopLocationTracking)
-                else -> Unit
-            }
-        }
-
-        lifecycleOwner.lifecycle.addObserver(observer)
-
-        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            vm.dispatch(MapIntent.StartLocationTracking)
-        }
-
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            vm.dispatch(MapIntent.StopLocationTracking)
-        }
+    LaunchedEffect(Unit) {
+        vm.dispatch(MapIntent.MapOpened)
     }
 
     LaunchedEffect(Unit) {
@@ -56,6 +56,10 @@ fun MapRoute(
                 is MapEffect.OpenAddPoi -> {
                     onOpenAddPoi(effect.latitude, effect.longitude)
                 }
+
+                MapEffect.RequestLocationPermission -> {
+                    locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
+                }
             }
         }
     }
@@ -64,4 +68,9 @@ fun MapRoute(
         state = state,
         dispatch = vm::dispatch,
     )
+}
+
+private fun Context.hasLocationPermission(): Boolean {
+    return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 }

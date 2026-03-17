@@ -12,38 +12,41 @@ import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTilePrototype
 import com.github.arhor.journey.domain.model.ExplorationTileRange
+import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
+import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
+import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
-import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
-import com.github.arhor.journey.feature.map.location.ForegroundUserLocationTracker
-import com.github.arhor.journey.feature.map.location.UserLocationUpdate
+import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
+import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val DEFAULT_CAMERA_ZOOM = 15.0
+private const val DEFAULT_CAMERA_ZOOM = 17.0
 private const val MAX_VISIBLE_FOG_TILE_COUNT = 8_192L
 private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
 
@@ -52,8 +55,6 @@ private data class State(
     val cameraPosition: CameraPositionState? = null,
     val cameraUpdateOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
     val recenterRequestToken: Int = 0,
-    val userLocation: LatLng? = null,
-    val userLocationTrackingStatus: UserLocationTrackingStatus = UserLocationTrackingStatus.INACTIVE,
     val isAwaitingLocationPermissionResult: Boolean = false,
     val visibleTileRange: ExplorationTileRange? = null,
     val fogTileRange: ExplorationTileRange? = null,
@@ -70,35 +71,61 @@ class MapViewModel @Inject constructor(
     private val observeExploredTiles: ObserveExploredTilesUseCase,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
-    private val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
     private val clearExploredTiles: ClearExploredTilesUseCase,
-    private val foregroundUserLocationTracker: ForegroundUserLocationTracker,
+    private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
+    private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
+    private val stopExplorationTrackingSession: StopExplorationTrackingSessionUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
     private val _state = MutableStateFlow(State())
-    private var locationTrackingJob: Job? = null
-    private var lastRevealedTiles: Set<ExplorationTile> = emptySet()
-
-    override fun buildUiState(): Flow<MapUiState> = combine(
-        _state,
-        observeSelectedMapStyle(),
-        observePointsOfInterest(),
-        observeExplorationProgress(),
-        observeFogExploredTiles(),
-        ::intoUiState,
-    ).catch {
-        emit(
-            MapUiState.Failure(
-                errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
-            ),
+    private val trackingSession = observeExplorationTrackingSession()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = ExplorationTrackingSession(),
         )
-    }.distinctUntilChanged()
+
+    override fun buildUiState(): Flow<MapUiState> =
+        combine(
+            combine(
+                _state,
+                trackingSession,
+                observeSelectedMapStyle(),
+                observePointsOfInterest(),
+                observeExplorationProgress(),
+            ) { state, session, mapStyleOutput, pointsOfInterest, explorationProgress ->
+                UiStateInputs(
+                    state = state,
+                    trackingSession = session,
+                    mapStyleOutput = mapStyleOutput,
+                    pointsOfInterest = pointsOfInterest,
+                    explorationProgress = explorationProgress,
+                )
+            },
+            observeFogExploredTiles(),
+        ) { inputs, exploredTiles ->
+            intoUiState(
+                state = inputs.state,
+                trackingSession = inputs.trackingSession,
+                mapStyleOutput = inputs.mapStyleOutput,
+                pointsOfInterest = inputs.pointsOfInterest,
+                explorationProgress = inputs.explorationProgress,
+                exploredTiles = exploredTiles,
+            )
+        }.catch {
+            emit(
+                MapUiState.Failure(
+                    errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
+                ),
+            )
+        }.distinctUntilChanged()
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
-            is MapIntent.StartLocationTracking -> onStartLocationTracking()
-            is MapIntent.StopLocationTracking -> onStopLocationTracking()
+            MapIntent.MapOpened -> onMapOpened()
+            MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
+            MapIntent.StopTrackingClicked -> onStopTrackingClicked()
             is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
             is MapIntent.CameraSettled -> onCameraSettled(intent)
             is MapIntent.CurrentLocationUnavailable -> onCurrentLocationUnavailable()
@@ -112,8 +139,6 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    /* ------------------------------------------ Internal implementation ------------------------------------------- */
-
     private fun observeFogExploredTiles(): Flow<Set<ExplorationTile>> =
         _state
             .map { state ->
@@ -124,85 +149,44 @@ class MapViewModel @Inject constructor(
                 range?.let(observeExploredTiles::invoke) ?: flowOf(emptySet())
             }
 
-    private fun onStartLocationTracking() {
-        if (locationTrackingJob != null) {
-            return
-        }
+    private suspend fun onMapOpened() {
+        startTrackingSessionIfNeeded()
+    }
 
-        locationTrackingJob = viewModelScope.launch {
-            foregroundUserLocationTracker.observeLocations()
-                .catch {
-                    emitEffect(MapEffect.ShowMessage(it.message ?: LOCATION_TRACKING_FAILED_MESSAGE))
-                }
-                .collect { update ->
-                    when (update) {
-                        is UserLocationUpdate.Available -> onUserLocationAvailable(update.location)
+    private suspend fun onResumeTrackingClicked() {
+        startTrackingSessionIfNeeded()
+    }
 
-                        UserLocationUpdate.LocationServicesDisabled -> {
-                            _state.update {
-                                it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.LOCATION_SERVICES_DISABLED)
-                            }
-                        }
+    private suspend fun startTrackingSessionIfNeeded() {
+        when (val result = startExplorationTrackingSession()) {
+            StartExplorationTrackingSessionResult.AlreadyActive,
+            StartExplorationTrackingSessionResult.Started -> Unit
 
-                        UserLocationUpdate.PermissionDenied -> {
-                            _state.update {
-                                it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.PERMISSION_DENIED)
-                            }
-                        }
+            StartExplorationTrackingSessionResult.PermissionRequired -> {
+                emitEffect(MapEffect.RequestLocationPermission)
+            }
 
-                        UserLocationUpdate.TemporarilyUnavailable -> {
-                            _state.update {
-                                it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.TEMPORARILY_UNAVAILABLE)
-                            }
-                        }
-                    }
-                }
+            is StartExplorationTrackingSessionResult.Failed -> {
+                emitEffect(
+                    MapEffect.ShowMessage(
+                        result.message ?: TRACKING_START_FAILED_MESSAGE,
+                    ),
+                )
+            }
         }
     }
 
-    private suspend fun onUserLocationAvailable(location: GeoPoint) {
-        _state.update { state ->
-            val userLocation = location.toLatLng()
-
-            state.copy(
-                cameraPosition = state.cameraPosition ?: CameraPositionState(
-                    target = userLocation,
-                    zoom = DEFAULT_CAMERA_ZOOM,
-                ),
-                cameraUpdateOrigin = if (state.cameraPosition == null) {
-                    CameraUpdateOrigin.PROGRAMMATIC
-                } else {
-                    state.cameraUpdateOrigin
-                },
-                userLocation = userLocation,
-                userLocationTrackingStatus = UserLocationTrackingStatus.TRACKING,
-            )
-        }
-
-        val revealTiles = ExplorationTileGrid.revealTilesAround(location)
-        if (revealTiles == lastRevealedTiles) {
-            return
-        }
-
+    private suspend fun onStopTrackingClicked() {
         try {
-            revealExplorationTilesAtLocation(location)
-            lastRevealedTiles = revealTiles
+            stopExplorationTrackingSession()
         } catch (e: Throwable) {
-            emitEffect(MapEffect.ShowMessage(e.message ?: EXPLORATION_PERSIST_FAILED_MESSAGE))
-        }
-    }
-
-    private fun onStopLocationTracking() {
-        locationTrackingJob?.cancel()
-        locationTrackingJob = null
-
-        _state.update {
-            it.copy(userLocationTrackingStatus = UserLocationTrackingStatus.INACTIVE)
+            emitEffect(MapEffect.ShowMessage(e.message ?: TRACKING_STOP_FAILED_MESSAGE))
         }
     }
 
     private fun intoUiState(
         state: State,
+        trackingSession: ExplorationTrackingSession,
         mapStyleOutput: Output<MapStyle?, DomainError>,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
@@ -210,14 +194,19 @@ class MapViewModel @Inject constructor(
     ): MapUiState = if (state.failureMessage == null) {
         mapStyleOutput.fold(
             onSuccess = {
-                val resolvedCameraPosition = state.cameraPosition.centerOn(pointsOfInterest)
+                val userLocation = trackingSession.lastKnownLocation?.toLatLng()
+                val resolvedCameraPosition = state.cameraPosition
+                    ?: userLocation?.toCameraPosition()
+                    ?: pointsOfInterest.defaultCameraPosition()
 
                 MapUiState.Content(
                     cameraPosition = resolvedCameraPosition,
                     cameraUpdateOrigin = state.cameraUpdateOrigin,
                     recenterRequestToken = state.recenterRequestToken,
-                    userLocation = state.userLocation,
-                    userLocationTrackingStatus = state.userLocationTrackingStatus,
+                    userLocation = userLocation,
+                    isExplorationTrackingActive = trackingSession.isActive,
+                    explorationTrackingCadence = trackingSession.cadence,
+                    explorationTrackingStatus = trackingSession.status,
                     selectedStyle = it,
                     visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
                     fogOfWar = fogOfWarUiState(
@@ -232,7 +221,7 @@ class MapViewModel @Inject constructor(
                         ?: it.cause?.message
                         ?: SETTINGS_LOADING_FAILED_MESSAGE,
                 )
-            }
+            },
         )
     } else {
         MapUiState.Failure(errorMessage = state.failureMessage)
@@ -268,9 +257,11 @@ class MapViewModel @Inject constructor(
         _state.update {
             it.copy(isAwaitingLocationPermissionResult = true)
         }
+
+        emitEffect(MapEffect.RequestLocationPermission)
     }
 
-    private fun onLocationPermissionResult(intent: MapIntent.LocationPermissionResult) {
+    private suspend fun onLocationPermissionResult(intent: MapIntent.LocationPermissionResult) {
         val wasAwaitingLocationPermissionResult = _state.value.isAwaitingLocationPermissionResult
 
         _state.update {
@@ -278,16 +269,23 @@ class MapViewModel @Inject constructor(
         }
 
         if (intent.isGranted) {
+            startTrackingSessionIfNeeded()
+
             if (wasAwaitingLocationPermissionResult) {
                 _state.update {
                     it.copy(recenterRequestToken = it.recenterRequestToken + 1)
                 }
             }
-
-            onStopLocationTracking()
-            onStartLocationTracking()
-        } else if (wasAwaitingLocationPermissionResult) {
-            emitEffect(MapEffect.ShowMessage(LOCATION_PERMISSION_DENIED_MESSAGE))
+        } else {
+            emitEffect(
+                MapEffect.ShowMessage(
+                    if (wasAwaitingLocationPermissionResult) {
+                        LOCATION_PERMISSION_DENIED_MESSAGE
+                    } else {
+                        TRACKING_PERMISSION_REQUIRED_MESSAGE
+                    },
+                ),
+            )
         }
     }
 
@@ -308,7 +306,11 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onAddPoiClicked() {
-        val target = _state.value.cameraPosition.target
+        val target = (uiState.value as? MapUiState.Content)
+            ?.cameraPosition
+            ?.target
+            ?: return
+
         emitEffect(
             MapEffect.OpenAddPoi(
                 latitude = target.latitude,
@@ -317,10 +319,6 @@ class MapViewModel @Inject constructor(
         )
     }
 
-    private fun onCameraSettled(intent: MapIntent.CameraSettled) {
-        val fogViewport = fogViewport(intent.visibleBounds)
-    }
-    
     private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
         updateFogViewport(intent.visibleBounds)
     }
@@ -402,7 +400,6 @@ class MapViewModel @Inject constructor(
     private suspend fun onClearExploredTilesClicked() {
         try {
             clearExploredTiles()
-            lastRevealedTiles = emptySet()
             emitEffect(MapEffect.ShowMessage(EXPLORATION_CLEAR_SUCCESS_MESSAGE))
         } catch (e: Throwable) {
             emitEffect(MapEffect.ShowMessage(e.message ?: EXPLORATION_CLEAR_FAILED_MESSAGE))
@@ -438,24 +435,28 @@ class MapViewModel @Inject constructor(
             longitude = lon,
         )
 
-    private fun CameraPositionState.centerOn(pointsOfInterest: List<PointOfInterest>): CameraPositionState {
-        if (
-            target != DEFAULT_CAMERA_TARGET ||
-            pointsOfInterest.isEmpty()
-        ) {
-            return this
+    private fun LatLng.toCameraPosition(): CameraPositionState =
+        CameraPositionState(
+            target = this,
+            zoom = DEFAULT_CAMERA_ZOOM,
+        )
+
+    private fun List<PointOfInterest>.defaultCameraPosition(): CameraPositionState? {
+        if (isEmpty()) {
+            return null
         }
 
-        val minLatitude = pointsOfInterest.minOf { it.location.lat }
-        val maxLatitude = pointsOfInterest.maxOf { it.location.lat }
-        val minLongitude = pointsOfInterest.minOf { it.location.lon }
-        val maxLongitude = pointsOfInterest.maxOf { it.location.lon }
+        val minLatitude = minOf { it.location.lat }
+        val maxLatitude = maxOf { it.location.lat }
+        val minLongitude = minOf { it.location.lon }
+        val maxLongitude = maxOf { it.location.lon }
 
-        return copy(
+        return CameraPositionState(
             target = LatLng(
                 latitude = (minLatitude + maxLatitude) / 2.0,
                 longitude = (minLongitude + maxLongitude) / 2.0,
             ),
+            zoom = DEFAULT_CAMERA_ZOOM,
         )
     }
 
@@ -465,6 +466,15 @@ class MapViewModel @Inject constructor(
         val fogTileRange: ExplorationTileRange,
         val visibleTileCount: Long,
         val isSuppressedByVisibleTileLimit: Boolean,
+    )
+
+    @Immutable
+    private data class UiStateInputs(
+        val state: State,
+        val trackingSession: ExplorationTrackingSession,
+        val mapStyleOutput: Output<MapStyle?, DomainError>,
+        val pointsOfInterest: List<PointOfInterest>,
+        val explorationProgress: ExplorationProgress,
     )
 
     private fun State.matches(fogViewport: FogViewport): Boolean {
@@ -483,14 +493,16 @@ class MapViewModel @Inject constructor(
         const val SETTINGS_LOADING_FAILED_MESSAGE = "Failed to load settings state."
         const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
+        const val TRACKING_PERMISSION_REQUIRED_MESSAGE =
+            "Location permission is required to start exploration tracking."
         const val LOCATION_PERMISSION_DENIED_MESSAGE =
             "Location permission is required to center the map on your position."
         const val CURRENT_LOCATION_UNAVAILABLE_MESSAGE =
             "Current location is not available yet."
-        const val LOCATION_TRACKING_FAILED_MESSAGE =
-            "Foreground location tracking failed."
-        const val EXPLORATION_PERSIST_FAILED_MESSAGE =
-            "Failed to persist explored tiles."
+        const val TRACKING_START_FAILED_MESSAGE =
+            "Failed to start exploration tracking."
+        const val TRACKING_STOP_FAILED_MESSAGE =
+            "Failed to stop exploration tracking."
         const val EXPLORATION_CLEAR_SUCCESS_MESSAGE =
             "Explored tiles cleared."
         const val EXPLORATION_CLEAR_FAILED_MESSAGE =

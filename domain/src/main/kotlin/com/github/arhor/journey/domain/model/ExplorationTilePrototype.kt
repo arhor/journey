@@ -14,5 +14,5 @@ object ExplorationTilePrototype {
      * The current implementation expands this into a simple north-aligned geographic bounds before
      * enumerating intersecting canonical tiles.
      */
-    const val REVEAL_RADIUS_METERS = 50.0
+    const val REVEAL_RADIUS_METERS = 20.0
 }
