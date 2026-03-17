@@ -36,20 +36,30 @@ data class ExplorationTileRange(
         }
     }
 
-    fun expandedBy(tilePadding: Int): ExplorationTileRange {
-        require(tilePadding >= 0) { "tilePadding must be >= 0" }
+    fun expandedBy(tilePadding: Int): ExplorationTileRange =
+        expandedBy(
+            horizontalTilePadding = tilePadding,
+            verticalTilePadding = tilePadding,
+        )
 
-        if (tilePadding == 0) {
+    fun expandedBy(
+        horizontalTilePadding: Int,
+        verticalTilePadding: Int,
+    ): ExplorationTileRange {
+        require(horizontalTilePadding >= 0) { "horizontalTilePadding must be >= 0" }
+        require(verticalTilePadding >= 0) { "verticalTilePadding must be >= 0" }
+
+        if (horizontalTilePadding == 0 && verticalTilePadding == 0) {
             return this
         }
 
         val maxTileIndex = (1 shl zoom) - 1
 
         return copy(
-            minX = (minX - tilePadding).coerceAtLeast(0),
-            maxX = (maxX + tilePadding).coerceAtMost(maxTileIndex),
-            minY = (minY - tilePadding).coerceAtLeast(0),
-            maxY = (maxY + tilePadding).coerceAtMost(maxTileIndex),
+            minX = (minX - horizontalTilePadding).coerceAtLeast(0),
+            maxX = (maxX + horizontalTilePadding).coerceAtMost(maxTileIndex),
+            minY = (minY - verticalTilePadding).coerceAtLeast(0),
+            maxY = (maxY + verticalTilePadding).coerceAtMost(maxTileIndex),
         )
     }
 }

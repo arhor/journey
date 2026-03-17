@@ -134,26 +134,38 @@ internal fun MapContent(
         }
 
         snapshotFlow {
-            val projection = cameraState.projection
+            cameraState.position
+            cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()
+        }.filterNotNull()
+            .distinctUntilChanged(::areGeoBoundsEquivalent)
+            .collectLatest { visibleBounds ->
+                dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBounds,
+                    ),
+                )
+            }
+    }
 
-            CameraViewportSnapshot(
-                position = cameraState.position,
-                visibleBounds = projection?.queryVisibleBoundingBox()?.toGeoBounds(),
-            )
-        }.debounce(CAMERA_SETTLE_DEBOUNCE_MS)
-            .distinctUntilChanged(::areCameraViewportSnapshotsEquivalent)
-            .collectLatest { snapshot ->
+    LaunchedEffect(state.cameraPosition, cameraState) {
+        if (state.cameraPosition == null) {
+            return@LaunchedEffect
+        }
+
+        snapshotFlow { cameraState.position }
+            .debounce(CAMERA_SETTLE_DEBOUNCE_MS)
+            .distinctUntilChanged(::areCameraPositionsEquivalent)
+            .collectLatest { position ->
                 dispatch(
                     MapIntent.CameraSettled(
                         position = CameraPositionState(
                             target = LatLng(
-                                latitude = snapshot.position.target.latitude,
-                                longitude = snapshot.position.target.longitude,
+                                latitude = position.target.latitude,
+                                longitude = position.target.longitude,
                             ),
-                            zoom = snapshot.position.zoom,
+                            zoom = position.zoom,
                         ),
                         origin = CameraUpdateOrigin.USER,
-                        visibleBounds = snapshot.visibleBounds,
                     ),
                 )
             }
@@ -316,7 +328,7 @@ private fun FogOfWarDebugPanel(
             )
             Text(
                 text = if (fogOfWar.isSuppressedByVisibleTileLimit) {
-                    "Fog hidden while zoomed out"
+                    "Fog hidden for current viewport size"
                 } else {
                     "Fog regions: ${fogOfWar.fogRanges.size}"
                 },
@@ -331,7 +343,7 @@ private fun FogOfWarDebugPanel(
     }
 }
 
-private const val CAMERA_SETTLE_DEBOUNCE_MS = 300L
+private const val CAMERA_SETTLE_DEBOUNCE_MS = 100L
 private const val USER_LOCATION_PUCK_ID_PREFIX = "user-location"
 private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
 private const val CAMERA_SETTLE_ZOOM_THRESHOLD = 0.01
@@ -352,14 +364,6 @@ private fun rememberUserLocationStateInternal(ctx: Context): UserLocationState {
             rememberNullLocationProvider()
         }
     )
-}
-
-private fun areCameraViewportSnapshotsEquivalent(
-    a: CameraViewportSnapshot,
-    b: CameraViewportSnapshot,
-): Boolean {
-    return areCameraPositionsEquivalent(a.position, b.position)
-        && areGeoBoundsEquivalent(a.visibleBounds, b.visibleBounds)
 }
 
 private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): Boolean {
@@ -397,9 +401,4 @@ private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosit
         longitude = target.longitude,
     ),
     zoom = zoom,
-)
-
-private data class CameraViewportSnapshot(
-    val position: CameraPosition,
-    val visibleBounds: GeoBounds?,
 )

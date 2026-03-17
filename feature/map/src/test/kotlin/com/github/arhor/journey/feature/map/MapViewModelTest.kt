@@ -520,7 +520,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should derive fog overlay stats when camera settles on visible bounds`() = runTest {
+    fun `dispatch should derive fog overlay stats when the viewport changes`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -546,12 +546,7 @@ class MapViewModelTest {
 
             // When
             fixture.viewModel.dispatch(
-                MapIntent.CameraSettled(
-                    position = com.github.arhor.journey.feature.map.model.CameraPositionState(
-                        target = LatLng(latitude = 0.0, longitude = 0.0),
-                        zoom = 12.0,
-                    ),
-                    origin = CameraUpdateOrigin.USER,
+                MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(visibleRange),
                 ),
             )
@@ -573,25 +568,20 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should pad the fog query by one tile while keeping explored stats scoped to the visible viewport`() = runTest {
+    fun `dispatch should buffer the fog query by one extra screen in every direction while keeping explored stats scoped to the live viewport`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
         val visibleRange = ExplorationTileRange(
             zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
             minX = 10,
-            maxX = 11,
+            maxX = 13,
             minY = 20,
-            maxY = 21,
+            maxY = 25,
         )
         val observedFogRanges = mutableListOf<ExplorationTileRange>()
         val fixture = createFixture(
             exploredTiles = setOf(
-                ExplorationTile(
-                    zoom = visibleRange.zoom,
-                    x = 9,
-                    y = 19,
-                ),
                 ExplorationTile(
                     zoom = visibleRange.zoom,
                     x = 10,
@@ -606,22 +596,20 @@ class MapViewModelTest {
 
             // When
             fixture.viewModel.dispatch(
-                MapIntent.CameraSettled(
-                    position = com.github.arhor.journey.feature.map.model.CameraPositionState(
-                        target = LatLng(latitude = 0.0, longitude = 0.0),
-                        zoom = 12.0,
-                    ),
-                    origin = CameraUpdateOrigin.USER,
+                MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(visibleRange),
                 ),
             )
             advanceUntilIdle()
 
             // Then
-            observedFogRanges.last() shouldBe visibleRange.expandedBy(tilePadding = 1)
+            observedFogRanges.last() shouldBe visibleRange.expandedBy(
+                horizontalTilePadding = 4,
+                verticalTilePadding = 6,
+            )
 
-            val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 4L }
-            actual.fogOfWar.visibleTileCount shouldBe 4L
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 24L }
+            actual.fogOfWar.visibleTileCount shouldBe 24L
             actual.fogOfWar.exploredVisibleTileCount shouldBe 1
             actual.fogOfWar.fogRanges.any { fogRange ->
                 fogRange.minX < visibleRange.minX ||
@@ -629,6 +617,205 @@ class MapViewModelTest {
                     fogRange.minY < visibleRange.minY ||
                     fogRange.maxY > visibleRange.maxY
             } shouldBe true
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should update fog overlay immediately when viewport changes without waiting for camera settled`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 12,
+            maxX = 13,
+            minY = 22,
+            maxY = 23,
+        )
+        val fixture = createFixture(
+            exploredTiles = setOf(
+                ExplorationTile(
+                    zoom = visibleRange.zoom,
+                    x = 12,
+                    y = 22,
+                ),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 4L }
+            actual.cameraPosition shouldBe null
+            actual.fogOfWar.visibleTileCount shouldBe 4L
+            actual.fogOfWar.exploredVisibleTileCount shouldBe 1
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should not re-subscribe to explored tiles when viewport changes stay within the same canonical tile range`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 30,
+            maxX = 35,
+            minY = 40,
+            maxY = 43,
+        )
+        val observedFogRanges = mutableListOf<ExplorationTileRange>()
+        val initialBounds = visibleBoundsInside(visibleRange)
+        val shiftedBounds = initialBounds.copy(
+            south = initialBounds.south + VIEWPORT_BOUNDS_EPSILON,
+            west = initialBounds.west + VIEWPORT_BOUNDS_EPSILON,
+            north = initialBounds.north - VIEWPORT_BOUNDS_EPSILON,
+            east = initialBounds.east - VIEWPORT_BOUNDS_EPSILON,
+        )
+        val fixture = createFixture(
+            observedTileRanges = observedFogRanges,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = initialBounds,
+                ),
+            )
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = shiftedBounds,
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            observedFogRanges shouldBe listOf(
+                visibleRange.expandedBy(
+                    horizontalTilePadding = 6,
+                    verticalTilePadding = 4,
+                )
+            )
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should suppress fog when the viewport exceeds the fog safety limit`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 100,
+            maxX = 221,
+            minY = 200,
+            maxY = 267,
+        )
+        val observedFogRanges = mutableListOf<ExplorationTileRange>()
+        val fixture = createFixture(
+            observedTileRanges = observedFogRanges,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleTileCount == 8_296L
+            }
+            actual.fogOfWar.visibleTileCount shouldBe 8_296L
+            actual.fogOfWar.fogRanges shouldBe emptyList()
+            actual.fogOfWar.isSuppressedByVisibleTileLimit shouldBe true
+            observedFogRanges shouldBe emptyList()
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should keep programmatic camera state until camera settles and then update to the settled user position`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 15,
+            maxX = 16,
+            minY = 25,
+            maxY = 26,
+        )
+        val fixture = createFixture(
+            pointsOfInterest = listOf(
+                pointOfInterest(id = "poi-1", lat = 51.1, lon = 17.03),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.ObjectTapped(objectId = "poi-1"))
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val programmatic = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 51.1, longitude = 17.03)
+                    && it.fogOfWar.visibleTileCount == 4L
+            }
+            programmatic.cameraPosition?.target shouldBe LatLng(latitude = 51.1, longitude = 17.03)
+            programmatic.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = com.github.arhor.journey.feature.map.model.CameraPositionState(
+                        target = LatLng(latitude = 51.2, longitude = 17.04),
+                        zoom = 14.0,
+                    ),
+                    origin = CameraUpdateOrigin.USER,
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val settled = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 51.2, longitude = 17.04)
+            }
+            settled.cameraPosition?.target shouldBe LatLng(latitude = 51.2, longitude = 17.04)
+            settled.cameraPosition?.zoom shouldBe 14.0
+            settled.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
+            settled.fogOfWar.visibleTileCount shouldBe 4L
         } finally {
             tearDownMainDispatcher()
         }
