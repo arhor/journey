@@ -1,7 +1,6 @@
 package com.github.arhor.journey.feature.map.renderer
 
 import com.github.arhor.journey.domain.model.ExplorationTileRange
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 
@@ -81,58 +80,6 @@ class FogOfWarRegionGeometryTest {
         // Then
         actual.size shouldBe 1
         actual.single().holeRings.size shouldBe 1
-    }
-
-    @Test
-    fun `toTileRegionGeometries should include diagnostic details when a boundary vertex is ambiguous`() {
-        // Given
-        val fogRanges = listOf(
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 0,
-                maxX = 2,
-                minY = 0,
-                maxY = 0,
-            ),
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 0,
-                maxX = 0,
-                minY = 1,
-                maxY = 1,
-            ),
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 2,
-                maxX = 2,
-                minY = 1,
-                maxY = 1,
-            ),
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 0,
-                maxX = 1,
-                minY = 2,
-                maxY = 2,
-            ),
-        )
-
-        // When
-        val exception = shouldThrow<IllegalStateException> {
-            fogRanges.toTileRegionGeometries(
-                cornerRadiusTiles = 0.25,
-                arcSegmentsPerCorner = 2,
-            )
-        }
-
-        // Then
-        val message = exception.message.orEmpty()
-        message.contains("zoom=16") shouldBe true
-        message.contains("componentBounds=x=0..2,y=0..2") shouldBe true
-        message.contains("adjacentCells=NW=false,NE=true,SW=true,SE=false") shouldBe true
-        message.contains("previousTrace=") shouldBe true
-        message.contains("currentTrace=") shouldBe true
-        message.contains("localWindow=") shouldBe true
     }
 
     @Test

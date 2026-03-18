@@ -4,16 +4,14 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
-import com.github.arhor.journey.domain.repository.ExplorationTileRepository
+import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.testing.MainDispatcherRule
 import com.github.arhor.journey.tracking.location.UserLocationSource
 import com.github.arhor.journey.tracking.location.UserLocationUpdate
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -31,15 +29,15 @@ class ExplorationTrackingRuntimeTest {
     fun `startIfNeeded should reveal exploration tiles once for repeated updates in the same tile cluster`() = runTest {
         // Given
         val userLocationSource = FakeUserLocationSource()
-        val explorationTileRepository = mockk<ExplorationTileRepository>()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
-            explorationTileRepository = explorationTileRepository,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { explorationTileRepository.accumulateExplorationTileLights(any()) } just runs
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
 
         // When
         runtime.startIfNeeded()
@@ -50,7 +48,7 @@ class ExplorationTrackingRuntimeTest {
         runCurrent()
 
         // Then
-        coVerify(exactly = 1) { explorationTileRepository.accumulateExplorationTileLights(any()) }
+        coVerify(exactly = 1) { revealExplorationTilesAtLocation.invoke(location) }
         runtime.snapshot().status shouldBe ExplorationTrackingStatus.TRACKING
         runtime.snapshot().lastKnownLocation shouldBe location
     }
@@ -62,7 +60,7 @@ class ExplorationTrackingRuntimeTest {
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
-            explorationTileRepository = mockk(relaxed = true),
+            revealExplorationTilesAtLocation = mockk(relaxed = true),
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
 
@@ -83,7 +81,7 @@ class ExplorationTrackingRuntimeTest {
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = FakeUserLocationSource(),
-            explorationTileRepository = mockk(relaxed = true),
+            revealExplorationTilesAtLocation = mockk(relaxed = true),
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
 
@@ -105,15 +103,15 @@ class ExplorationTrackingRuntimeTest {
         // Given
         val userLocationSource = FakeUserLocationSource()
         val configHolder = ExplorationTileRuntimeConfigHolder()
-        val explorationTileRepository = mockk<ExplorationTileRepository>()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
-            explorationTileRepository = explorationTileRepository,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
             configHolder = configHolder,
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { explorationTileRepository.accumulateExplorationTileLights(any()) } just runs
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
 
         // When
         runtime.startIfNeeded()
@@ -125,7 +123,7 @@ class ExplorationTrackingRuntimeTest {
         runCurrent()
 
         // Then
-        coVerify(exactly = 2) { explorationTileRepository.accumulateExplorationTileLights(any()) }
+        coVerify(exactly = 2) { revealExplorationTilesAtLocation.invoke(location) }
     }
 
     private class FakeUserLocationSource : UserLocationSource {

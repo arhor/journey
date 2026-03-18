@@ -131,19 +131,6 @@ private data class DirectedEdge(
     val end: GridVertex,
 )
 
-private data class BoundaryEdgeTrace(
-    val edge: DirectedEdge,
-    val sourceCell: TileCell,
-    val side: BoundarySide,
-)
-
-private enum class BoundarySide {
-    TOP,
-    RIGHT,
-    BOTTOM,
-    LEFT,
-}
-
 private fun List<ExplorationTileRange>.toTileCells(): Set<TileCell> {
     val cells = linkedSetOf<TileCell>()
 
@@ -199,7 +186,7 @@ private fun Set<TileCell>.toTileRegionGeometry(
     cornerRadiusTiles: Double,
     arcSegmentsPerCorner: Int,
 ): TileRegionGeometry {
-    val boundaryLoops = extractBoundaryLoops(zoom = zoom)
+    val boundaryLoops = extractBoundaryLoops()
     val exteriorLoop = boundaryLoops.maxBy { loop -> kotlin.math.abs(loop.signedAreaGeo()) }
     val holeLoops = boundaryLoops
         .filterNot { it === exteriorLoop }
@@ -233,69 +220,35 @@ private fun Set<TileCell>.toTileRegionGeometry(
     )
 }
 
-private fun Set<TileCell>.extractBoundaryLoops(
-    zoom: Int,
-): List<List<GridPoint>> {
-    val edgesByStart = mutableMapOf<GridVertex, BoundaryEdgeTrace>()
+private fun Set<TileCell>.extractBoundaryLoops(): List<List<GridPoint>> {
+    val edgesByStart = mutableMapOf<GridVertex, DirectedEdge>()
 
     for (cell in this) {
         if (TileCell(x = cell.x, y = cell.y - 1) !in this) {
             edgesByStart.addBoundaryEdge(
-                trace = BoundaryEdgeTrace(
-                    edge = DirectedEdge(
-                        start = GridVertex(x = cell.x, y = cell.y),
-                        end = GridVertex(x = cell.x + 1, y = cell.y),
-                    ),
-                    sourceCell = cell,
-                    side = BoundarySide.TOP,
-                ),
-                occupiedCells = this,
-                zoom = zoom,
+                start = GridVertex(x = cell.x, y = cell.y),
+                end = GridVertex(x = cell.x + 1, y = cell.y),
             )
         }
 
         if (TileCell(x = cell.x + 1, y = cell.y) !in this) {
             edgesByStart.addBoundaryEdge(
-                trace = BoundaryEdgeTrace(
-                    edge = DirectedEdge(
-                        start = GridVertex(x = cell.x + 1, y = cell.y),
-                        end = GridVertex(x = cell.x + 1, y = cell.y + 1),
-                    ),
-                    sourceCell = cell,
-                    side = BoundarySide.RIGHT,
-                ),
-                occupiedCells = this,
-                zoom = zoom,
+                start = GridVertex(x = cell.x + 1, y = cell.y),
+                end = GridVertex(x = cell.x + 1, y = cell.y + 1),
             )
         }
 
         if (TileCell(x = cell.x, y = cell.y + 1) !in this) {
             edgesByStart.addBoundaryEdge(
-                trace = BoundaryEdgeTrace(
-                    edge = DirectedEdge(
-                        start = GridVertex(x = cell.x + 1, y = cell.y + 1),
-                        end = GridVertex(x = cell.x, y = cell.y + 1),
-                    ),
-                    sourceCell = cell,
-                    side = BoundarySide.BOTTOM,
-                ),
-                occupiedCells = this,
-                zoom = zoom,
+                start = GridVertex(x = cell.x + 1, y = cell.y + 1),
+                end = GridVertex(x = cell.x, y = cell.y + 1),
             )
         }
 
         if (TileCell(x = cell.x - 1, y = cell.y) !in this) {
             edgesByStart.addBoundaryEdge(
-                trace = BoundaryEdgeTrace(
-                    edge = DirectedEdge(
-                        start = GridVertex(x = cell.x, y = cell.y + 1),
-                        end = GridVertex(x = cell.x, y = cell.y),
-                    ),
-                    sourceCell = cell,
-                    side = BoundarySide.LEFT,
-                ),
-                occupiedCells = this,
-                zoom = zoom,
+                start = GridVertex(x = cell.x, y = cell.y + 1),
+                end = GridVertex(x = cell.x, y = cell.y),
             )
         }
     }
@@ -305,7 +258,7 @@ private fun Set<TileCell>.extractBoundaryLoops(
 
     while (remainingStarts.isNotEmpty()) {
         val firstStart = remainingStarts.minWith(compareBy<GridVertex> { it.y }.thenBy { it.x })
-        val firstEdge = edgesByStart.getValue(firstStart).edge
+        val firstEdge = edgesByStart.getValue(firstStart)
         val vertices = mutableListOf<GridVertex>()
         var currentEdge = firstEdge
 
@@ -319,7 +272,6 @@ private fun Set<TileCell>.extractBoundaryLoops(
             }
 
             currentEdge = edgesByStart[currentEdge.end]
-                ?.edge
                 ?: error("Failed to continue fog boundary loop at ${currentEdge.end}.")
         }
 
@@ -329,94 +281,12 @@ private fun Set<TileCell>.extractBoundaryLoops(
     return loops
 }
 
-private fun MutableMap<GridVertex, BoundaryEdgeTrace>.addBoundaryEdge(
-    trace: BoundaryEdgeTrace,
-    occupiedCells: Set<TileCell>,
-    zoom: Int,
+private fun MutableMap<GridVertex, DirectedEdge>.addBoundaryEdge(
+    start: GridVertex,
+    end: GridVertex,
 ) {
-    val previous = put(trace.edge.start, trace)
-
-    if (previous == null) {
-        return
-    }
-
-    val message = occupiedCells.buildAmbiguousBoundaryMessage(
-        zoom = zoom,
-        vertex = trace.edge.start,
-        previous = previous,
-        current = trace,
-    )
-    throw IllegalStateException(message)
-}
-
-private fun Set<TileCell>.buildAmbiguousBoundaryMessage(
-    zoom: Int,
-    vertex: GridVertex,
-    previous: BoundaryEdgeTrace,
-    current: BoundaryEdgeTrace,
-): String = buildString {
-    append("Encountered an ambiguous fog boundary edge")
-    append(" at ")
-    append(vertex)
-    append(" on zoom=")
-    append(zoom)
-    append(". componentBounds=")
-    append(componentBoundsSummary())
-    append(", componentCellCount=")
-    append(size)
-    append(", adjacentCells=")
-    append(adjacentCellsSummary(vertex))
-    append(", previousTrace=")
-    append(previous)
-    append(", currentTrace=")
-    append(current)
-    append(", localWindow=\n")
-    append(localWindowAround(vertex))
-}
-
-private fun Set<TileCell>.componentBoundsSummary(): String {
-    val minX = minOf(TileCell::x)
-    val maxX = maxOf(TileCell::x)
-    val minY = minOf(TileCell::y)
-    val maxY = maxOf(TileCell::y)
-
-    return "x=$minX..$maxX,y=$minY..$maxY"
-}
-
-private fun Set<TileCell>.adjacentCellsSummary(vertex: GridVertex): String {
-    val northWest = TileCell(x = vertex.x - 1, y = vertex.y - 1) in this
-    val northEast = TileCell(x = vertex.x, y = vertex.y - 1) in this
-    val southWest = TileCell(x = vertex.x - 1, y = vertex.y) in this
-    val southEast = TileCell(x = vertex.x, y = vertex.y) in this
-
-    return "NW=$northWest,NE=$northEast,SW=$southWest,SE=$southEast"
-}
-
-private fun Set<TileCell>.localWindowAround(
-    vertex: GridVertex,
-    radius: Int = 2,
-): String {
-    val minX = vertex.x - radius
-    val maxX = vertex.x + radius - 1
-    val minY = vertex.y - radius
-    val maxY = vertex.y + radius - 1
-
-    return (minY..maxY).joinToString(separator = "\n") { y ->
-        buildString {
-            append(y)
-            append(':')
-
-            for (x in minX..maxX) {
-                append(
-                    if (TileCell(x = x, y = y) in this@localWindowAround) {
-                        '#'
-                    } else {
-                        '.'
-                    },
-                )
-            }
-        }
-    }
+    val previous = put(start, DirectedEdge(start = start, end = end))
+    check(previous == null) { "Encountered an ambiguous fog boundary edge at $start." }
 }
 
 private fun List<GridVertex>.simplifyOrthogonalLoop(): List<GridPoint> {
@@ -606,4 +476,3 @@ private const val HALF_LONGITUDE_SPAN = 180.0
 private const val FULL_LONGITUDE_SPAN = 360.0
 private const val DEGREES_PER_RADIAN = 180.0 / PI
 private const val FULL_TURN_RADIANS = PI * 2.0
-private const val FOG_OF_WAR_REGION_GEOMETRY_TAG = "FogOfWarRegionGeometry"

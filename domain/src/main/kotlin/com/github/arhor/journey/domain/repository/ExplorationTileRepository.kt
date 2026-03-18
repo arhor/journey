@@ -1,19 +1,19 @@
 package com.github.arhor.journey.domain.repository
 
-import com.github.arhor.journey.domain.model.ExplorationTileLight
+import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import kotlinx.coroutines.flow.Flow
 
 interface ExplorationTileRepository {
 
-    fun observeExplorationTileLights(range: ExplorationTileRange): Flow<List<ExplorationTileLight>>
+    fun observeExploredTiles(range: ExplorationTileRange): Flow<Set<ExplorationTile>>
 
     /**
-     * Accumulates the provided tile light using max(oldLight, contribution).
+     * Marks the provided tiles as explored.
      *
      * This operation is expected to be idempotent.
      */
-    suspend fun accumulateExplorationTileLights(tileLights: Collection<ExplorationTileLight>)
+    suspend fun markExplored(tiles: Set<ExplorationTile>)
 
-    suspend fun clearExplorationTileLights()
+    suspend fun clear()
 }

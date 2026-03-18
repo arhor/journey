@@ -40,14 +40,8 @@ sealed interface MapUiState {
 data class FogOfWarUiState(
     val canonicalZoom: Int,
     val visibleTileRange: ExplorationTileRange?,
-    val fogBands: List<FogOfWarBandUiState>,
+    val fogRanges: List<ExplorationTileRange>,
     val visibleTileCount: Long,
-    val litVisibleTileCount: Int,
+    val exploredVisibleTileCount: Int,
     val isSuppressedByVisibleTileLimit: Boolean,
-)
-
-@Immutable
-data class FogOfWarBandUiState(
-    val opacity: Float,
-    val ranges: List<ExplorationTileRange>,
 )

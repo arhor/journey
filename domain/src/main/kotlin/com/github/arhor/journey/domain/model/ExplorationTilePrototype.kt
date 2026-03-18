@@ -9,12 +9,10 @@ object ExplorationTilePrototype {
     const val CANONICAL_ZOOM = 19
 
     /**
-     * Current player light profile expressed as Chebyshev-distance tile rings.
+     * Prototype reveal radius around the live user location.
      *
-     * Future systems can layer additional light sources on top of this baseline profile.
+     * The current implementation expands this into a simple north-aligned geographic bounds before
+     * enumerating intersecting canonical tiles.
      */
-    const val PLAYER_LIGHT_MAX_RING = 2
-    const val CURRENT_TILE_LIGHT = 1.0f
-    const val FIRST_RING_LIGHT = 0.66f
-    const val SECOND_RING_LIGHT = 0.33f
+    const val REVEAL_RADIUS_METERS = 10.0
 }

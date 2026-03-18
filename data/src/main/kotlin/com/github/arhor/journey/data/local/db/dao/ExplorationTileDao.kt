@@ -1,8 +1,9 @@
 package com.github.arhor.journey.data.local.db.dao
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
 import com.github.arhor.journey.data.local.db.entity.ExplorationTileEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -27,32 +28,8 @@ interface ExplorationTileDao {
         maxY: Int,
     ): Flow<List<ExplorationTileEntity>>
 
-    @Query(
-        """
-        INSERT INTO exploration_tile (zoom, x, y, light)
-        VALUES (:zoom, :x, :y, :light)
-        ON CONFLICT(zoom, x, y) DO UPDATE
-        SET light = MAX(exploration_tile.light, excluded.light)
-        """,
-    )
-    suspend fun insertOrAccumulate(
-        zoom: Int,
-        x: Int,
-        y: Int,
-        light: Float,
-    )
-
-    @Transaction
-    suspend fun accumulate(entities: List<ExplorationTileEntity>) {
-        entities.forEach { entity ->
-            insertOrAccumulate(
-                zoom = entity.zoom,
-                x = entity.x,
-                y = entity.y,
-                light = entity.light,
-            )
-        }
-    }
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insert(entities: List<ExplorationTileEntity>): List<Long>
 
     @Query("DELETE FROM exploration_tile")
     suspend fun clear()

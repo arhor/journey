@@ -70,7 +70,7 @@ class ExplorationTileGridTest {
     }
 
     @Test
-    fun `playerLightContributionsAt should assign expected light values across tile rings`() {
+    fun `revealTilesAround should include neighboring tiles when reveal bounds cross canonical tile borders`() {
         // Given
         val point = GeoPoint(
             lat = 0.0,
@@ -78,85 +78,16 @@ class ExplorationTileGridTest {
         )
 
         // When
-        val actual = ExplorationTileGrid.playerLightContributionsAt(
+        val actual = ExplorationTileGrid.revealTilesAround(
             point = point,
-            zoom = 3,
-        )
-        val actualByTile = actual.associateBy(ExplorationTileLight::tile)
-
-        // Then
-        actualByTile[ExplorationTile(zoom = 3, x = 4, y = 4)]?.light shouldBe 1.0f
-        actualByTile[ExplorationTile(zoom = 3, x = 3, y = 4)]?.light shouldBe 0.66f
-        actualByTile[ExplorationTile(zoom = 3, x = 6, y = 4)]?.light shouldBe 0.33f
-    }
-
-    @Test
-    fun `playerLightContributionsAt should not emit tiles outside the supported ring radius`() {
-        // Given
-        val point = GeoPoint(
-            lat = 0.0,
-            lon = 0.0,
-        )
-
-        // When
-        val actual = ExplorationTileGrid.playerLightContributionsAt(
-            point = point,
-            zoom = 3,
-        )
-
-        // Then
-        actual.map(ExplorationTileLight::tile) shouldContainExactlyInAnyOrder setOf(
-            ExplorationTile(zoom = 3, x = 2, y = 2),
-            ExplorationTile(zoom = 3, x = 3, y = 2),
-            ExplorationTile(zoom = 3, x = 4, y = 2),
-            ExplorationTile(zoom = 3, x = 5, y = 2),
-            ExplorationTile(zoom = 3, x = 6, y = 2),
-            ExplorationTile(zoom = 3, x = 2, y = 3),
-            ExplorationTile(zoom = 3, x = 3, y = 3),
-            ExplorationTile(zoom = 3, x = 4, y = 3),
-            ExplorationTile(zoom = 3, x = 5, y = 3),
-            ExplorationTile(zoom = 3, x = 6, y = 3),
-            ExplorationTile(zoom = 3, x = 2, y = 4),
-            ExplorationTile(zoom = 3, x = 3, y = 4),
-            ExplorationTile(zoom = 3, x = 4, y = 4),
-            ExplorationTile(zoom = 3, x = 5, y = 4),
-            ExplorationTile(zoom = 3, x = 6, y = 4),
-            ExplorationTile(zoom = 3, x = 2, y = 5),
-            ExplorationTile(zoom = 3, x = 3, y = 5),
-            ExplorationTile(zoom = 3, x = 4, y = 5),
-            ExplorationTile(zoom = 3, x = 5, y = 5),
-            ExplorationTile(zoom = 3, x = 6, y = 5),
-            ExplorationTile(zoom = 3, x = 2, y = 6),
-            ExplorationTile(zoom = 3, x = 3, y = 6),
-            ExplorationTile(zoom = 3, x = 4, y = 6),
-            ExplorationTile(zoom = 3, x = 5, y = 6),
-            ExplorationTile(zoom = 3, x = 6, y = 6),
-        )
-    }
-
-    @Test
-    fun `playerLightContributionsAt should clamp light rings to world bounds near the tile grid edge`() {
-        // Given
-        val point = GeoPoint(
-            lat = 85.0,
-            lon = -179.999,
-        )
-
-        // When
-        val actual = ExplorationTileGrid.playerLightContributionsAt(
-            point = point,
+            radiusMeters = 1_000.0,
             zoom = 2,
         )
 
         // Then
-        actual.map(ExplorationTileLight::tile) shouldContainExactlyInAnyOrder setOf(
-            ExplorationTile(zoom = 2, x = 0, y = 0),
-            ExplorationTile(zoom = 2, x = 1, y = 0),
-            ExplorationTile(zoom = 2, x = 0, y = 1),
+        actual shouldContainExactlyInAnyOrder setOf(
             ExplorationTile(zoom = 2, x = 1, y = 1),
-            ExplorationTile(zoom = 2, x = 2, y = 0),
             ExplorationTile(zoom = 2, x = 2, y = 1),
-            ExplorationTile(zoom = 2, x = 0, y = 2),
             ExplorationTile(zoom = 2, x = 1, y = 2),
             ExplorationTile(zoom = 2, x = 2, y = 2),
         )

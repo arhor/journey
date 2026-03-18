@@ -4,7 +4,6 @@ import com.github.arhor.journey.data.local.db.entity.DiscoveredPoiEntity
 import com.github.arhor.journey.data.local.db.entity.ExplorationTileEntity
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationTile
-import com.github.arhor.journey.domain.model.ExplorationTileLight
 import java.time.Instant
 
 fun DiscoveredPoiEntity.toDomain(): DiscoveredPoi =
@@ -19,20 +18,16 @@ fun DiscoveredPoi.toEntity(): DiscoveredPoiEntity =
         discoveredAtMs = discoveredAt.toEpochMilli(),
     )
 
-fun ExplorationTileEntity.toDomain(): ExplorationTileLight =
-    ExplorationTileLight(
-        tile = ExplorationTile(
-            zoom = zoom,
-            x = x,
-            y = y,
-        ),
-        light = light,
+fun ExplorationTileEntity.toDomain(): ExplorationTile =
+    ExplorationTile(
+        zoom = zoom,
+        x = x,
+        y = y,
     )
 
-fun ExplorationTileLight.toEntity(): ExplorationTileEntity =
+fun ExplorationTile.toEntity(): ExplorationTileEntity =
     ExplorationTileEntity(
-        zoom = tile.zoom,
-        x = tile.x,
-        y = tile.y,
-        light = light,
+        zoom = zoom,
+        x = x,
+        y = y,
     )
