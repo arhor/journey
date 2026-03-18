@@ -77,10 +77,20 @@ object ExplorationTileGrid {
         point: GeoPoint,
         radiusMeters: Double = ExplorationTilePrototype.REVEAL_RADIUS_METERS,
         zoom: Int = ExplorationTilePrototype.CANONICAL_ZOOM,
-    ): Set<ExplorationTile> = tilesInBounds(
-        bounds = revealBounds(point, radiusMeters),
-        zoom = zoom,
-    )
+    ): Set<ExplorationTile> {
+        val normalizedRadiusMeters = radiusMeters.coerceAtLeast(0.0)
+
+        return tilesInBounds(
+            bounds = revealBounds(point, normalizedRadiusMeters),
+            zoom = zoom,
+        ).filterTo(mutableSetOf()) { tile ->
+            intersectsRevealCircle(
+                point = point,
+                radiusMeters = normalizedRadiusMeters,
+                tile = tile,
+            )
+        }
+    }
 
     private fun revealBounds(
         point: GeoPoint,
@@ -97,6 +107,30 @@ object ExplorationTileGrid {
             north = (clampedLatitude + latitudeDelta.toDegrees()).coerceIn(MIN_LATITUDE, MAX_LATITUDE),
             east = (point.lon + longitudeDelta.toDegrees()).coerceIn(MIN_LONGITUDE, MAX_LONGITUDE),
         )
+    }
+
+    private fun intersectsRevealCircle(
+        point: GeoPoint,
+        radiusMeters: Double,
+        tile: ExplorationTile,
+    ): Boolean {
+        val tileBounds = bounds(tile)
+        val clampedLatitude = point.lat.coerceIn(MIN_LATITUDE, MAX_LATITUDE)
+        val metersPerLatitudeDegree = EARTH_RADIUS_METERS / DEGREES_PER_RADIAN
+        val metersPerLongitudeDegree =
+            EARTH_RADIUS_METERS * cos(clampedLatitude.toRadians()).coerceAtLeast(COSINE_EPSILON) / DEGREES_PER_RADIAN
+
+        val westMeters = (tileBounds.west - point.lon) * metersPerLongitudeDegree
+        val eastMeters = (tileBounds.east - point.lon) * metersPerLongitudeDegree
+        val southMeters = (tileBounds.south - clampedLatitude) * metersPerLatitudeDegree
+        val northMeters = (tileBounds.north - clampedLatitude) * metersPerLatitudeDegree
+
+        val closestXMeters = 0.0.coerceIn(westMeters, eastMeters)
+        val closestYMeters = 0.0.coerceIn(southMeters, northMeters)
+        val distanceSquaredMeters =
+            closestXMeters * closestXMeters + closestYMeters * closestYMeters
+
+        return distanceSquaredMeters <= radiusMeters * radiusMeters
     }
 
     private fun longitudeToTileX(

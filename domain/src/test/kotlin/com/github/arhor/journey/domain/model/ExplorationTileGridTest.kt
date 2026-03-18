@@ -3,6 +3,10 @@ package com.github.arhor.journey.domain.model
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.Test
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.hypot
 
 class ExplorationTileGridTest {
 
@@ -91,5 +95,70 @@ class ExplorationTileGridTest {
             ExplorationTile(zoom = 2, x = 1, y = 2),
             ExplorationTile(zoom = 2, x = 2, y = 2),
         )
+    }
+
+    @Test
+    fun `revealTilesAround should exclude diagonal tiles outside the circular radius`() {
+        // Given
+        val centerTile = ExplorationTileGrid.tileAt(
+            point = GeoPoint(
+                lat = 0.001,
+                lon = 0.001,
+            ),
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+        )
+        val centerTileBounds = ExplorationTileGrid.bounds(centerTile)
+        val point = GeoPoint(
+            lat = (centerTileBounds.south + centerTileBounds.north) / 2.0,
+            lon = (centerTileBounds.west + centerTileBounds.east) / 2.0,
+        )
+        val halfTileWidthMeters = longitudeDistanceMeters(
+            point = point,
+            longitude = centerTileBounds.east,
+        )
+        val halfTileHeightMeters = latitudeDistanceMeters(
+            point = point,
+            latitude = centerTileBounds.north,
+        )
+        val radiusMeters = maxOf(halfTileWidthMeters, halfTileHeightMeters) + 0.1
+
+        (radiusMeters < hypot(halfTileWidthMeters, halfTileHeightMeters)) shouldBe true
+
+        // When
+        val actual = ExplorationTileGrid.revealTilesAround(
+            point = point,
+            radiusMeters = radiusMeters,
+            zoom = centerTile.zoom,
+        )
+
+        // Then
+        actual shouldContainExactlyInAnyOrder setOf(
+            centerTile,
+            centerTile.copy(x = centerTile.x - 1),
+            centerTile.copy(x = centerTile.x + 1),
+            centerTile.copy(y = centerTile.y - 1),
+            centerTile.copy(y = centerTile.y + 1),
+        )
+    }
+
+    private fun longitudeDistanceMeters(
+        point: GeoPoint,
+        longitude: Double,
+    ): Double {
+        val latitudeRadians = point.lat.toRadians()
+        val metersPerLongitudeDegree = EARTH_RADIUS_METERS * cos(latitudeRadians) / DEGREES_PER_RADIAN
+        return abs(longitude - point.lon) * metersPerLongitudeDegree
+    }
+
+    private fun latitudeDistanceMeters(
+        point: GeoPoint,
+        latitude: Double,
+    ): Double = abs(latitude - point.lat) * EARTH_RADIUS_METERS / DEGREES_PER_RADIAN
+
+    private fun Double.toRadians(): Double = this / DEGREES_PER_RADIAN
+
+    private companion object {
+        const val EARTH_RADIUS_METERS = 6_378_137.0
+        const val DEGREES_PER_RADIAN = 180.0 / PI
     }
 }
