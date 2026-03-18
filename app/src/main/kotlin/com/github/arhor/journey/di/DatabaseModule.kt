@@ -36,6 +36,7 @@ object DatabaseModule {
                 JourneyDatabase.MIGRATION_2_3,
                 JourneyDatabase.MIGRATION_3_4,
                 JourneyDatabase.MIGRATION_4_5,
+                JourneyDatabase.MIGRATION_5_6,
             )
             .build()
 

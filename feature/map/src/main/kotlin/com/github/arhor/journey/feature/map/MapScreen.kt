@@ -254,7 +254,7 @@ internal fun MapContent(
 
                     if (state.debug.isFogOfWarOverlayEnabled) {
                         FogOfWarRendererAdapter(
-                            fogRanges = state.fogOfWar.fogRanges,
+                            fogBands = state.fogOfWar.fogBands,
                         )
                     }
 

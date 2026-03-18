@@ -40,7 +40,6 @@ data class MapDebugUiState(
     val isFogOfWarOverlayEnabled: Boolean,
     val isTilesGridOverlayEnabled: Boolean,
     val canonicalZoom: Int,
-    val revealRadiusMeters: Int,
     val renderMode: MapRenderMode,
 )
 
@@ -175,31 +174,6 @@ internal fun MapDebugControlsSheet(
                     decrementEnabled = state.debug.canonicalZoom > ExplorationTileRuntimeConfig.MIN_CANONICAL_ZOOM,
                     incrementEnabled = state.debug.canonicalZoom < ExplorationTileRuntimeConfig.MAX_CANONICAL_ZOOM,
                 )
-
-                DebugStepperRow(
-                    label = stringResource(R.string.map_debug_reveal_radius_label),
-                    value = stringResource(
-                        R.string.map_debug_reveal_radius_value,
-                        state.debug.revealRadiusMeters,
-                    ),
-                    onDecrement = {
-                        dispatch(
-                            MapIntent.RevealRadiusMetersChanged(
-                                value = state.debug.revealRadiusMeters - DEBUG_STEPPER_STEP,
-                            ),
-                        )
-                    },
-                    onIncrement = {
-                        dispatch(
-                            MapIntent.RevealRadiusMetersChanged(
-                                value = state.debug.revealRadiusMeters + DEBUG_STEPPER_STEP,
-                            ),
-                        )
-                    },
-                    decrementEnabled = state.debug.revealRadiusMeters >
-                        ExplorationTileRuntimeConfig.MIN_REVEAL_RADIUS_METERS.toInt(),
-                    incrementEnabled = true,
-                )
             }
 
             DebugSectionCard(
@@ -293,7 +267,7 @@ internal fun MapDebugInfoOverlay(
 
                         MapDebugInfoItem.ExploredHere -> stringResource(
                             R.string.map_debug_info_explored_here_value,
-                            state.fogOfWar.exploredVisibleTileCount,
+                            state.fogOfWar.litVisibleTileCount,
                         )
 
                         MapDebugInfoItem.FogSummary -> {
@@ -302,7 +276,7 @@ internal fun MapDebugInfoOverlay(
                             } else {
                                 stringResource(
                                     R.string.map_debug_info_fog_regions_value,
-                                    state.fogOfWar.fogRanges.size,
+                                    state.fogOfWar.fogBands.sumOf { it.ranges.size },
                                 )
                             }
                         }

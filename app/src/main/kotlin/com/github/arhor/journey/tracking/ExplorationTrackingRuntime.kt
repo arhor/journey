@@ -7,7 +7,7 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
-import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
+import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import com.github.arhor.journey.tracking.location.UserLocationSource
 import com.github.arhor.journey.tracking.location.UserLocationUpdate
 import kotlinx.coroutines.CoroutineScope
@@ -25,7 +25,7 @@ import javax.inject.Singleton
 class ExplorationTrackingRuntime @Inject constructor(
     @AppCoroutineScope private val appScope: CoroutineScope,
     private val userLocationSource: UserLocationSource,
-    private val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
+    private val explorationTileRepository: ExplorationTileRepository,
     private val configHolder: ExplorationTileRuntimeConfigHolder,
 ) {
     private val cadence = MutableStateFlow(ExplorationTrackingCadence.BACKGROUND)
@@ -36,7 +36,7 @@ class ExplorationTrackingRuntime @Inject constructor(
     )
 
     private var trackingJob: Job? = null
-    private var lastRevealedTiles: Set<ExplorationTile> = emptySet()
+    private var lastLitCenterTile: ExplorationTile? = null
 
     fun observeSession(): Flow<ExplorationTrackingSession> = session.asStateFlow()
 
@@ -98,7 +98,7 @@ class ExplorationTrackingRuntime @Inject constructor(
     fun stop() {
         trackingJob?.cancel()
         trackingJob = null
-        lastRevealedTiles = emptySet()
+        lastLitCenterTile = null
 
         session.update {
             it.copy(
@@ -150,16 +150,20 @@ class ExplorationTrackingRuntime @Inject constructor(
         }
 
         val config = configHolder.snapshot()
-        val revealTiles = ExplorationTileGrid.revealTilesAround(
+        val currentCenterTile = ExplorationTileGrid.tileAt(
             point = update.location,
-            radiusMeters = config.revealRadiusMeters,
             zoom = config.canonicalZoom,
         )
-        if (revealTiles == lastRevealedTiles) {
+        if (currentCenterTile == lastLitCenterTile) {
             return
         }
 
-        revealExplorationTilesAtLocation(update.location)
-        lastRevealedTiles = revealTiles
+        explorationTileRepository.accumulateExplorationTileLights(
+            tileLights = ExplorationTileGrid.playerLightContributionsAt(
+                point = update.location,
+                zoom = config.canonicalZoom,
+            ),
+        )
+        lastLitCenterTile = currentCenterTile
     }
 }

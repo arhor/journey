@@ -9,6 +9,7 @@ import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.ExplorationTileLight
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTileRange
@@ -18,18 +19,16 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
-import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
-import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUseCase
-import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
+import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -64,7 +63,6 @@ private data class State(
     val isFogOfWarOverlayEnabled: Boolean = true,
     val isTilesGridOverlayEnabled: Boolean = false,
     val canonicalZoom: Int,
-    val revealRadiusMeters: Int,
     val mapRenderMode: MapRenderMode = MapRenderMode.Standard,
     val visibleBounds: GeoBounds? = null,
     val visibleTileRange: ExplorationTileRange? = null,
@@ -79,13 +77,11 @@ private data class State(
 class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
-    private val observeExploredTiles: ObserveExploredTilesUseCase,
+    private val explorationTileRepository: ExplorationTileRepository,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
-    private val clearExploredTiles: ClearExploredTilesUseCase,
     private val getExplorationTileRuntimeConfig: GetExplorationTileRuntimeConfigUseCase,
     private val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
-    private val setExplorationTileRevealRadius: SetExplorationTileRevealRadiusUseCase,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
     private val stopExplorationTrackingSession: StopExplorationTrackingSessionUseCase,
@@ -96,7 +92,6 @@ class MapViewModel @Inject constructor(
     private val _state = MutableStateFlow(
         State(
             canonicalZoom = initialTileRuntimeConfig.canonicalZoom,
-            revealRadiusMeters = initialTileRuntimeConfig.revealRadiusMeters.toInt(),
         ),
     )
     private val trackingSession = observeExplorationTrackingSession()
@@ -123,15 +118,15 @@ class MapViewModel @Inject constructor(
                     explorationProgress = explorationProgress,
                 )
             },
-            observeFogExploredTiles(),
-        ) { inputs, exploredTiles ->
+            observeFogTileLights(),
+        ) { inputs, tileLights ->
             intoUiState(
                 state = inputs.state,
                 trackingSession = inputs.trackingSession,
                 mapStyleOutput = inputs.mapStyleOutput,
                 pointsOfInterest = inputs.pointsOfInterest,
                 explorationProgress = inputs.explorationProgress,
-                exploredTiles = exploredTiles,
+                tileLights = tileLights,
             )
         }.catch {
             emit(
@@ -150,7 +145,6 @@ class MapViewModel @Inject constructor(
             is MapIntent.FogOfWarOverlayToggled -> onFogOfWarOverlayToggled(intent)
             is MapIntent.TilesGridOverlayToggled -> onTilesGridOverlayToggled(intent)
             is MapIntent.CanonicalZoomChanged -> onCanonicalZoomChanged(intent)
-            is MapIntent.RevealRadiusMetersChanged -> onRevealRadiusMetersChanged(intent)
             is MapIntent.MapRenderModeSelected -> onMapRenderModeSelected(intent)
             MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
             MapIntent.StopTrackingClicked -> onStopTrackingClicked()
@@ -168,14 +162,14 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun observeFogExploredTiles(): Flow<Set<ExplorationTile>> =
+    private fun observeFogTileLights(): Flow<List<ExplorationTileLight>> =
         _state
             .map { state ->
                 state.fogTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit }
             }
             .distinctUntilChanged()
             .flatMapLatest { range ->
-                range?.let(observeExploredTiles::invoke) ?: flowOf(emptySet())
+                range?.let(explorationTileRepository::observeExplorationTileLights) ?: flowOf(emptyList())
             }
 
     private suspend fun onMapOpened() {
@@ -241,17 +235,6 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun onRevealRadiusMetersChanged(intent: MapIntent.RevealRadiusMetersChanged) {
-        val revealRadiusMeters = intent.value.coerceAtLeast(
-            minimumValue = ExplorationTileRuntimeConfig.MIN_REVEAL_RADIUS_METERS.toInt(),
-        )
-        setExplorationTileRevealRadius(revealRadiusMeters.toDouble())
-
-        _state.update {
-            it.copy(revealRadiusMeters = revealRadiusMeters)
-        }
-    }
-
     private fun onMapRenderModeSelected(intent: MapIntent.MapRenderModeSelected) {
         _state.update {
             it.copy(mapRenderMode = intent.mode)
@@ -295,7 +278,7 @@ class MapViewModel @Inject constructor(
         mapStyleOutput: Output<MapStyle?, DomainError>,
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
-        exploredTiles: Set<ExplorationTile>,
+        tileLights: List<ExplorationTileLight>,
     ): MapUiState = if (state.failureMessage == null) {
         mapStyleOutput.fold(
             onSuccess = {
@@ -328,7 +311,7 @@ class MapViewModel @Inject constructor(
                     visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
                     fogOfWar = fogOfWarUiState(
                         state = state,
-                        exploredTiles = exploredTiles,
+                        tileLights = tileLights,
                     ),
                     debug = MapDebugUiState(
                         isSheetVisible = state.isDebugControlsSheetVisible,
@@ -336,7 +319,6 @@ class MapViewModel @Inject constructor(
                         isFogOfWarOverlayEnabled = state.isFogOfWarOverlayEnabled,
                         isTilesGridOverlayEnabled = state.isTilesGridOverlayEnabled,
                         canonicalZoom = state.canonicalZoom,
-                        revealRadiusMeters = state.revealRadiusMeters,
                         renderMode = state.mapRenderMode,
                     ),
                 )
@@ -355,20 +337,23 @@ class MapViewModel @Inject constructor(
 
     private fun fogOfWarUiState(
         state: State,
-        exploredTiles: Set<ExplorationTile>,
+        tileLights: List<ExplorationTileLight>,
     ): FogOfWarUiState {
-        val fogRanges = calculateUnexploredFogRanges(
+        val tileLightByTile = tileLights.associate { it.tile to it.light }
+        val fogBands = calculateFogOfWarBands(
             tileRange = state.fogTileRange.takeUnless { state.isFogSuppressedByVisibleTileLimit },
-            exploredTiles = exploredTiles,
+            tileLightByTile = tileLightByTile,
         )
 
         return FogOfWarUiState(
             canonicalZoom = state.canonicalZoom,
             visibleTileRange = state.visibleTileRange,
-            fogRanges = fogRanges,
+            fogBands = fogBands,
             visibleTileCount = state.visibleTileCount,
-            exploredVisibleTileCount = state.visibleTileRange?.let { visibleRange ->
-                exploredTiles.count(visibleRange::contains)
+            litVisibleTileCount = state.visibleTileRange?.let { visibleRange ->
+                tileLights.count { tileLight ->
+                    tileLight.light > 0.0f && visibleRange.contains(tileLight.tile)
+                }
             } ?: 0,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
         )
@@ -551,7 +536,7 @@ class MapViewModel @Inject constructor(
 
     private suspend fun onClearExploredTilesClicked() {
         try {
-            clearExploredTiles()
+            explorationTileRepository.clearExplorationTileLights()
             emitEffect(MapEffect.ShowMessage(EXPLORATION_CLEAR_SUCCESS_MESSAGE))
         } catch (e: Throwable) {
             emitEffect(MapEffect.ShowMessage(e.message ?: EXPLORATION_CLEAR_FAILED_MESSAGE))
@@ -673,8 +658,8 @@ class MapViewModel @Inject constructor(
         const val TRACKING_STOP_FAILED_MESSAGE =
             "Failed to stop exploration tracking."
         const val EXPLORATION_CLEAR_SUCCESS_MESSAGE =
-            "Explored tiles cleared."
+            "Exploration tile light cleared."
         const val EXPLORATION_CLEAR_FAILED_MESSAGE =
-            "Failed to clear explored tiles."
+            "Failed to clear exploration tile light."
     }
 }

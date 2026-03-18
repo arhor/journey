@@ -9,73 +9,103 @@ import org.junit.Test
 class FogOfWarCalculatorTest {
 
     @Test
-    fun `calculateUnexploredFogRanges should extend fog one tile past the left viewport edge when the border remains unexplored`() {
+    fun `calculateFogOfWarBands should emit a full fog band when every tile is unlit`() {
         // Given
-        val visibleRange = ExplorationTileRange(
+        val tileRange = ExplorationTileRange(
             zoom = 16,
             minX = 10,
             maxX = 11,
             minY = 20,
             maxY = 21,
         )
-        val fogTileRange = visibleRange.expandedBy(tilePadding = 1)
-        val exploredTiles = fogTileRange.asSequence()
-            .filter { tile -> tile.x >= 11 }
-            .toSet()
 
         // When
-        val actual = calculateUnexploredFogRanges(
-            tileRange = fogTileRange,
-            exploredTiles = exploredTiles,
+        val actual = calculateFogOfWarBands(
+            tileRange = tileRange,
+            tileLightByTile = emptyMap(),
         )
 
         // Then
         actual shouldContainExactly listOf(
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 9,
-                maxX = 10,
-                minY = 19,
-                maxY = 22,
+            FogOfWarBandUiState(
+                opacity = fogOpacityForTest(0.0f),
+                ranges = listOf(
+                    ExplorationTileRange(
+                        zoom = 16,
+                        minX = 10,
+                        maxX = 11,
+                        minY = 20,
+                        maxY = 21,
+                    ),
+                ),
             ),
         )
     }
 
     @Test
-    fun `calculateUnexploredFogRanges should extend fog past a viewport corner when the corner remains unexplored`() {
+    fun `calculateFogOfWarBands should exclude brighter tiles from darker fog bands`() {
         // Given
-        val visibleRange = ExplorationTileRange(
+        val tileRange = ExplorationTileRange(
             zoom = 16,
             minX = 10,
-            maxX = 11,
+            maxX = 13,
             minY = 20,
-            maxY = 21,
+            maxY = 20,
         )
-        val fogTileRange = visibleRange.expandedBy(tilePadding = 1)
-        val exploredTiles = fogTileRange.asSequence()
-            .filter { tile -> tile.x >= 11 || tile.y >= 21 }
-            .toSet()
 
         // When
-        val actual = calculateUnexploredFogRanges(
-            tileRange = fogTileRange,
-            exploredTiles = exploredTiles,
+        val actual = calculateFogOfWarBands(
+            tileRange = tileRange,
+            tileLightByTile = mapOf(
+                ExplorationTile(zoom = 16, x = 10, y = 20) to 1.0f,
+                ExplorationTile(zoom = 16, x = 11, y = 20) to 0.66f,
+                ExplorationTile(zoom = 16, x = 12, y = 20) to 0.33f,
+            ),
         )
 
         // Then
         actual shouldContainExactly listOf(
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 9,
-                maxX = 10,
-                minY = 19,
-                maxY = 20,
+            FogOfWarBandUiState(
+                opacity = fogOpacityForTest(0.0f),
+                ranges = listOf(
+                    ExplorationTileRange(
+                        zoom = 16,
+                        minX = 13,
+                        maxX = 13,
+                        minY = 20,
+                        maxY = 20,
+                    ),
+                ),
+            ),
+            FogOfWarBandUiState(
+                opacity = fogOpacityForTest(0.33f),
+                ranges = listOf(
+                    ExplorationTileRange(
+                        zoom = 16,
+                        minX = 12,
+                        maxX = 12,
+                        minY = 20,
+                        maxY = 20,
+                    ),
+                ),
+            ),
+            FogOfWarBandUiState(
+                opacity = fogOpacityForTest(0.66f),
+                ranges = listOf(
+                    ExplorationTileRange(
+                        zoom = 16,
+                        minX = 11,
+                        maxX = 11,
+                        minY = 20,
+                        maxY = 20,
+                    ),
+                ),
             ),
         )
     }
 
     @Test
-    fun `calculateUnexploredFogRanges should merge vertical runs when adjacent rows share the same unexplored span`() {
+    fun `calculateFogOfWarBands should merge vertical runs when adjacent rows share the same fog opacity span`() {
         // Given
         val tileRange = ExplorationTileRange(
             zoom = 16,
@@ -84,26 +114,30 @@ class FogOfWarCalculatorTest {
             minY = 0,
             maxY = 2,
         )
-        val exploredTiles = setOf(
-            ExplorationTile(zoom = 16, x = 1, y = 2),
-        )
 
         // When
-        val actual = calculateUnexploredFogRanges(
+        val actual = calculateFogOfWarBands(
             tileRange = tileRange,
-            exploredTiles = exploredTiles,
+            tileLightByTile = mapOf(
+                ExplorationTile(zoom = 16, x = 1, y = 2) to 1.0f,
+            ),
         )
 
         // Then
         actual shouldContainExactly listOf(
-            ExplorationTileRange(zoom = 16, minX = 0, maxX = 2, minY = 0, maxY = 1),
-            ExplorationTileRange(zoom = 16, minX = 0, maxX = 0, minY = 2, maxY = 2),
-            ExplorationTileRange(zoom = 16, minX = 2, maxX = 2, minY = 2, maxY = 2),
+            FogOfWarBandUiState(
+                opacity = fogOpacityForTest(0.0f),
+                ranges = listOf(
+                    ExplorationTileRange(zoom = 16, minX = 0, maxX = 2, minY = 0, maxY = 1),
+                    ExplorationTileRange(zoom = 16, minX = 0, maxX = 0, minY = 2, maxY = 2),
+                    ExplorationTileRange(zoom = 16, minX = 2, maxX = 2, minY = 2, maxY = 2),
+                ),
+            ),
         )
     }
 
     @Test
-    fun `calculateUnexploredFogRanges should return empty when every visible tile is already explored`() {
+    fun `calculateFogOfWarBands should return empty when every visible tile is fully lit`() {
         // Given
         val tileRange = ExplorationTileRange(
             zoom = 16,
@@ -112,15 +146,17 @@ class FogOfWarCalculatorTest {
             minY = 20,
             maxY = 21,
         )
-        val exploredTiles = tileRange.asSequence().toSet()
 
         // When
-        val actual = calculateUnexploredFogRanges(
+        val actual = calculateFogOfWarBands(
             tileRange = tileRange,
-            exploredTiles = exploredTiles,
+            tileLightByTile = tileRange.asSequence()
+                .associateWith { 1.0f },
         )
 
         // Then
         actual.isEmpty() shouldBe true
     }
 }
+
+private fun fogOpacityForTest(light: Float): Float = 0.90f * (1.0f - light)

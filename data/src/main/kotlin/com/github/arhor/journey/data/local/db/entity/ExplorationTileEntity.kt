@@ -1,5 +1,6 @@
 package com.github.arhor.journey.data.local.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 
 @Entity(
@@ -10,6 +11,8 @@ data class ExplorationTileEntity(
     val zoom: Int,
     val x: Int,
     val y: Int,
+    @ColumnInfo(defaultValue = "1.0")
+    val light: Float,
 ) : Comparable<ExplorationTileEntity> {
 
     override fun compareTo(other: ExplorationTileEntity): Int = COMPARATOR.compare(this, other)

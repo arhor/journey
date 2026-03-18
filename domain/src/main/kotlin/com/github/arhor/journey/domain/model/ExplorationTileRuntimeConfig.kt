@@ -9,12 +9,10 @@ import kotlinx.coroutines.flow.update
 
 data class ExplorationTileRuntimeConfig(
     val canonicalZoom: Int = ExplorationTilePrototype.CANONICAL_ZOOM,
-    val revealRadiusMeters: Double = ExplorationTilePrototype.REVEAL_RADIUS_METERS,
 ) {
     companion object {
         const val MIN_CANONICAL_ZOOM = 0
         const val MAX_CANONICAL_ZOOM = 30
-        const val MIN_REVEAL_RADIUS_METERS = 1.0
     }
 }
 
@@ -32,16 +30,6 @@ class ExplorationTileRuntimeConfigHolder @Inject constructor() {
                 canonicalZoom = canonicalZoom.coerceIn(
                     minimumValue = ExplorationTileRuntimeConfig.MIN_CANONICAL_ZOOM,
                     maximumValue = ExplorationTileRuntimeConfig.MAX_CANONICAL_ZOOM,
-                ),
-            )
-        }
-    }
-
-    fun setRevealRadiusMeters(revealRadiusMeters: Double) {
-        config.update {
-            it.copy(
-                revealRadiusMeters = revealRadiusMeters.coerceAtLeast(
-                    minimumValue = ExplorationTileRuntimeConfig.MIN_REVEAL_RADIUS_METERS,
                 ),
             )
         }

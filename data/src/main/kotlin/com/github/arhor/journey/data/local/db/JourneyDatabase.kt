@@ -23,7 +23,7 @@ import com.github.arhor.journey.data.local.db.entity.PoiEntity
         DiscoveredPoiEntity::class,
         ExplorationTileEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class JourneyDatabase : RoomDatabase() {
@@ -82,6 +82,17 @@ abstract class JourneyDatabase : RoomDatabase() {
                         y INTEGER NOT NULL,
                         PRIMARY KEY(zoom, x, y)
                     )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    ALTER TABLE exploration_tile
+                    ADD COLUMN light REAL NOT NULL DEFAULT 1.0 CHECK(light >= 0.0 AND light <= 1.0)
                     """.trimIndent(),
                 )
             }

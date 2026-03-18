@@ -1,10 +1,11 @@
 package com.github.arhor.journey.domain.model
 
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.asinh
 import kotlin.math.atan
-import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.max
 import kotlin.math.sinh
 import kotlin.math.tan
 
@@ -73,30 +74,46 @@ object ExplorationTileGrid {
         zoom: Int = ExplorationTilePrototype.CANONICAL_ZOOM,
     ): Set<ExplorationTile> = tileRange(bounds, zoom).asSequence().toSet()
 
-    fun revealTilesAround(
+    fun playerLightContributionsAt(
         point: GeoPoint,
-        radiusMeters: Double = ExplorationTilePrototype.REVEAL_RADIUS_METERS,
         zoom: Int = ExplorationTilePrototype.CANONICAL_ZOOM,
-    ): Set<ExplorationTile> = tilesInBounds(
-        bounds = revealBounds(point, radiusMeters),
-        zoom = zoom,
-    )
-
-    private fun revealBounds(
-        point: GeoPoint,
-        radiusMeters: Double,
-    ): GeoBounds {
-        val clampedLatitude = point.lat.coerceIn(MIN_LATITUDE, MAX_LATITUDE)
-        val latitudeRadians = clampedLatitude.toRadians()
-        val latitudeDelta = radiusMeters / EARTH_RADIUS_METERS
-        val longitudeDelta = radiusMeters / (EARTH_RADIUS_METERS * cos(latitudeRadians).coerceAtLeast(COSINE_EPSILON))
-
-        return GeoBounds(
-            south = (clampedLatitude - latitudeDelta.toDegrees()).coerceIn(MIN_LATITUDE, MAX_LATITUDE),
-            west = (point.lon - longitudeDelta.toDegrees()).coerceIn(MIN_LONGITUDE, MAX_LONGITUDE),
-            north = (clampedLatitude + latitudeDelta.toDegrees()).coerceIn(MIN_LATITUDE, MAX_LATITUDE),
-            east = (point.lon + longitudeDelta.toDegrees()).coerceIn(MIN_LONGITUDE, MAX_LONGITUDE),
+    ): Set<ExplorationTileLight> {
+        val centerTile = tileAt(
+            point = point,
+            zoom = zoom,
         )
+        val maxTileIndex = tilesPerAxis(zoom) - 1
+
+        return buildSet {
+            PLAYER_LIGHT_BY_RING.forEachIndexed { ring, light ->
+                val minX = (centerTile.x - ring).coerceAtLeast(0)
+                val maxX = (centerTile.x + ring).coerceAtMost(maxTileIndex)
+                val minY = (centerTile.y - ring).coerceAtLeast(0)
+                val maxY = (centerTile.y + ring).coerceAtMost(maxTileIndex)
+
+                for (y in minY..maxY) {
+                    for (x in minX..maxX) {
+                        val distance = max(
+                            abs(x - centerTile.x),
+                            abs(y - centerTile.y),
+                        )
+
+                        if (distance == ring) {
+                            add(
+                                ExplorationTileLight(
+                                    tile = ExplorationTile(
+                                        zoom = zoom,
+                                        x = x,
+                                        y = y,
+                                    ),
+                                    light = light,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun longitudeToTileX(
@@ -139,7 +156,6 @@ object ExplorationTileGrid {
 
     private fun Double.toDegrees(): Double = this * DEGREES_PER_RADIAN
 
-    private const val EARTH_RADIUS_METERS = 6_378_137.0
     private const val HALF_LONGITUDE_SPAN = 180.0
     private const val FULL_LONGITUDE_SPAN = 360.0
     private const val MIN_LONGITUDE = -180.0
@@ -147,7 +163,11 @@ object ExplorationTileGrid {
     private const val MIN_LATITUDE = -85.05112878
     private const val MAX_LATITUDE = 85.05112878
     private const val DEGREES_PER_RADIAN = 180.0 / PI
-    private const val COSINE_EPSILON = 1e-6
     private const val LATITUDE_EPSILON = 1e-9
     private const val LONGITUDE_EPSILON = 1e-9
+    private val PLAYER_LIGHT_BY_RING = listOf(
+        ExplorationTilePrototype.CURRENT_TILE_LIGHT,
+        ExplorationTilePrototype.FIRST_RING_LIGHT,
+        ExplorationTilePrototype.SECOND_RING_LIGHT,
+    )
 }

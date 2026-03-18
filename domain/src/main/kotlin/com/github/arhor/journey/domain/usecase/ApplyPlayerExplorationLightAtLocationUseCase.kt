@@ -1,7 +1,7 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
+import com.github.arhor.journey.domain.model.ExplorationTileLight
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
@@ -9,22 +9,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class RevealExplorationTilesAtLocationUseCase @Inject constructor(
+class ApplyPlayerExplorationLightAtLocationUseCase @Inject constructor(
     private val repository: ExplorationTileRepository,
     private val configHolder: ExplorationTileRuntimeConfigHolder,
 ) {
-    suspend operator fun invoke(location: GeoPoint): Set<ExplorationTile> {
-        val config = configHolder.snapshot()
-        val tiles = ExplorationTileGrid.revealTilesAround(
+    suspend operator fun invoke(location: GeoPoint): Set<ExplorationTileLight> {
+        val tileLights = ExplorationTileGrid.playerLightContributionsAt(
             point = location,
-            radiusMeters = config.revealRadiusMeters,
-            zoom = config.canonicalZoom,
+            zoom = configHolder.snapshot().canonicalZoom,
         )
 
-        if (tiles.isNotEmpty()) {
-            repository.markExplored(tiles)
+        if (tileLights.isNotEmpty()) {
+            repository.accumulateExplorationTileLights(tileLights)
         }
 
-        return tiles
+        return tileLights
     }
 }

@@ -3,7 +3,7 @@ package com.github.arhor.journey.data.repository
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.mapper.toDomain
 import com.github.arhor.journey.data.mapper.toEntity
-import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.ExplorationTileLight
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import kotlinx.coroutines.flow.Flow
@@ -16,7 +16,7 @@ class RoomExplorationTileRepository @Inject constructor(
     private val dao: ExplorationTileDao,
 ) : ExplorationTileRepository {
 
-    override fun observeExploredTiles(range: ExplorationTileRange): Flow<Set<ExplorationTile>> =
+    override fun observeExplorationTileLights(range: ExplorationTileRange): Flow<List<ExplorationTileLight>> =
         dao.observeByRange(
             zoom = range.zoom,
             minX = range.minX,
@@ -25,22 +25,28 @@ class RoomExplorationTileRepository @Inject constructor(
             maxY = range.maxY,
         ).map { data ->
             data.map { it.toDomain() }
-                .toSet()
         }
 
-    override suspend fun markExplored(tiles: Set<ExplorationTile>) {
-        if (tiles.isEmpty()) {
+    override suspend fun accumulateExplorationTileLights(tileLights: Collection<ExplorationTileLight>) {
+        if (tileLights.isEmpty()) {
             return
         }
 
-        dao.insert(
-            entities = tiles
-                .map { it.toEntity() }
+        dao.accumulate(
+            entities = tileLights
+                .groupBy(ExplorationTileLight::tile)
+                .map { (tile, groupedLights) ->
+                    ExplorationTileLight(
+                        tile = tile,
+                        light = groupedLights.maxOf(ExplorationTileLight::light),
+                    )
+                }
+                .map(ExplorationTileLight::toEntity)
                 .sorted(),
         )
     }
 
-    override suspend fun clear() {
+    override suspend fun clearExplorationTileLights() {
         dao.clear()
     }
 }

@@ -29,10 +29,6 @@ sealed interface MapIntent {
         val value: Int,
     ) : MapIntent
 
-    data class RevealRadiusMetersChanged(
-        val value: Int,
-    ) : MapIntent
-
     data class MapRenderModeSelected(
         val mode: MapRenderMode,
     ) : MapIntent

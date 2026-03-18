@@ -4,6 +4,7 @@ import com.github.arhor.journey.data.local.db.entity.DiscoveredPoiEntity
 import com.github.arhor.journey.data.local.db.entity.ExplorationTileEntity
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.ExplorationTileLight
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 import java.time.Instant
@@ -54,36 +55,44 @@ class ExplorationMapperTest {
             zoom = 16,
             x = 34567,
             y = 22345,
+            light = 0.66f,
         )
 
         // When
         val actual = entity.toDomain()
 
         // Then
-        actual shouldBe ExplorationTile(
-            zoom = 16,
-            x = 34567,
-            y = 22345,
+        actual shouldBe ExplorationTileLight(
+            tile = ExplorationTile(
+                zoom = 16,
+                x = 34567,
+                y = 22345,
+            ),
+            light = 0.66f,
         )
     }
 
     @Test
     fun `toEntity should map exploration tile coordinates when prototype tile is provided`() {
         // Given
-        val tile = ExplorationTile(
-            zoom = 16,
-            x = 34567,
-            y = 22345,
+        val tileLight = ExplorationTileLight(
+            tile = ExplorationTile(
+                zoom = 16,
+                x = 34567,
+                y = 22345,
+            ),
+            light = 0.33f,
         )
 
         // When
-        val actual = tile.toEntity()
+        val actual = tileLight.toEntity()
 
         // Then
         actual shouldBe ExplorationTileEntity(
             zoom = 16,
             x = 34567,
             y = 22345,
+            light = 0.33f,
         )
     }
 }
