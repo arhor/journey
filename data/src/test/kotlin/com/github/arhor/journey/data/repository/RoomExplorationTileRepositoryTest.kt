@@ -1,7 +1,7 @@
 package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
-import com.github.arhor.journey.data.local.db.entity.ExplorationTileEntity
+import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import io.kotest.matchers.collections.shouldContainExactly
@@ -19,7 +19,7 @@ class RoomExplorationTileRepositoryTest {
         // Given
         val dao = FakeExplorationTileDao(
             observedItems = listOf(
-                ExplorationTileEntity(
+                ExploredTileEntity(
                     zoom = 16,
                     x = 34567,
                     y = 22345,
@@ -66,9 +66,9 @@ class RoomExplorationTileRepositoryTest {
 
         // Then
         dao.insertedEntities shouldContainExactly listOf(
-            ExplorationTileEntity(zoom = 16, x = 2, y = 1),
-            ExplorationTileEntity(zoom = 16, x = 1, y = 2),
-            ExplorationTileEntity(zoom = 16, x = 3, y = 2),
+            ExploredTileEntity(zoom = 16, x = 2, y = 1),
+            ExploredTileEntity(zoom = 16, x = 1, y = 2),
+            ExploredTileEntity(zoom = 16, x = 3, y = 2),
         )
     }
 
@@ -86,9 +86,9 @@ class RoomExplorationTileRepositoryTest {
     }
 
     private class FakeExplorationTileDao(
-        private val observedItems: List<ExplorationTileEntity>,
+        private val observedItems: List<ExploredTileEntity>,
     ) : ExplorationTileDao {
-        val insertedEntities = mutableListOf<ExplorationTileEntity>()
+        val insertedEntities = mutableListOf<ExploredTileEntity>()
         var clearCalls: Int = 0
 
         override fun observeByRange(
@@ -97,9 +97,9 @@ class RoomExplorationTileRepositoryTest {
             maxX: Int,
             minY: Int,
             maxY: Int,
-        ): Flow<List<ExplorationTileEntity>> = flowOf(observedItems)
+        ): Flow<List<ExploredTileEntity>> = flowOf(observedItems)
 
-        override suspend fun insert(entities: List<ExplorationTileEntity>): List<Long> {
+        override suspend fun insert(entities: List<ExploredTileEntity>): List<Long> {
             insertedEntities += entities
             return List(entities.size) { 1L }
         }

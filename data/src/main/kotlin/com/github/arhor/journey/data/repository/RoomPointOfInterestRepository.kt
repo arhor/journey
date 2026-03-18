@@ -1,7 +1,6 @@
 package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.PoiDao
-import com.github.arhor.journey.data.local.seed.PointOfInterestSeed
 import com.github.arhor.journey.data.mapper.toDomain
 import com.github.arhor.journey.data.mapper.toEntity
 import com.github.arhor.journey.domain.model.PointOfInterest
@@ -25,11 +24,5 @@ class RoomPointOfInterestRepository @Inject constructor(
 
     override suspend fun upsert(pointOfInterest: PointOfInterest) {
         dao.upsert(pointOfInterest.toEntity())
-    }
-
-    override suspend fun ensureSeeded() {
-        if (dao.count() == 0) {
-            dao.upsertAll(PointOfInterestSeed.items.map { it.toEntity() })
-        }
     }
 }

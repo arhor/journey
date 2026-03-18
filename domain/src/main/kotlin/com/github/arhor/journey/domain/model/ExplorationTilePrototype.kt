@@ -14,5 +14,5 @@ object ExplorationTilePrototype {
      * The current implementation uses north-aligned geographic bounds as a coarse search area,
      * then keeps only canonical tiles that intersect the circular reveal radius.
      */
-    const val REVEAL_RADIUS_METERS = 80.0
+    const val REVEAL_RADIUS_METERS = 50.0
 }

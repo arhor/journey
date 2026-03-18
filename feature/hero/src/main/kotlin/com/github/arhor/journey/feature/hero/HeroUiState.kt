@@ -1,7 +1,6 @@
 package com.github.arhor.journey.feature.hero
 
 import androidx.compose.runtime.Immutable
-import com.github.arhor.journey.domain.model.ActivityType
 
 sealed interface HeroUiState {
 
@@ -21,10 +20,5 @@ sealed interface HeroUiState {
         val vitality: Int,
         val dexterity: Int,
         val stamina: Int,
-        val selectedActivityType: ActivityType,
-        val durationMinutesInput: String,
-        val isSubmitting: Boolean,
-        val importedTodayActivities: Int,
-        val importedTodaySteps: Long,
     ) : HeroUiState
 }

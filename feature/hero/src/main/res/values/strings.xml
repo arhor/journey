@@ -8,19 +8,5 @@
     <string name="hero_stat_vitality">Vitality</string>
     <string name="hero_stat_dexterity">Dexterity</string>
     <string name="hero_stat_stamina">Stamina</string>
-    <string name="hero_log_activity_title">Log Activity</string>
-    <string name="hero_log_activity_type_label">Activity Type</string>
-    <string name="hero_log_duration_label">Duration (minutes)</string>
-    <string name="hero_log_duration_placeholder">e.g. 30</string>
-    <string name="hero_log_submit">Log Activity</string>
-    <string name="hero_log_submit_loading">Logging…</string>
-    <string name="hero_activity_walk">Walk</string>
-    <string name="hero_activity_run">Run</string>
-    <string name="hero_activity_workout">Workout</string>
-    <string name="hero_activity_stretching">Stretching</string>
-    <string name="hero_activity_rest">Rest</string>
-    <string name="hero_import_summary_title">Imported Activity (Today)</string>
-    <string name="hero_import_summary_today_activities">Imported activities: %1$d</string>
-    <string name="hero_import_summary_today_steps">Imported steps: %1$d</string>
     <string name="hero_nav_label">Hero</string>
 </resources>

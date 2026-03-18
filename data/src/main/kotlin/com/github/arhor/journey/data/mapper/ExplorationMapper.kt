@@ -1,7 +1,7 @@
 package com.github.arhor.journey.data.mapper
 
 import com.github.arhor.journey.data.local.db.entity.DiscoveredPoiEntity
-import com.github.arhor.journey.data.local.db.entity.ExplorationTileEntity
+import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationTile
 import java.time.Instant
@@ -18,15 +18,15 @@ fun DiscoveredPoi.toEntity(): DiscoveredPoiEntity =
         discoveredAtMs = discoveredAt.toEpochMilli(),
     )
 
-fun ExplorationTileEntity.toDomain(): ExplorationTile =
+fun ExploredTileEntity.toDomain(): ExplorationTile =
     ExplorationTile(
         zoom = zoom,
         x = x,
         y = y,
     )
 
-fun ExplorationTile.toEntity(): ExplorationTileEntity =
-    ExplorationTileEntity(
+fun ExplorationTile.toEntity(): ExploredTileEntity =
+    ExploredTileEntity(
         zoom = zoom,
         x = x,
         y = y,

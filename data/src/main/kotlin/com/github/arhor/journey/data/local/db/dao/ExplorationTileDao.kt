@@ -4,7 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.github.arhor.journey.data.local.db.entity.ExplorationTileEntity
+import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -13,7 +13,7 @@ interface ExplorationTileDao {
     @Query(
         """
         SELECT *
-        FROM exploration_tile
+        FROM explored_tiles
         WHERE zoom = :zoom
             AND x BETWEEN :minX AND :maxX
             AND y BETWEEN :minY AND :maxY
@@ -26,11 +26,11 @@ interface ExplorationTileDao {
         maxX: Int,
         minY: Int,
         maxY: Int,
-    ): Flow<List<ExplorationTileEntity>>
+    ): Flow<List<ExploredTileEntity>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insert(entities: List<ExplorationTileEntity>): List<Long>
+    suspend fun insert(entities: List<ExploredTileEntity>): List<Long>
 
-    @Query("DELETE FROM exploration_tile")
+    @Query("DELETE FROM explored_tiles")
     suspend fun clear()
 }
