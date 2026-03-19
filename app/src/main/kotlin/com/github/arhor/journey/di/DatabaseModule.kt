@@ -3,10 +3,13 @@ package com.github.arhor.journey.di
 import android.content.Context
 import androidx.room.Room
 import com.github.arhor.journey.data.local.db.JourneyDatabase
+import com.github.arhor.journey.data.local.db.JourneyDatabaseMigrations
 import com.github.arhor.journey.data.local.db.RoomTransactionRunner
+import com.github.arhor.journey.data.local.db.dao.CollectedResourceSpawnDao
 import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.dao.HeroDao
+import com.github.arhor.journey.data.local.db.dao.HeroResourceDao
 import com.github.arhor.journey.data.local.db.dao.PoiDao
 import com.github.arhor.journey.domain.TransactionRunner
 import dagger.Module
@@ -26,11 +29,21 @@ object DatabaseModule {
         @ApplicationContext context: Context,
     ): JourneyDatabase =
         Room.databaseBuilder(context, JourneyDatabase::class.java, "journey.db")
-            .addMigrations()
+            .addMigrations(
+                JourneyDatabaseMigrations.MIGRATION_5_7,
+                JourneyDatabaseMigrations.MIGRATION_6_7,
+            )
             .build()
 
     @Provides
     fun provideHeroDao(db: JourneyDatabase): HeroDao = db.heroDao()
+
+    @Provides
+    fun provideHeroResourceDao(db: JourneyDatabase): HeroResourceDao = db.heroResourceDao()
+
+    @Provides
+    fun provideCollectedResourceSpawnDao(db: JourneyDatabase): CollectedResourceSpawnDao =
+        db.collectedResourceSpawnDao()
 
     @Provides
     fun providePoiDao(db: JourneyDatabase): PoiDao = db.poiDao()

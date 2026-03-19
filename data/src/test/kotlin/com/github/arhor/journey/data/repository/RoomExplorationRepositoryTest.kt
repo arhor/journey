@@ -21,11 +21,11 @@ class RoomExplorationRepositoryTest {
             observedItems = listOf(
                 DiscoveredPoiEntity(
                     poiId = "poi-1",
-                    discoveredAtMs = discoveredAt.toEpochMilli(),
+                    discoveredAt = discoveredAt,
                 ),
                 DiscoveredPoiEntity(
                     poiId = "poi-1",
-                    discoveredAtMs = discoveredAt.toEpochMilli(),
+                    discoveredAt = discoveredAt,
                 ),
             ),
         )
@@ -40,7 +40,7 @@ class RoomExplorationRepositoryTest {
     }
 
     @Test
-    fun `discoverPoi should map instant to millis when poi discovery is persisted`() = runTest {
+    fun `discoverPoi should persist instant when poi discovery is persisted`() = runTest {
         // Given
         val dao = FakeDiscoveredPoiDao(observedItems = emptyList())
         val subject = RoomExplorationRepository(dao = dao)
@@ -56,7 +56,7 @@ class RoomExplorationRepositoryTest {
         dao.insertedEntities shouldBe listOf(
             DiscoveredPoiEntity(
                 poiId = "poi-9",
-                discoveredAtMs = discoveredAt.toEpochMilli(),
+                discoveredAt = discoveredAt,
             ),
         )
     }

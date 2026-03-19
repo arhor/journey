@@ -11,12 +11,12 @@ import java.time.Instant
 class ExplorationMapperTest {
 
     @Test
-    fun `toDomain should map epoch millis to instant when discovered poi entity is provided`() {
+    fun `toDomain should map instant when discovered poi entity is provided`() {
         // Given
         val discoveredAt = Instant.parse("2026-02-15T12:00:00Z")
         val entity = DiscoveredPoiEntity(
             poiId = "poi-a",
-            discoveredAtMs = discoveredAt.toEpochMilli(),
+            discoveredAt = discoveredAt,
         )
 
         // When
@@ -30,7 +30,7 @@ class ExplorationMapperTest {
     }
 
     @Test
-    fun `toEntity should keep pre epoch timestamp when discovered poi is before 1970`() {
+    fun `toEntity should keep pre epoch instant when discovered poi is before 1970`() {
         // Given
         val discovered = DiscoveredPoi(
             poiId = "poi-b",
@@ -43,7 +43,7 @@ class ExplorationMapperTest {
         // Then
         actual shouldBe DiscoveredPoiEntity(
             poiId = "poi-b",
-            discoveredAtMs = Instant.parse("1969-12-31T23:59:58Z").toEpochMilli(),
+            discoveredAt = Instant.parse("1969-12-31T23:59:58Z"),
         )
     }
 

@@ -5,7 +5,6 @@ import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
-import java.time.Instant
 
 fun HeroEntity.toDomain(): Hero =
     Hero(
@@ -25,8 +24,8 @@ fun HeroEntity.toDomain(): Hero =
             now = energyNow,
             max = energyMax,
         ),
-        createdAt = Instant.ofEpochMilli(createdAtMs),
-        updatedAt = Instant.ofEpochMilli(updatedAtMs),
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
 
 fun Hero.toEntity(): HeroEntity =
@@ -41,7 +40,6 @@ fun Hero.toEntity(): HeroEntity =
         stamina = stats.stamina,
         energyNow = energy.now,
         energyMax = energy.max,
-        createdAtMs = createdAt.toEpochMilli(),
-        updatedAtMs = updatedAt.toEpochMilli(),
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
-

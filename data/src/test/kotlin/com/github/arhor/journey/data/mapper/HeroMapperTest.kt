@@ -6,8 +6,8 @@ import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import io.kotest.matchers.shouldBe
-import java.time.Instant
 import org.junit.Test
+import java.time.Instant
 
 class HeroMapperTest {
 
@@ -27,8 +27,8 @@ class HeroMapperTest {
             stamina = 8,
             energyNow = 999,
             energyMax = 0,
-            createdAtMs = createdAt.toEpochMilli(),
-            updatedAtMs = updatedAt.toEpochMilli(),
+            createdAt = createdAt,
+            updatedAt = updatedAt,
         )
 
         // When
@@ -72,8 +72,8 @@ class HeroMapperTest {
             stamina = 9,
             energyNow = 30,
             energyMax = 50,
-            createdAtMs = Instant.parse("2026-01-10T08:00:00Z").toEpochMilli(),
-            updatedAtMs = Instant.parse("2026-01-10T09:00:00Z").toEpochMilli(),
+            createdAt = Instant.parse("2026-01-10T08:00:00Z"),
+            updatedAt = Instant.parse("2026-01-10T09:00:00Z"),
         )
         actual shouldBe expected
     }

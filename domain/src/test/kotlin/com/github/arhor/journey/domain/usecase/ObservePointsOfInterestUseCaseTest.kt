@@ -15,7 +15,7 @@ import org.junit.Test
 class ObservePointsOfInterestUseCaseTest {
 
     @Test
-    fun `invoke should call ensureSeeded and emit points of interest when collection starts`() = runTest {
+    fun `invoke should emit points of interest from the repository flow`() = runTest {
         // Given
         val expected = listOf(
             PointOfInterest(
@@ -35,16 +35,14 @@ class ObservePointsOfInterestUseCaseTest {
 
         // Then
         actual shouldBe expected
-        repository.ensureSeededCalls shouldBe 1
     }
 
     @Test
-    fun `invoke should fail collection when ensureSeeded throws before upstream emits`() = runTest {
+    fun `invoke should fail collection when the repository flow throws`() = runTest {
         // Given
         val expectedError = IllegalStateException("seeding failed")
         val repository = FakePointOfInterestRepository(
-            flow = flow { emit(emptyList()) },
-            ensureSeededError = expectedError,
+            flow = flow { throw expectedError },
         )
         val subject = ObservePointsOfInterestUseCase(repository = repository)
 
@@ -53,24 +51,15 @@ class ObservePointsOfInterestUseCaseTest {
 
         // Then
         result.exceptionOrNull() shouldBe expectedError
-        repository.ensureSeededCalls shouldBe 1
     }
 
     private class FakePointOfInterestRepository(
         private val flow: Flow<List<PointOfInterest>>,
-        private val ensureSeededError: Throwable? = null,
     ) : PointOfInterestRepository {
-        var ensureSeededCalls: Int = 0
-
         override fun observeAll(): Flow<List<PointOfInterest>> = flow
 
         override suspend fun getById(id: String): PointOfInterest? = null
 
         override suspend fun upsert(pointOfInterest: PointOfInterest) = Unit
-
-        override suspend fun ensureSeeded() {
-            ensureSeededCalls += 1
-            ensureSeededError?.let { throw it }
-        }
     }
 }

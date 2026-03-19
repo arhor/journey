@@ -47,7 +47,5 @@ class GetPointOfInterestUseCaseTest {
         }
 
         override suspend fun upsert(pointOfInterest: PointOfInterest) = Unit
-
-        override suspend fun ensureSeeded() = Unit
     }
 }

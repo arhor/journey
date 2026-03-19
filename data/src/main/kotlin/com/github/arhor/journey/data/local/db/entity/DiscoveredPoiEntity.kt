@@ -3,6 +3,7 @@ package com.github.arhor.journey.data.local.db.entity
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
+import java.time.Instant
 
 @Entity(
     tableName = "discovered_poi",
@@ -19,7 +20,6 @@ import androidx.room.ForeignKey
 data class DiscoveredPoiEntity(
     @ColumnInfo(name = "poi_id")
     val poiId: String,
-    @ColumnInfo(name = "discovered_at_ms")
-    val discoveredAtMs: Long,
+    @ColumnInfo(name = "discovered_at")
+    val discoveredAt: Instant,
 )
-

@@ -1,12 +1,16 @@
 package com.github.arhor.journey.di
 
 import com.github.arhor.journey.data.repository.MapStylesRepositoryImpl
+import com.github.arhor.journey.data.repository.RoomCollectedResourceSpawnRepository
 import com.github.arhor.journey.data.repository.RoomExplorationRepository
 import com.github.arhor.journey.data.repository.RoomExplorationTileRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
+import com.github.arhor.journey.data.repository.RoomHeroResourcesRepository
 import com.github.arhor.journey.data.repository.RoomPointOfInterestRepository
+import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.ExplorationRepository
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
+import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.MapStylesRepository
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
@@ -23,6 +27,16 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindHeroRepository(impl: RoomHeroRepository): HeroRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindHeroInventoryRepository(impl: RoomHeroResourcesRepository): HeroInventoryRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindCollectedResourceSpawnRepository(
+        impl: RoomCollectedResourceSpawnRepository,
+    ): CollectedResourceSpawnRepository
 
     @Binds
     @Singleton
