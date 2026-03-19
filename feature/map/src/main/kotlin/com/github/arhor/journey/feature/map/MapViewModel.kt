@@ -457,7 +457,11 @@ class MapViewModel @Inject constructor(
 
     private fun onCameraGestureStarted(intent: MapIntent.CameraGestureStarted) {
         _state.update { state ->
-            if (!state.isFollowingUserLocation) {
+            if (
+                state.cameraPosition == intent.position &&
+                state.cameraUpdateOrigin == CameraUpdateOrigin.USER &&
+                !state.isFollowingUserLocation
+            ) {
                 state
             } else {
                 state.copy(

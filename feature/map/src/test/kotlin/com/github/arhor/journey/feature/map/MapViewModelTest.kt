@@ -610,6 +610,48 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `dispatch should mark camera as user controlled when gesture starts after programmatic move`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
+        )
+        val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
+        val gestureCameraPosition = CameraPositionState(
+            target = LatLng(latitude = 40.7615, longitude = -73.9777),
+            zoom = 15.5,
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+            fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraGestureStarted(
+                    position = gestureCameraPosition,
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.cameraPosition == gestureCameraPosition
+            }
+            actual.cameraPosition shouldBe gestureCameraPosition
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `dispatch should recenter camera and open object details when tapped object is present`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
