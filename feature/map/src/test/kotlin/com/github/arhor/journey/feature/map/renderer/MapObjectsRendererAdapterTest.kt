@@ -1,6 +1,7 @@
 package com.github.arhor.journey.feature.map.renderer
 
 import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -39,6 +40,7 @@ class MapObjectsRendererAdapterTest {
             longitude = 24.03,
             radiusMeters = 120,
             isDiscovered = true,
+            kind = MapObjectKind.PointOfInterest,
         )
 
         // When
@@ -50,6 +52,7 @@ class MapObjectsRendererAdapterTest {
         val feature = actual.features.single()
         feature.geometry shouldBe Point(longitude = 24.03, latitude = 49.84)
         feature.id shouldBe JsonPrimitive("poi-1")
+        feature.properties.get(PROPERTY_OBJECT_KIND)?.jsonPrimitive?.contentOrNull shouldBe "poi"
         feature.properties.get(PROPERTY_OBJECT_TITLE)?.jsonPrimitive?.contentOrNull shouldBe "Old Tower"
         feature.properties.get(PROPERTY_OBJECT_DESCRIPTION)?.jsonPrimitive?.contentOrNull shouldBe "Historic tower"
         feature.properties.get(PROPERTY_OBJECT_RADIUS_METERS)?.jsonPrimitive?.contentOrNull shouldBe "120"
@@ -67,6 +70,7 @@ class MapObjectsRendererAdapterTest {
             longitude = 30.52,
             radiusMeters = 80,
             isDiscovered = false,
+            kind = MapObjectKind.PointOfInterest,
         )
 
         // When
@@ -74,6 +78,7 @@ class MapObjectsRendererAdapterTest {
 
         // Then
         actual[PROPERTY_OBJECT_ID]?.jsonPrimitive?.contentOrNull shouldBe "poi-2"
+        actual[PROPERTY_OBJECT_KIND]?.jsonPrimitive?.contentOrNull shouldBe "poi"
         actual[PROPERTY_OBJECT_TITLE]?.jsonPrimitive?.contentOrNull shouldBe "Bridge"
         actual.containsKey(PROPERTY_OBJECT_DESCRIPTION) shouldBe false
         actual[PROPERTY_OBJECT_RADIUS_METERS]?.jsonPrimitive?.contentOrNull shouldBe "80"
@@ -123,6 +128,7 @@ class MapObjectsRendererAdapterTest {
                 longitude = 16.37,
                 radiusMeters = 90,
                 isDiscovered = true,
+                kind = MapObjectKind.PointOfInterest,
             ),
         )
 
@@ -141,8 +147,10 @@ class MapObjectsRendererAdapterTest {
         longitude: Double,
         radiusMeters: Int,
         isDiscovered: Boolean,
+        kind: MapObjectKind,
     ): MapObjectUiModel = MapObjectUiModel(
         id = id,
+        kind = kind,
         title = title,
         description = description,
         position = LatLng(latitude = latitude, longitude = longitude),

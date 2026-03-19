@@ -7,6 +7,8 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
+import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.tracking.location.UserLocationSource
 import com.github.arhor.journey.tracking.location.UserLocationUpdate
@@ -18,14 +20,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val NEARBY_COLLECTION_BUCKET_SCALE = 10_000.0
 
 @Singleton
 class ExplorationTrackingRuntime @Inject constructor(
     @AppCoroutineScope private val appScope: CoroutineScope,
     private val userLocationSource: UserLocationSource,
     private val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
+    private val collectNearbyResourceSpawns: CollectNearbyResourceSpawnsUseCase,
     private val configHolder: ExplorationTileRuntimeConfigHolder,
 ) {
     private val cadence = MutableStateFlow(ExplorationTrackingCadence.BACKGROUND)
@@ -37,6 +43,7 @@ class ExplorationTrackingRuntime @Inject constructor(
 
     private var trackingJob: Job? = null
     private var lastRevealedTiles: Set<ExplorationTile> = emptySet()
+    private var lastNearbyCollectionBucket: NearbyCollectionBucket? = null
 
     fun observeSession(): Flow<ExplorationTrackingSession> = session.asStateFlow()
 
@@ -99,6 +106,7 @@ class ExplorationTrackingRuntime @Inject constructor(
         trackingJob?.cancel()
         trackingJob = null
         lastRevealedTiles = emptySet()
+        lastNearbyCollectionBucket = null
 
         session.update {
             it.copy(
@@ -149,6 +157,8 @@ class ExplorationTrackingRuntime @Inject constructor(
             )
         }
 
+        maybeCollectNearbyResources(location = update.location)
+
         val config = configHolder.snapshot()
         val revealTiles = ExplorationTileGrid.revealTilesAround(
             point = update.location,
@@ -162,4 +172,28 @@ class ExplorationTrackingRuntime @Inject constructor(
         revealExplorationTilesAtLocation(update.location)
         lastRevealedTiles = revealTiles
     }
+
+    private suspend fun maybeCollectNearbyResources(location: GeoPoint) {
+        val bucket = location.toNearbyCollectionBucket()
+        if (bucket == lastNearbyCollectionBucket) {
+            return
+        }
+
+        runCatching {
+            collectNearbyResourceSpawns(location)
+        }.onSuccess {
+            lastNearbyCollectionBucket = bucket
+        }
+    }
+
+    private fun GeoPoint.toNearbyCollectionBucket(): NearbyCollectionBucket =
+        NearbyCollectionBucket(
+            latBucket = (lat * NEARBY_COLLECTION_BUCKET_SCALE).roundToInt(),
+            lonBucket = (lon * NEARBY_COLLECTION_BUCKET_SCALE).roundToInt(),
+        )
+
+    private data class NearbyCollectionBucket(
+        val latBucket: Int,
+        val lonBucket: Int,
+    )
 }

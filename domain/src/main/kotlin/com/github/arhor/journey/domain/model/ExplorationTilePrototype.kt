@@ -6,7 +6,7 @@ object ExplorationTilePrototype {
      *
      * Exploration storage stays at this zoom regardless of the visual map zoom.
      */
-    const val CANONICAL_ZOOM = 21
+    const val CANONICAL_ZOOM = 20
 
     /**
      * Prototype reveal radius around the live user location.

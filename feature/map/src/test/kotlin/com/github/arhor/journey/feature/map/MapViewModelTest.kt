@@ -17,10 +17,12 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
+import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
@@ -87,8 +89,59 @@ class MapViewModelTest {
             // Then
             actual.selectedStyle shouldBe fixture.mapStyle
             actual.visibleObjects.map { it.id to it.isDiscovered }.toMap() shouldBe mapOf(
-                FIRST_POI_ID.toString() to true,
-                SECOND_POI_ID.toString() to false,
+                "${POI_ID_PREFIX}:$FIRST_POI_ID" to true,
+                "${POI_ID_PREFIX}:$SECOND_POI_ID" to false,
+            )
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `uiState should include resource spawns alongside points of interest`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            pointsOfInterest = listOf(
+                pointOfInterest(id = FIRST_POI_ID, lat = 50.45, lon = 30.52),
+            ),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = "cell-1-slot-0",
+                    resourceTypeId = "wood",
+                    lat = 50.46,
+                    lon = 30.53,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+        )
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects.any { it.id == "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0" }
+            }
+
+            // Then
+            actual.visibleObjects.map { it.id }.toSet() shouldBe setOf(
+                "${POI_ID_PREFIX}:$FIRST_POI_ID",
+                "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0",
             )
         } finally {
             tearDownMainDispatcher()
@@ -671,7 +724,11 @@ class MapViewModelTest {
             runCurrent()
 
             // When
-            fixture.viewModel.dispatch(MapIntent.ObjectTapped(objectId = FIRST_POI_ID.toString()))
+            fixture.viewModel.dispatch(
+                MapIntent.ObjectTapped(
+                    objectId = "${POI_ID_PREFIX}:$FIRST_POI_ID",
+                ),
+            )
             advanceUntilIdle()
             fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
                 lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
@@ -686,6 +743,69 @@ class MapViewModelTest {
                 it.cameraPosition?.target == LatLng(latitude = 51.1, longitude = 17.03)
             }
             actual.cameraPosition?.target shouldBe LatLng(latitude = 51.1, longitude = 17.03)
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should recenter camera and not open POI details when tapped object is a resource spawn`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val spawnId = "cell-2-slot-1"
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
+            pointsOfInterest = emptyList(),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = spawnId,
+                    resourceTypeId = "stone",
+                    lat = 51.2,
+                    lon = 17.1,
+                    collectionRadiusMeters = 20.0,
+                ),
+            ),
+        )
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+            fixture.viewModel.awaitContent {
+                it.visibleObjects.any { objectModel ->
+                    objectModel.id == "${RESOURCE_SPAWN_ID_PREFIX}:$spawnId"
+                }
+            }
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.ObjectTapped(
+                    objectId = "${RESOURCE_SPAWN_ID_PREFIX}:$spawnId",
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            coVerify(exactly = 0) { fixture.discoverPointOfInterest.invoke(any()) }
+            val actual = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 51.2, longitude = 17.1)
+            }
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 51.2, longitude = 17.1)
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
             tearDownMainDispatcher()
@@ -746,6 +866,7 @@ class MapViewModelTest {
         pointsOfInterest: List<PointOfInterest> = listOf(
             pointOfInterest(id = FIRST_POI_ID, lat = 50.45, lon = 30.52),
         ),
+        resourceSpawns: List<ResourceSpawn> = emptyList(),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<ExplorationTile> = emptySet(),
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
@@ -754,6 +875,7 @@ class MapViewModelTest {
             StartExplorationTrackingSessionResult.AlreadyActive,
     ): Fixture {
         val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
+        val observeCollectibleResourceSpawns = mockk<ObserveCollectibleResourceSpawnsUseCase>()
         val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
         val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
@@ -774,6 +896,7 @@ class MapViewModelTest {
         val trackingSessionFlow = MutableStateFlow(trackingSession)
 
         every { observePointsOfInterest.invoke() } returns MutableStateFlow(pointsOfInterest)
+        every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(resourceSpawns)
         every { observeExplorationProgress.invoke() } returns MutableStateFlow(explorationProgress)
         every { observeExploredTiles.invoke(any()) } returns MutableStateFlow(exploredTiles)
         every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
@@ -792,6 +915,7 @@ class MapViewModelTest {
         return Fixture(
             viewModel = MapViewModel(
                 observePointsOfInterest = observePointsOfInterest,
+                observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
                 observeExplorationProgress = observeExplorationProgress,
                 observeExploredTiles = observeExploredTiles,
                 observeSelectedMapStyle = observeSelectedMapStyle,
@@ -828,6 +952,19 @@ class MapViewModelTest {
         radiusMeters = 100,
     )
 
+    private fun resourceSpawn(
+        id: String,
+        resourceTypeId: String,
+        lat: Double,
+        lon: Double,
+        collectionRadiusMeters: Double,
+    ): ResourceSpawn = ResourceSpawn(
+        id = id,
+        typeId = resourceTypeId,
+        position = GeoPoint(lat = lat, lon = lon),
+        collectionRadiusMeters = collectionRadiusMeters,
+    )
+
     private fun visibleBoundsInside(range: ExplorationTileRange): GeoBounds =
         ExplorationTileGrid.bounds(range).let { bounds ->
             GeoBounds(
@@ -847,5 +984,7 @@ class MapViewModelTest {
         const val VIEWPORT_BOUNDS_EPSILON = 1e-6
         const val FIRST_POI_ID = 1L
         const val SECOND_POI_ID = 2L
+        const val POI_ID_PREFIX = "poi"
+        const val RESOURCE_SPAWN_ID_PREFIX = "spawn"
     }
 }

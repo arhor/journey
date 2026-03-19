@@ -17,10 +17,12 @@ import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
+import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
@@ -33,6 +35,7 @@ import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUse
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
@@ -78,6 +81,7 @@ private data class State(
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val observePointsOfInterest: ObservePointsOfInterestUseCase,
+    private val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val observeExploredTiles: ObserveExploredTilesUseCase,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
@@ -124,7 +128,8 @@ class MapViewModel @Inject constructor(
                 )
             },
             observeFogExploredTiles(),
-        ) { inputs, exploredTiles ->
+            observeVisibleResourceSpawns(),
+        ) { inputs, exploredTiles, resourceSpawns ->
             intoUiState(
                 state = inputs.state,
                 trackingSession = inputs.trackingSession,
@@ -132,6 +137,7 @@ class MapViewModel @Inject constructor(
                 pointsOfInterest = inputs.pointsOfInterest,
                 explorationProgress = inputs.explorationProgress,
                 exploredTiles = exploredTiles,
+                resourceSpawns = resourceSpawns,
             )
         }.catch {
             emit(
@@ -176,6 +182,14 @@ class MapViewModel @Inject constructor(
             .distinctUntilChanged()
             .flatMapLatest { range ->
                 range?.let(observeExploredTiles::invoke) ?: flowOf(emptySet())
+            }
+
+    private fun observeVisibleResourceSpawns(): Flow<List<ResourceSpawn>> =
+        _state
+            .map { it.visibleBounds }
+            .distinctUntilChanged()
+            .flatMapLatest { bounds ->
+                bounds?.let(observeCollectibleResourceSpawns::invoke) ?: flowOf(emptyList())
             }
 
     private suspend fun onMapOpened() {
@@ -296,6 +310,7 @@ class MapViewModel @Inject constructor(
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
         exploredTiles: Set<ExplorationTile>,
+        resourceSpawns: List<ResourceSpawn>,
     ): MapUiState = if (state.failureMessage == null) {
         mapStyleOutput.fold(
             onSuccess = {
@@ -325,7 +340,11 @@ class MapViewModel @Inject constructor(
                     explorationTrackingCadence = trackingSession.cadence,
                     explorationTrackingStatus = trackingSession.status,
                     selectedStyle = it,
-                    visibleObjects = mapObjects(pointsOfInterest, explorationProgress),
+                    visibleObjects = mapObjects(
+                        pointsOfInterest = pointsOfInterest,
+                        explorationProgress = explorationProgress,
+                        resourceSpawns = resourceSpawns,
+                    ),
                     fogOfWar = fogOfWarUiState(
                         state = state,
                         exploredTiles = exploredTiles,
@@ -529,29 +548,28 @@ class MapViewModel @Inject constructor(
 
     private suspend fun onObjectTapped(objectId: String) {
         val contentState = uiState.value as? MapUiState.Content ?: return
-        val poiId = objectId.toLongOrNull() ?: run {
-            emitEffect(MapEffect.ShowMessage(OBJECT_DISCOVERY_FAILED_MESSAGE))
-            return
-        }
+        val objectUiModel = contentState.visibleObjects
+            .firstOrNull { it.id == objectId }
+            ?: return
+        val parsedId = parseMapObjectId(objectUiModel.id) ?: return
 
         try {
-            contentState.visibleObjects
-                .firstOrNull { it.id == objectId }
-                ?.let { objectUiModel ->
-                    _state.update {
-                        it.copy(
-                            cameraPosition = CameraPositionState(
-                                target = objectUiModel.position,
-                                zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
-                            ),
-                            cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
-                            isFollowingUserLocation = false,
-                        )
-                    }
-                }
+            _state.update {
+                it.copy(
+                    cameraPosition = CameraPositionState(
+                        target = objectUiModel.position,
+                        zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
+                    ),
+                    cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
+                    isFollowingUserLocation = false,
+                )
+            }
 
-            discoverPointOfInterest(poiId)
-            emitEffect(MapEffect.OpenObjectDetails(objectId))
+            if (parsedId.kind == MapObjectKind.PointOfInterest) {
+                val poiId = parsedId.rawId.toLongOrNull() ?: return
+                discoverPointOfInterest(poiId)
+                emitEffect(MapEffect.OpenObjectDetails(parsedId.rawId))
+            }
         } catch (e: Throwable) {
             emitEffect(MapEffect.ShowMessage(e.message ?: OBJECT_DISCOVERY_FAILED_MESSAGE))
         }
@@ -569,6 +587,7 @@ class MapViewModel @Inject constructor(
     private fun mapObjects(
         pointsOfInterest: List<PointOfInterest>,
         explorationProgress: ExplorationProgress,
+        resourceSpawns: List<ResourceSpawn>,
     ): List<MapObjectUiModel> {
         val discoveredPoiIds = explorationProgress.discovered
             .map { it.poiId }
@@ -576,18 +595,54 @@ class MapViewModel @Inject constructor(
 
         return pointsOfInterest.map { poi ->
             poi.toUiModel(isDiscovered = poi.id in discoveredPoiIds)
-        }
+        } + resourceSpawns.map { it.toUiModel() }
     }
 
     private fun PointOfInterest.toUiModel(isDiscovered: Boolean): MapObjectUiModel =
         MapObjectUiModel(
-            id = id.toString(),
+            id = mapObjectId(
+                kind = MapObjectKind.PointOfInterest,
+                rawId = id.toString(),
+            ),
+            kind = MapObjectKind.PointOfInterest,
             title = name,
             description = description,
             position = location.toLatLng(),
             radiusMeters = radiusMeters,
             isDiscovered = isDiscovered,
         )
+
+    private fun ResourceSpawn.toUiModel(): MapObjectUiModel =
+        MapObjectUiModel(
+            id = mapObjectId(
+                kind = MapObjectKind.ResourceSpawn,
+                rawId = id,
+            ),
+            kind = MapObjectKind.ResourceSpawn,
+            title = typeId,
+            description = null,
+            position = position.toLatLng(),
+            radiusMeters = collectionRadiusMeters.toInt(),
+            isDiscovered = false,
+        )
+
+    private fun parseMapObjectId(id: String): ParsedMapObjectId? {
+        val parts = id.split(MAP_OBJECT_ID_SEPARATOR, limit = 2)
+        if (parts.size != 2) {
+            return null
+        }
+
+        val kind = MapObjectKind.entries.firstOrNull { it.idPrefix == parts[0] } ?: return null
+        return ParsedMapObjectId(
+            kind = kind,
+            rawId = parts[1],
+        )
+    }
+
+    private fun mapObjectId(
+        kind: MapObjectKind,
+        rawId: String,
+    ): String = "${kind.idPrefix}$MAP_OBJECT_ID_SEPARATOR$rawId"
 
     private fun GeoPoint.toLatLng(): LatLng =
         LatLng(
@@ -637,6 +692,12 @@ class MapViewModel @Inject constructor(
         val explorationProgress: ExplorationProgress,
     )
 
+    @Immutable
+    private data class ParsedMapObjectId(
+        val kind: MapObjectKind,
+        val rawId: String,
+    )
+
     private fun State.matches(fogViewport: FogViewport): Boolean {
         return visibleTileRange == fogViewport.visibleTileRange
             && fogTileRange == fogViewport.fogTileRange
@@ -684,5 +745,6 @@ class MapViewModel @Inject constructor(
             "Explored tiles cleared."
         const val EXPLORATION_CLEAR_FAILED_MESSAGE =
             "Failed to clear explored tiles."
+        const val MAP_OBJECT_ID_SEPARATOR = ":"
     }
 }

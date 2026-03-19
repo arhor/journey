@@ -124,6 +124,7 @@ internal fun List<MapObjectUiModel>.toGeoJsonDataOrNull(): GeoJsonData.Features?
 
 internal fun MapObjectUiModel.toFeatureProperties(): JsonObject = buildJsonObject {
     put(PROPERTY_OBJECT_ID, id)
+    put(PROPERTY_OBJECT_KIND, kind.idPrefix)
     put(PROPERTY_OBJECT_TITLE, title)
     description?.let { put(PROPERTY_OBJECT_DESCRIPTION, it) }
     put(PROPERTY_OBJECT_RADIUS_METERS, radiusMeters)
@@ -144,6 +145,7 @@ internal const val CLUSTER_COUNT_LAYER_ID = "game-entities-cluster-count-layer"
 internal const val OBJECT_LAYER_ID = "game-entities-object-layer"
 
 internal const val PROPERTY_OBJECT_ID = "object_id"
+internal const val PROPERTY_OBJECT_KIND = "kind"
 internal const val PROPERTY_OBJECT_TITLE = "title"
 internal const val PROPERTY_OBJECT_DESCRIPTION = "description"
 internal const val PROPERTY_OBJECT_RADIUS_METERS = "radius_meters"

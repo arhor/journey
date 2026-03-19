@@ -6,9 +6,17 @@ import com.github.arhor.journey.feature.map.model.LatLng
 @Immutable
 data class MapObjectUiModel(
     val id: String,
+    val kind: MapObjectKind,
     val title: String,
     val description: String?,
     val position: LatLng,
     val radiusMeters: Int,
     val isDiscovered: Boolean,
 )
+
+enum class MapObjectKind(
+    val idPrefix: String,
+) {
+    PointOfInterest(idPrefix = "poi"),
+    ResourceSpawn(idPrefix = "spawn"),
+}
