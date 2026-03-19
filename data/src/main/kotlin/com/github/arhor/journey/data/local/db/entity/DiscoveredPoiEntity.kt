@@ -14,6 +14,7 @@ import java.time.Instant
             parentColumns = ["id"],
             childColumns = ["poi_id"],
             onDelete = ForeignKey.CASCADE,
+            onUpdate = ForeignKey.CASCADE,
         ),
     ],
 )
