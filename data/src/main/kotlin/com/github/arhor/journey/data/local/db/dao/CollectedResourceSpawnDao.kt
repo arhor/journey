@@ -14,8 +14,8 @@ interface CollectedResourceSpawnDao {
         """
         SELECT *
         FROM collected_resource_spawns
-        WHERE hero_id = :heroId
-        ORDER BY collected_at DESC
+        WHERE heroId = :heroId
+        ORDER BY collectedAt DESC
         """,
     )
     fun observeAll(heroId: String): Flow<List<CollectedResourceSpawnEntity>>
@@ -25,8 +25,8 @@ interface CollectedResourceSpawnDao {
         SELECT EXISTS(
             SELECT 1
             FROM collected_resource_spawns
-            WHERE hero_id = :heroId
-                AND spawn_id = :spawnId
+            WHERE heroId = :heroId
+                AND spawnId = :spawnId
         )
         """,
     )

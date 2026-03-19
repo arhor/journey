@@ -14,9 +14,9 @@ interface HeroResourceDao {
         """
         SELECT *
         FROM hero_resources
-        WHERE hero_id = :heroId
+        WHERE heroId = :heroId
             AND amount > 0
-        ORDER BY type_id ASC
+        ORDER BY typeId ASC
         """,
     )
     fun observeAll(heroId: String): Flow<List<HeroResourceEntity>>
@@ -25,8 +25,8 @@ interface HeroResourceDao {
         """
         SELECT amount
         FROM hero_resources
-        WHERE hero_id = :heroId
-            AND type_id = :typeId
+        WHERE heroId = :heroId
+          AND typeId = :typeId
         LIMIT 1
         """,
     )
@@ -39,8 +39,8 @@ interface HeroResourceDao {
         """
         SELECT amount
         FROM hero_resources
-        WHERE hero_id = :heroId
-            AND type_id = :typeId
+        WHERE heroId = :heroId
+            AND typeId = :typeId
         LIMIT 1
         """,
     )
@@ -53,8 +53,8 @@ interface HeroResourceDao {
         """
         SELECT *
         FROM hero_resources
-        WHERE hero_id = :heroId
-            AND type_id = :typeId
+        WHERE heroId = :heroId
+            AND typeId = :typeId
         LIMIT 1
         """,
     )
@@ -69,10 +69,10 @@ interface HeroResourceDao {
     @Query(
         """
         INSERT INTO hero_resources (
-            hero_id,
-            type_id,
+            heroId,
+            typeId,
             amount,
-            updated_at
+            updatedAt
         )
         VALUES (
             :heroId,
@@ -80,9 +80,9 @@ interface HeroResourceDao {
             :amountDelta,
             :updatedAt
         )
-        ON CONFLICT(hero_id, type_id) DO UPDATE SET
+        ON CONFLICT(heroId, typeId) DO UPDATE SET
             amount = hero_resources.amount + excluded.amount,
-            updated_at = excluded.updated_at
+            updatedAt = excluded.updatedAt
         """,
     )
     suspend fun incrementAmount(
@@ -96,9 +96,9 @@ interface HeroResourceDao {
         """
         UPDATE hero_resources
         SET amount = amount - :amountDelta,
-            updated_at = :updatedAt
-        WHERE hero_id = :heroId
-            AND type_id = :typeId
+            updatedAt = :updatedAt
+        WHERE heroId = :heroId
+            AND typeId = :typeId
             AND amount >= :amountDelta
         """,
     )

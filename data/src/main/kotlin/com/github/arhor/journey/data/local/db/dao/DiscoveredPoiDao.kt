@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface DiscoveredPoiDao {
 
-    @Query("SELECT * FROM discovered_poi ORDER BY discovered_at DESC")
+    @Query("SELECT * FROM discovered_poi ORDER BY discoveredAt DESC")
     fun observeAll(): Flow<List<DiscoveredPoiEntity>>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
