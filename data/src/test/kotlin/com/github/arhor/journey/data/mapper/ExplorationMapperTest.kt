@@ -14,8 +14,9 @@ class ExplorationMapperTest {
     fun `toDomain should map instant when discovered poi entity is provided`() {
         // Given
         val discoveredAt = Instant.parse("2026-02-15T12:00:00Z")
+        val poiId = 1L
         val entity = DiscoveredPoiEntity(
-            poiId = "poi-a",
+            poiId = poiId,
             discoveredAt = discoveredAt,
         )
 
@@ -24,7 +25,7 @@ class ExplorationMapperTest {
 
         // Then
         actual shouldBe DiscoveredPoi(
-            poiId = "poi-a",
+            poiId = poiId,
             discoveredAt = discoveredAt,
         )
     }
@@ -32,8 +33,9 @@ class ExplorationMapperTest {
     @Test
     fun `toEntity should keep pre epoch instant when discovered poi is before 1970`() {
         // Given
+        val poiId = 2L
         val discovered = DiscoveredPoi(
-            poiId = "poi-b",
+            poiId = poiId,
             discoveredAt = Instant.parse("1969-12-31T23:59:58Z"),
         )
 
@@ -42,7 +44,7 @@ class ExplorationMapperTest {
 
         // Then
         actual shouldBe DiscoveredPoiEntity(
-            poiId = "poi-b",
+            poiId = poiId,
             discoveredAt = Instant.parse("1969-12-31T23:59:58Z"),
         )
     }

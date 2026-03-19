@@ -19,10 +19,10 @@ class RoomPointOfInterestRepository @Inject constructor(
         dao.observeAll()
             .map { items -> items.map { it.toDomain() } }
 
-    override suspend fun getById(id: String): PointOfInterest? =
+    override suspend fun getById(id: Long): PointOfInterest? =
         dao.getById(id)?.toDomain()
 
-    override suspend fun upsert(pointOfInterest: PointOfInterest) {
-        dao.upsert(pointOfInterest.toEntity())
+    override suspend fun upsert(pointOfInterest: PointOfInterest): Long {
+        return dao.upsert(pointOfInterest.toEntity())
     }
 }

@@ -8,6 +8,7 @@ import androidx.lifecycle.lifecycleScope
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.usecase.SetExplorationTrackingCadenceUseCase
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -24,17 +25,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-
-        lifecycleScope.launchWhenStarted {
+        lifecycleScope.launch {
             setExplorationTrackingCadence(ExplorationTrackingCadence.FOREGROUND)
         }
     }
 
     override fun onStop() {
-        lifecycleScope.launchWhenCreated {
+        super.onStop()
+        lifecycleScope.launch {
             setExplorationTrackingCadence(ExplorationTrackingCadence.BACKGROUND)
         }
-
-        super.onStop()
     }
 }

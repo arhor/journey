@@ -16,7 +16,7 @@ interface HeroResourceDao {
         FROM hero_resources
         WHERE hero_id = :heroId
             AND amount > 0
-        ORDER BY resource_type_id ASC
+        ORDER BY type_id ASC
         """,
     )
     fun observeAll(heroId: String): Flow<List<HeroResourceEntity>>
@@ -26,13 +26,13 @@ interface HeroResourceDao {
         SELECT amount
         FROM hero_resources
         WHERE hero_id = :heroId
-            AND resource_type_id = :resourceTypeId
+            AND type_id = :typeId
         LIMIT 1
         """,
     )
     fun observeAmount(
         heroId: String,
-        resourceTypeId: String,
+        typeId: String,
     ): Flow<Int?>
 
     @Query(
@@ -40,13 +40,13 @@ interface HeroResourceDao {
         SELECT amount
         FROM hero_resources
         WHERE hero_id = :heroId
-            AND resource_type_id = :resourceTypeId
+            AND type_id = :typeId
         LIMIT 1
         """,
     )
     suspend fun getAmount(
         heroId: String,
-        resourceTypeId: String,
+        typeId: String,
     ): Int?
 
     @Query(
@@ -54,13 +54,13 @@ interface HeroResourceDao {
         SELECT *
         FROM hero_resources
         WHERE hero_id = :heroId
-            AND resource_type_id = :resourceTypeId
+            AND type_id = :typeId
         LIMIT 1
         """,
     )
     suspend fun getById(
         heroId: String,
-        resourceTypeId: String,
+        typeId: String,
     ): HeroResourceEntity?
 
     @Upsert
@@ -70,24 +70,24 @@ interface HeroResourceDao {
         """
         INSERT INTO hero_resources (
             hero_id,
-            resource_type_id,
+            type_id,
             amount,
             updated_at
         )
         VALUES (
             :heroId,
-            :resourceTypeId,
+            :typeId,
             :amountDelta,
             :updatedAt
         )
-        ON CONFLICT(hero_id, resource_type_id) DO UPDATE SET
+        ON CONFLICT(hero_id, type_id) DO UPDATE SET
             amount = hero_resources.amount + excluded.amount,
             updated_at = excluded.updated_at
         """,
     )
     suspend fun incrementAmount(
         heroId: String,
-        resourceTypeId: String,
+        typeId: String,
         amountDelta: Int,
         updatedAt: Instant,
     )
@@ -98,13 +98,13 @@ interface HeroResourceDao {
         SET amount = amount - :amountDelta,
             updated_at = :updatedAt
         WHERE hero_id = :heroId
-            AND resource_type_id = :resourceTypeId
+            AND type_id = :typeId
             AND amount >= :amountDelta
         """,
     )
     suspend fun decrementAmountIfEnough(
         heroId: String,
-        resourceTypeId: String,
+        typeId: String,
         amountDelta: Int,
         updatedAt: Instant,
     ): Int

@@ -8,7 +8,7 @@ import com.github.arhor.journey.domain.model.HeroResource
 fun HeroResourceEntity.toDomain(): HeroResource =
     HeroResource(
         heroId = heroId,
-        resourceTypeId = resourceTypeId,
+        resourceTypeId = typeId,
         amount = amount,
         updatedAt = updatedAt,
     )
@@ -16,7 +16,7 @@ fun HeroResourceEntity.toDomain(): HeroResource =
 fun HeroResource.toEntity(): HeroResourceEntity =
     HeroResourceEntity(
         heroId = heroId,
-        resourceTypeId = resourceTypeId,
+        typeId = resourceTypeId,
         amount = amount,
         updatedAt = updatedAt,
     )
@@ -24,15 +24,15 @@ fun HeroResource.toEntity(): HeroResourceEntity =
 fun CollectedResourceSpawnEntity.toDomain(): CollectedResourceSpawn =
     CollectedResourceSpawn(
         heroId = heroId,
+        typeId = typeId,
         spawnId = spawnId,
-        resourceTypeId = resourceTypeId,
         collectedAt = collectedAt,
     )
 
 fun CollectedResourceSpawn.toEntity(): CollectedResourceSpawnEntity =
     CollectedResourceSpawnEntity(
         heroId = heroId,
+        typeId = typeId,
         spawnId = spawnId,
-        resourceTypeId = resourceTypeId,
         collectedAt = collectedAt,
     )

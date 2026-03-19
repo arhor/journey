@@ -15,8 +15,9 @@ class GetPointOfInterestUseCaseTest {
     @Test
     fun `invoke should return point of interest from repository when id exists`() = runTest {
         // Given
+        val poiId = 1L
         val expected = PointOfInterest(
-            id = "poi-1",
+            id = poiId,
             name = "Old Town Market Square",
             description = "Historic square",
             category = PoiCategory.LANDMARK,
@@ -27,25 +28,25 @@ class GetPointOfInterestUseCaseTest {
         val subject = GetPointOfInterestUseCase(repository = repository)
 
         // When
-        val actual = subject("poi-1")
+        val actual = subject(poiId)
 
         // Then
         actual shouldBe expected
-        repository.requestedId shouldBe "poi-1"
+        repository.requestedId shouldBe poiId
     }
 
     private class FakePointOfInterestRepository(
         private val pointOfInterest: PointOfInterest?,
     ) : PointOfInterestRepository {
-        var requestedId: String? = null
+        var requestedId: Long? = null
 
         override fun observeAll(): Flow<List<PointOfInterest>> = emptyFlow()
 
-        override suspend fun getById(id: String): PointOfInterest? {
+        override suspend fun getById(id: Long): PointOfInterest? {
             requestedId = id
             return pointOfInterest
         }
 
-        override suspend fun upsert(pointOfInterest: PointOfInterest) = Unit
+        override suspend fun upsert(pointOfInterest: PointOfInterest) = pointOfInterest.id
     }
 }

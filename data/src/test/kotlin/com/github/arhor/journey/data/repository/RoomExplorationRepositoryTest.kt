@@ -17,14 +17,15 @@ class RoomExplorationRepositoryTest {
     fun `observeProgress should map discovered entities to set when dao emits duplicates`() = runTest {
         // Given
         val discoveredAt = Instant.parse("2026-02-20T08:30:00Z")
+        val poiId = 1L
         val dao = FakeDiscoveredPoiDao(
             observedItems = listOf(
                 DiscoveredPoiEntity(
-                    poiId = "poi-1",
+                    poiId = poiId,
                     discoveredAt = discoveredAt,
                 ),
                 DiscoveredPoiEntity(
-                    poiId = "poi-1",
+                    poiId = poiId,
                     discoveredAt = discoveredAt,
                 ),
             ),
@@ -36,7 +37,7 @@ class RoomExplorationRepositoryTest {
 
         // Then
         actual.discovered shouldHaveSize 1
-        actual.discovered.first().poiId shouldBe "poi-1"
+        actual.discovered.first().poiId shouldBe poiId
     }
 
     @Test
@@ -45,17 +46,18 @@ class RoomExplorationRepositoryTest {
         val dao = FakeDiscoveredPoiDao(observedItems = emptyList())
         val subject = RoomExplorationRepository(dao = dao)
         val discoveredAt = Instant.parse("2026-02-21T10:00:00Z")
+        val poiId = 2L
 
         // When
         subject.discoverPoi(
-            poiId = "poi-9",
+            poiId = poiId,
             discoveredAt = discoveredAt,
         )
 
         // Then
         dao.insertedEntities shouldBe listOf(
             DiscoveredPoiEntity(
-                poiId = "poi-9",
+                poiId = poiId,
                 discoveredAt = discoveredAt,
             ),
         )

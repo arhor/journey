@@ -14,7 +14,7 @@ interface ExplorationRepository {
      * This operation is expected to be idempotent.
      */
     suspend fun discoverPoi(
-        poiId: String,
+        poiId: Long,
         discoveredAt: Instant,
     )
 }

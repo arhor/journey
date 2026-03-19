@@ -13,15 +13,14 @@ interface PoiDao {
     fun observeAll(): Flow<List<PoiEntity>>
 
     @Query("SELECT * FROM poi WHERE id = :id LIMIT 1")
-    suspend fun getById(id: String): PoiEntity?
+    suspend fun getById(id: Long): PoiEntity?
 
     @Query("SELECT COUNT(*) FROM poi")
     suspend fun count(): Int
 
     @Upsert
-    suspend fun upsert(entity: PoiEntity)
+    suspend fun upsert(entity: PoiEntity): Long
 
     @Upsert
-    suspend fun upsertAll(entities: List<PoiEntity>)
+    suspend fun upsertAll(entities: List<PoiEntity>): LongArray
 }
-

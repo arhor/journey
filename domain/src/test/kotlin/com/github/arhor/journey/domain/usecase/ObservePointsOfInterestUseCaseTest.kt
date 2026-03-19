@@ -17,9 +17,10 @@ class ObservePointsOfInterestUseCaseTest {
     @Test
     fun `invoke should emit points of interest from the repository flow`() = runTest {
         // Given
+        val poiId = 1L
         val expected = listOf(
             PointOfInterest(
-                id = "poi-1",
+                id = poiId,
                 name = "Old Oak",
                 description = "A large oak tree",
                 category = PoiCategory.LANDMARK,
@@ -58,8 +59,8 @@ class ObservePointsOfInterestUseCaseTest {
     ) : PointOfInterestRepository {
         override fun observeAll(): Flow<List<PointOfInterest>> = flow
 
-        override suspend fun getById(id: String): PointOfInterest? = null
+        override suspend fun getById(id: Long): PointOfInterest? = null
 
-        override suspend fun upsert(pointOfInterest: PointOfInterest) = Unit
+        override suspend fun upsert(pointOfInterest: PointOfInterest) = pointOfInterest.id
     }
 }

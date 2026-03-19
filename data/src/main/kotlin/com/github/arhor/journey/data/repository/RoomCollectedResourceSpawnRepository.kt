@@ -39,7 +39,7 @@ class RoomCollectedResourceSpawnRepository @Inject constructor(
             CollectedResourceSpawn(
                 heroId = heroId,
                 spawnId = spawnId,
-                resourceTypeId = resourceTypeId,
+                typeId = resourceTypeId,
                 collectedAt = collectedAt,
             ).toEntity(),
         ) != -1L

@@ -4,7 +4,6 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,12 +17,9 @@ class AddPointOfInterestUseCase @Inject constructor(
         category: PoiCategory,
         location: GeoPoint,
         radiusMeters: Int,
-    ): String {
-        val id = "poi_${UUID.randomUUID().toString().replace('-', '_')}"
-
-        repository.upsert(
+    ): Long {
+        val id = repository.upsert(
             PointOfInterest(
-                id = id,
                 name = name,
                 description = description,
                 category = category,
@@ -31,7 +27,6 @@ class AddPointOfInterestUseCase @Inject constructor(
                 radiusMeters = radiusMeters,
             ),
         )
-
         return id
     }
 }

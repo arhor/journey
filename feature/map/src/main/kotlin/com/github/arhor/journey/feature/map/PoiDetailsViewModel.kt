@@ -18,8 +18,13 @@ class PoiDetailsViewModel @Inject constructor(
 ) : ViewModel() {
     private val destination = savedStateHandle.toRoute<PoiDetailsDestination>()
 
-    val uiState = flow<PoiDetailsUiState> {
-        val poi = getPointOfInterest(destination.poiId)
+    val uiState = flow {
+        val poiId = destination.poiId.toLongOrNull()
+        val poi = if (poiId != null) {
+            getPointOfInterest(poiId)
+        } else {
+            null
+        }
         emit(
             if (poi == null) {
                 PoiDetailsUiState.Failure(
@@ -27,7 +32,7 @@ class PoiDetailsViewModel @Inject constructor(
                 )
             } else {
                 PoiDetailsUiState.Content(
-                    id = poi.id,
+                    id = poi.id.toString(),
                     name = poi.name,
                     description = poi.description,
                     category = poi.category.name.replace('_', ' '),

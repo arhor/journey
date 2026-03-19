@@ -9,6 +9,6 @@ import javax.inject.Singleton
 class GetPointOfInterestUseCase @Inject constructor(
     private val repository: PointOfInterestRepository,
 ) {
-    suspend operator fun invoke(id: String): PointOfInterest? =
+    suspend operator fun invoke(id: Long): PointOfInterest? =
         repository.getById(id)
 }

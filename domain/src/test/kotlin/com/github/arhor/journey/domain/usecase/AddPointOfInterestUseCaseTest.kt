@@ -28,7 +28,6 @@ class AddPointOfInterestUseCaseTest {
         )
 
         // Then
-        id.startsWith("poi_") shouldBe true
         repository.savedPointOfInterest shouldBe PointOfInterest(
             id = id,
             name = "Custom point",
@@ -44,10 +43,11 @@ class AddPointOfInterestUseCaseTest {
 
         override fun observeAll(): Flow<List<PointOfInterest>> = emptyFlow()
 
-        override suspend fun getById(id: String): PointOfInterest? = null
+        override suspend fun getById(id: Long): PointOfInterest? = null
 
-        override suspend fun upsert(pointOfInterest: PointOfInterest) {
+        override suspend fun upsert(pointOfInterest: PointOfInterest): Long {
             savedPointOfInterest = pointOfInterest
+            return pointOfInterest.id
         }
     }
 }

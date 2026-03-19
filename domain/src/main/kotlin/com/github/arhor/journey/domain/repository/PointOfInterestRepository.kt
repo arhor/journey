@@ -7,7 +7,7 @@ interface PointOfInterestRepository {
 
     fun observeAll(): Flow<List<PointOfInterest>>
 
-    suspend fun getById(id: String): PointOfInterest?
+    suspend fun getById(id: Long): PointOfInterest?
 
-    suspend fun upsert(pointOfInterest: PointOfInterest)
+    suspend fun upsert(pointOfInterest: PointOfInterest): Long
 }

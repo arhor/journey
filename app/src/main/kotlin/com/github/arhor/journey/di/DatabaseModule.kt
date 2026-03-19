@@ -3,7 +3,6 @@ package com.github.arhor.journey.di
 import android.content.Context
 import androidx.room.Room
 import com.github.arhor.journey.data.local.db.JourneyDatabase
-import com.github.arhor.journey.data.local.db.JourneyDatabaseMigrations
 import com.github.arhor.journey.data.local.db.RoomTransactionRunner
 import com.github.arhor.journey.data.local.db.dao.CollectedResourceSpawnDao
 import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
@@ -29,10 +28,7 @@ object DatabaseModule {
         @ApplicationContext context: Context,
     ): JourneyDatabase =
         Room.databaseBuilder(context, JourneyDatabase::class.java, "journey.db")
-            .addMigrations(
-                JourneyDatabaseMigrations.MIGRATION_5_7,
-                JourneyDatabaseMigrations.MIGRATION_6_7,
-            )
+            .addMigrations()
             .build()
 
     @Provides

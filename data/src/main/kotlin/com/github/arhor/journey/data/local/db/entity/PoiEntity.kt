@@ -6,8 +6,8 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "poi")
 data class PoiEntity(
-    @PrimaryKey
-    val id: String,
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
     val name: String,
     val description: String?,
     val category: String,
@@ -16,4 +16,3 @@ data class PoiEntity(
     @ColumnInfo(name = "radius_meters")
     val radiusMeters: Int,
 )
-

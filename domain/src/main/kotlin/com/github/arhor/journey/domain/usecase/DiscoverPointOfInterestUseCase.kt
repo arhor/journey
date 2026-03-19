@@ -10,7 +10,7 @@ class DiscoverPointOfInterestUseCase @Inject constructor(
     private val repository: ExplorationRepository,
     private val clock: Clock,
 ) {
-    suspend operator fun invoke(poiId: String) {
+    suspend operator fun invoke(poiId: Long) {
         repository.discoverPoi(
             poiId = poiId,
             discoveredAt = clock.instant(),

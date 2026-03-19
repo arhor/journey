@@ -12,8 +12,9 @@ class PoiMapperTest {
     @Test
     fun `toDomain should fallback to landmark when entity contains unknown category`() {
         // Given
+        val poiId = 1L
         val entity = PoiEntity(
-            id = "poi-1",
+            id = poiId,
             name = "Hidden Place",
             description = "Unknown category value",
             category = "UNKNOWN_CATEGORY",
@@ -26,7 +27,7 @@ class PoiMapperTest {
         val actual = entity.toDomain()
 
         // Then
-        actual.id shouldBe "poi-1"
+        actual.id shouldBe poiId
         actual.category shouldBe PoiCategory.LANDMARK
         actual.location shouldBe GeoPoint(lat = 52.2, lon = 21.0)
     }
@@ -34,8 +35,9 @@ class PoiMapperTest {
     @Test
     fun `toEntity should map all point of interest fields when domain model is provided`() {
         // Given
+        val poiId = 2L
         val point = PointOfInterest(
-            id = "poi-2",
+            id = poiId,
             name = "Stone Gate",
             description = "A mapped landmark",
             category = PoiCategory.SHRINE,
@@ -48,7 +50,7 @@ class PoiMapperTest {
 
         // Then
         actual shouldBe PoiEntity(
-            id = "poi-2",
+            id = poiId,
             name = "Stone Gate",
             description = "A mapped landmark",
             category = PoiCategory.SHRINE.name,

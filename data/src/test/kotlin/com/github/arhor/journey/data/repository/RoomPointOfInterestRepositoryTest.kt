@@ -15,11 +15,13 @@ class RoomPointOfInterestRepositoryTest {
     @Test
     fun `observeAll should map entities and fallback category when dao emits unknown value`() = runTest {
         // Given
+        val knownPoiId = 1L
+        val unknownPoiId = 2L
         val dao = FakePoiDao(
             countValue = 1,
             observedItems = listOf(
                 PoiEntity(
-                    id = "poi-1",
+                    id = knownPoiId,
                     name = "Known",
                     description = null,
                     category = "LANDMARK",
@@ -28,7 +30,7 @@ class RoomPointOfInterestRepositoryTest {
                     radiusMeters = 80,
                 ),
                 PoiEntity(
-                    id = "poi-2",
+                    id = unknownPoiId,
                     name = "Unknown",
                     description = "Falls back to LANDMARK",
                     category = "NOT_EXISTING",
@@ -45,18 +47,19 @@ class RoomPointOfInterestRepositoryTest {
 
         // Then
         actual shouldHaveSize 2
-        actual.first().id shouldBe "poi-1"
+        actual.first().id shouldBe knownPoiId
         actual.last().category.name shouldBe "LANDMARK"
     }
 
     @Test
     fun `getById should map dao entity when point of interest exists`() = runTest {
         // Given
+        val poiId = 3L
         val dao = FakePoiDao(
             countValue = 1,
             observedItems = listOf(
                 PoiEntity(
-                    id = "poi-1",
+                    id = poiId,
                     name = "Known",
                     description = "Known description",
                     category = "LANDMARK",
@@ -69,10 +72,10 @@ class RoomPointOfInterestRepositoryTest {
         val subject = RoomPointOfInterestRepository(dao = dao)
 
         // When
-        val actual = subject.getById("poi-1")
+        val actual = subject.getById(poiId)
 
         // Then
-        actual?.id shouldBe "poi-1"
+        actual?.id shouldBe poiId
         actual?.name shouldBe "Known"
     }
 
@@ -87,16 +90,18 @@ class RoomPointOfInterestRepositoryTest {
 
         override fun observeAll(): Flow<List<PoiEntity>> = flowOf(observedItems)
 
-        override suspend fun getById(id: String): PoiEntity? = observedItems.find { it.id == id }
+        override suspend fun getById(id: Long): PoiEntity? = observedItems.find { it.id == id }
 
         override suspend fun count(): Int = countValue
 
-        override suspend fun upsert(entity: PoiEntity) {
+        override suspend fun upsert(entity: PoiEntity): Long {
             upsertedEntity = entity
+            return entity.id
         }
 
-        override suspend fun upsertAll(entities: List<PoiEntity>) {
+        override suspend fun upsertAll(entities: List<PoiEntity>): LongArray {
             upsertedEntities = entities
+            return entities.map { it.id }.toLongArray()
         }
     }
 }

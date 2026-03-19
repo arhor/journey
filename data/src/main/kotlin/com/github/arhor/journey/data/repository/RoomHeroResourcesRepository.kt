@@ -28,7 +28,7 @@ class RoomHeroResourcesRepository @Inject constructor(
     ): Flow<Int> =
         dao.observeAmount(
             heroId = heroId,
-            resourceTypeId = resourceTypeId,
+            typeId = resourceTypeId,
         ).map { amount -> amount ?: 0 }
 
     override suspend fun getAmount(
@@ -37,7 +37,7 @@ class RoomHeroResourcesRepository @Inject constructor(
     ): Int =
         dao.getAmount(
             heroId = heroId,
-            resourceTypeId = resourceTypeId,
+            typeId = resourceTypeId,
         ) ?: 0
 
     override suspend fun setAmount(
@@ -52,7 +52,7 @@ class RoomHeroResourcesRepository @Inject constructor(
             dao.upsert(
                 HeroResourceEntity(
                     heroId = heroId,
-                    resourceTypeId = resourceTypeId,
+                    typeId = resourceTypeId,
                     amount = amount,
                     updatedAt = updatedAt,
                 ),
@@ -76,7 +76,7 @@ class RoomHeroResourcesRepository @Inject constructor(
         return transactionRunner.runInTransaction {
             dao.incrementAmount(
                 heroId = heroId,
-                resourceTypeId = resourceTypeId,
+                typeId = resourceTypeId,
                 amountDelta = amount,
                 updatedAt = updatedAt,
             )
@@ -99,7 +99,7 @@ class RoomHeroResourcesRepository @Inject constructor(
         return transactionRunner.runInTransaction {
             val updatedRows = dao.decrementAmountIfEnough(
                 heroId = heroId,
-                resourceTypeId = resourceTypeId,
+                typeId = resourceTypeId,
                 amountDelta = amount,
                 updatedAt = updatedAt,
             )
@@ -122,7 +122,7 @@ class RoomHeroResourcesRepository @Inject constructor(
         requireNotNull(
             dao.getById(
                 heroId = heroId,
-                resourceTypeId = resourceTypeId,
+                typeId = resourceTypeId,
             ),
         ) {
             "Hero resource must exist after mutation for heroId=$heroId resourceTypeId=$resourceTypeId."

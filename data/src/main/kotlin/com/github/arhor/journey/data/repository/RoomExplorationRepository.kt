@@ -26,7 +26,7 @@ class RoomExplorationRepository @Inject constructor(
             }
 
     override suspend fun discoverPoi(
-        poiId: String,
+        poiId: Long,
         discoveredAt: Instant,
     ) {
         dao.insert(

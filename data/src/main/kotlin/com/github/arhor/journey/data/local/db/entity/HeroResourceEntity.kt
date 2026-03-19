@@ -7,21 +7,22 @@ import java.time.Instant
 
 @Entity(
     tableName = "hero_resources",
-    primaryKeys = ["hero_id", "resource_type_id"],
+    primaryKeys = ["hero_id", "type_id"],
     foreignKeys = [
         ForeignKey(
             entity = HeroEntity::class,
             parentColumns = ["id"],
             childColumns = ["hero_id"],
             onDelete = ForeignKey.CASCADE,
+            onUpdate = ForeignKey.CASCADE,
         ),
     ],
 )
 data class HeroResourceEntity(
     @ColumnInfo(name = "hero_id")
     val heroId: String,
-    @ColumnInfo(name = "resource_type_id")
-    val resourceTypeId: String,
+    @ColumnInfo(name = "type_id")
+    val typeId: String,
     val amount: Int,
     @ColumnInfo(name = "updated_at")
     val updatedAt: Instant,

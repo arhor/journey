@@ -18,6 +18,7 @@ class DiscoverPointOfInterestUseCaseTest {
     fun `invoke should pass poi id and clock instant to repository`() = runTest {
         // Given
         val now = Instant.parse("2026-03-05T09:30:00Z")
+        val poiId = 1L
         val repository = FakeExplorationRepository()
         val subject = DiscoverPointOfInterestUseCase(
             repository = repository,
@@ -25,16 +26,17 @@ class DiscoverPointOfInterestUseCaseTest {
         )
 
         // When
-        subject("poi-7")
+        subject(poiId)
 
         // Then
-        repository.discoveries shouldBe listOf(DiscoveredPoi(poiId = "poi-7", discoveredAt = now))
+        repository.discoveries shouldBe listOf(DiscoveredPoi(poiId = poiId, discoveredAt = now))
     }
 
     @Test
     fun `invoke should propagate repository failure when discover operation throws`() = runTest {
         // Given
         val expectedError = IllegalStateException("db write failed")
+        val poiId = 2L
         val repository = FakeExplorationRepository(error = expectedError)
         val subject = DiscoverPointOfInterestUseCase(
             repository = repository,
@@ -42,7 +44,7 @@ class DiscoverPointOfInterestUseCaseTest {
         )
 
         // When
-        val result = runCatching { subject("poi-9") }
+        val result = runCatching { subject(poiId) }
 
         // Then
         result.exceptionOrNull() shouldBe expectedError
@@ -55,7 +57,7 @@ class DiscoverPointOfInterestUseCaseTest {
 
         override fun observeProgress(): Flow<ExplorationProgress> = emptyFlow()
 
-        override suspend fun discoverPoi(poiId: String, discoveredAt: Instant) {
+        override suspend fun discoverPoi(poiId: Long, discoveredAt: Instant) {
             error?.let { throw it }
             discoveries += DiscoveredPoi(poiId = poiId, discoveredAt = discoveredAt)
         }

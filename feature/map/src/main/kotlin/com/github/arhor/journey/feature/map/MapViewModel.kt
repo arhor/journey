@@ -525,6 +525,10 @@ class MapViewModel @Inject constructor(
 
     private suspend fun onObjectTapped(objectId: String) {
         val contentState = uiState.value as? MapUiState.Content ?: return
+        val poiId = objectId.toLongOrNull() ?: run {
+            emitEffect(MapEffect.ShowMessage(OBJECT_DISCOVERY_FAILED_MESSAGE))
+            return
+        }
 
         try {
             contentState.visibleObjects
@@ -542,7 +546,7 @@ class MapViewModel @Inject constructor(
                     }
                 }
 
-            discoverPointOfInterest(objectId)
+            discoverPointOfInterest(poiId)
             emitEffect(MapEffect.OpenObjectDetails(objectId))
         } catch (e: Throwable) {
             emitEffect(MapEffect.ShowMessage(e.message ?: OBJECT_DISCOVERY_FAILED_MESSAGE))
@@ -573,7 +577,7 @@ class MapViewModel @Inject constructor(
 
     private fun PointOfInterest.toUiModel(isDiscovered: Boolean): MapObjectUiModel =
         MapObjectUiModel(
-            id = id,
+            id = id.toString(),
             title = name,
             description = description,
             position = location.toLatLng(),

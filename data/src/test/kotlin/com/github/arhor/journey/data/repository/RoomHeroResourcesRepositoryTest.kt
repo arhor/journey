@@ -27,19 +27,19 @@ class RoomHeroResourcesRepositoryTest {
             initialEntities = listOf(
                 HeroResourceEntity(
                     heroId = "player",
-                    resourceTypeId = "stone",
+                    typeId = "stone",
                     amount = 0,
                     updatedAt = updatedAt,
                 ),
                 HeroResourceEntity(
                     heroId = "player",
-                    resourceTypeId = "wood",
+                    typeId = "wood",
                     amount = 2,
                     updatedAt = updatedAt,
                 ),
                 HeroResourceEntity(
                     heroId = "other",
-                    resourceTypeId = "wood",
+                    typeId = "wood",
                     amount = 7,
                     updatedAt = updatedAt,
                 ),
@@ -74,7 +74,7 @@ class RoomHeroResourcesRepositoryTest {
             initialEntities = listOf(
                 HeroResourceEntity(
                     heroId = "player",
-                    resourceTypeId = resourceTypeId,
+                    typeId = resourceTypeId,
                     amount = 1,
                     updatedAt = initialUpdatedAt,
                 ),
@@ -116,7 +116,7 @@ class RoomHeroResourcesRepositoryTest {
             initialEntities = listOf(
                 HeroResourceEntity(
                     heroId = "player",
-                    resourceTypeId = resourceTypeId,
+                    typeId = resourceTypeId,
                     amount = 4,
                     updatedAt = initialUpdatedAt,
                 ),
@@ -154,7 +154,7 @@ class RoomHeroResourcesRepositoryTest {
             initialEntities = listOf(
                 HeroResourceEntity(
                     heroId = "player",
-                    resourceTypeId = resourceTypeId,
+                    typeId = resourceTypeId,
                     amount = 2,
                     updatedAt = Instant.parse("2026-03-10T09:00:00Z"),
                 ),
@@ -186,51 +186,51 @@ class RoomHeroResourcesRepositoryTest {
         initialEntities: List<HeroResourceEntity>,
     ) : HeroResourceDao {
         private val entities = MutableStateFlow(
-            initialEntities.associateBy { Key(heroId = it.heroId, resourceTypeId = it.resourceTypeId) },
+            initialEntities.associateBy { Key(heroId = it.heroId, resourceTypeId = it.typeId) },
         )
 
         override fun observeAll(heroId: String): Flow<List<HeroResourceEntity>> =
             entities.map { map ->
                 map.values
                     .filter { it.heroId == heroId && it.amount > 0 }
-                    .sortedBy { it.resourceTypeId }
+                    .sortedBy { it.typeId }
             }
 
         override fun observeAmount(
             heroId: String,
-            resourceTypeId: String,
+            typeId: String,
         ): Flow<Int?> =
-            entities.map { map -> map[Key(heroId = heroId, resourceTypeId = resourceTypeId)]?.amount }
+            entities.map { map -> map[Key(heroId = heroId, resourceTypeId = typeId)]?.amount }
 
         override suspend fun getAmount(
             heroId: String,
-            resourceTypeId: String,
+            typeId: String,
         ): Int? =
-            entities.value[Key(heroId = heroId, resourceTypeId = resourceTypeId)]?.amount
+            entities.value[Key(heroId = heroId, resourceTypeId = typeId)]?.amount
 
         override suspend fun getById(
             heroId: String,
-            resourceTypeId: String,
+            typeId: String,
         ): HeroResourceEntity? =
-            entities.value[Key(heroId = heroId, resourceTypeId = resourceTypeId)]
+            entities.value[Key(heroId = heroId, resourceTypeId = typeId)]
 
         override suspend fun upsert(entity: HeroResourceEntity) {
             entities.value = entities.value.toMutableMap().apply {
-                this[Key(heroId = entity.heroId, resourceTypeId = entity.resourceTypeId)] = entity
+                this[Key(heroId = entity.heroId, resourceTypeId = entity.typeId)] = entity
             }
         }
 
         override suspend fun incrementAmount(
             heroId: String,
-            resourceTypeId: String,
+            typeId: String,
             amountDelta: Int,
             updatedAt: Instant,
         ) {
-            val key = Key(heroId = heroId, resourceTypeId = resourceTypeId)
+            val key = Key(heroId = heroId, resourceTypeId = typeId)
             val existing = entities.value[key]
             val next = HeroResourceEntity(
                 heroId = heroId,
-                resourceTypeId = resourceTypeId,
+                typeId = typeId,
                 amount = (existing?.amount ?: 0) + amountDelta,
                 updatedAt = updatedAt,
             )
@@ -239,11 +239,11 @@ class RoomHeroResourcesRepositoryTest {
 
         override suspend fun decrementAmountIfEnough(
             heroId: String,
-            resourceTypeId: String,
+            typeId: String,
             amountDelta: Int,
             updatedAt: Instant,
         ): Int {
-            val key = Key(heroId = heroId, resourceTypeId = resourceTypeId)
+            val key = Key(heroId = heroId, resourceTypeId = typeId)
             val existing = entities.value[key] ?: return 0
             if (existing.amount < amountDelta) {
                 return 0

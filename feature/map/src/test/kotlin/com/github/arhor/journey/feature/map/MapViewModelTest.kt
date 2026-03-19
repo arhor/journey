@@ -7,8 +7,8 @@ import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTilePrototype
-import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTileRange
+import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
@@ -65,15 +65,15 @@ class MapViewModelTest {
 
         // Given
         val pointsOfInterest = listOf(
-            pointOfInterest(id = "poi-1", lat = 49.0, lon = 24.0),
-            pointOfInterest(id = "poi-2", lat = 49.1, lon = 24.1),
+            pointOfInterest(id = FIRST_POI_ID, lat = 49.0, lon = 24.0),
+            pointOfInterest(id = SECOND_POI_ID, lat = 49.1, lon = 24.1),
         )
         val fixture = createFixture(
             pointsOfInterest = pointsOfInterest,
             explorationProgress = ExplorationProgress(
                 discovered = setOf(
                     DiscoveredPoi(
-                        poiId = "poi-1",
+                        poiId = FIRST_POI_ID,
                         discoveredAt = Instant.parse("2026-03-01T12:00:00Z"),
                     ),
                 ),
@@ -87,8 +87,8 @@ class MapViewModelTest {
             // Then
             actual.selectedStyle shouldBe fixture.mapStyle
             actual.visibleObjects.map { it.id to it.isDiscovered }.toMap() shouldBe mapOf(
-                "poi-1" to true,
-                "poi-2" to false,
+                FIRST_POI_ID.toString() to true,
+                SECOND_POI_ID.toString() to false,
             )
         } finally {
             tearDownMainDispatcher()
@@ -619,7 +619,7 @@ class MapViewModelTest {
                 lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
             ),
             pointsOfInterest = listOf(
-                pointOfInterest(id = "poi-1", lat = 51.1, lon = 17.03),
+                pointOfInterest(id = FIRST_POI_ID, lat = 51.1, lon = 17.03),
             ),
         )
 
@@ -629,7 +629,7 @@ class MapViewModelTest {
             runCurrent()
 
             // When
-            fixture.viewModel.dispatch(MapIntent.ObjectTapped(objectId = "poi-1"))
+            fixture.viewModel.dispatch(MapIntent.ObjectTapped(objectId = FIRST_POI_ID.toString()))
             advanceUntilIdle()
             fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
                 lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
@@ -637,8 +637,8 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             // Then
-            effectDeferred.await() shouldBe MapEffect.OpenObjectDetails(objectId = "poi-1")
-            coVerify(exactly = 1) { fixture.discoverPointOfInterest.invoke("poi-1") }
+            effectDeferred.await() shouldBe MapEffect.OpenObjectDetails(objectId = FIRST_POI_ID.toString())
+            coVerify(exactly = 1) { fixture.discoverPointOfInterest.invoke(FIRST_POI_ID) }
 
             val actual = fixture.viewModel.awaitContent {
                 it.cameraPosition?.target == LatLng(latitude = 51.1, longitude = 17.03)
@@ -702,7 +702,7 @@ class MapViewModelTest {
     private fun createFixture(
         mapStyleOutput: Output<MapStyle?, DomainError>? = null,
         pointsOfInterest: List<PointOfInterest> = listOf(
-            pointOfInterest(id = "poi-1", lat = 50.45, lon = 30.52),
+            pointOfInterest(id = FIRST_POI_ID, lat = 50.45, lon = 30.52),
         ),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<ExplorationTile> = emptySet(),
@@ -774,7 +774,7 @@ class MapViewModelTest {
     }
 
     private fun pointOfInterest(
-        id: String,
+        id: Long,
         lat: Double,
         lon: Double,
     ): PointOfInterest = PointOfInterest(
@@ -803,5 +803,7 @@ class MapViewModelTest {
 
     private companion object {
         const val VIEWPORT_BOUNDS_EPSILON = 1e-6
+        const val FIRST_POI_ID = 1L
+        const val SECOND_POI_ID = 2L
     }
 }

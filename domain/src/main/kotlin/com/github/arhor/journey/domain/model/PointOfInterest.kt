@@ -6,7 +6,7 @@ package com.github.arhor.journey.domain.model
  * This model intentionally contains only domain data; map SDK / rendering details belong to the UI layer.
  */
 data class PointOfInterest(
-    val id: String,
+    val id: Long = 0,
     val name: String,
     val description: String?,
     val category: PoiCategory,

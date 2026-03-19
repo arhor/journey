@@ -24,10 +24,10 @@ import java.time.Instant
 data class CollectedResourceSpawnEntity(
     @ColumnInfo(name = "hero_id")
     val heroId: String,
+    @ColumnInfo(name = "type_id")
+    val typeId: String,
     @ColumnInfo(name = "spawn_id")
     val spawnId: String,
-    @ColumnInfo(name = "resource_type_id")
-    val resourceTypeId: String,
     @ColumnInfo(name = "collected_at")
     val collectedAt: Instant,
 )

@@ -61,13 +61,13 @@ class HeroResourceDaoTest {
         // When
         heroResourceDao.incrementAmount(
             heroId = "player",
-            resourceTypeId = "wood",
+            typeId = "wood",
             amountDelta = 1,
             updatedAt = Instant.ofEpochMilli(1_700_000_100_000L),
         )
         heroResourceDao.incrementAmount(
             heroId = "player",
-            resourceTypeId = "wood",
+            typeId = "wood",
             amountDelta = 2,
             updatedAt = Instant.ofEpochMilli(1_700_000_200_000L),
         )
@@ -75,12 +75,12 @@ class HeroResourceDaoTest {
         // Then
         heroResourceDao.getAmount(
             heroId = "player",
-            resourceTypeId = "wood",
+            typeId = "wood",
         ) shouldBe 3
         heroResourceDao.observeAll(heroId = "player").first() shouldBe listOf(
             HeroResourceEntity(
                 heroId = "player",
-                resourceTypeId = "wood",
+                typeId = "wood",
                 amount = 3,
                 updatedAt = Instant.ofEpochMilli(1_700_000_200_000L),
             ),
@@ -93,7 +93,7 @@ class HeroResourceDaoTest {
         heroResourceDao.upsert(
             HeroResourceEntity(
                 heroId = "player",
-                resourceTypeId = "ore",
+                typeId = "ore",
                 amount = 2,
                 updatedAt = Instant.ofEpochMilli(1_700_000_100_000L),
             ),
@@ -102,13 +102,13 @@ class HeroResourceDaoTest {
         // When
         val success = heroResourceDao.decrementAmountIfEnough(
             heroId = "player",
-            resourceTypeId = "ore",
+            typeId = "ore",
             amountDelta = 1,
             updatedAt = Instant.ofEpochMilli(1_700_000_200_000L),
         )
         val failure = heroResourceDao.decrementAmountIfEnough(
             heroId = "player",
-            resourceTypeId = "ore",
+            typeId = "ore",
             amountDelta = 2,
             updatedAt = Instant.ofEpochMilli(1_700_000_300_000L),
         )
@@ -118,7 +118,7 @@ class HeroResourceDaoTest {
         failure shouldBe 0
         heroResourceDao.getAmount(
             heroId = "player",
-            resourceTypeId = "ore",
+            typeId = "ore",
         ) shouldBe 1
     }
 }

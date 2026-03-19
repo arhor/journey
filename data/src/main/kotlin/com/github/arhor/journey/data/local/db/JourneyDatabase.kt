@@ -25,10 +25,14 @@ import com.github.arhor.journey.data.local.db.entity.PoiEntity
         DiscoveredPoiEntity::class,
         ExploredTileEntity::class,
     ],
-    version = 7,
+    version = 1,
     exportSchema = false,
 )
-@TypeConverters(InstantTypeConverter::class)
+@TypeConverters(
+    value = [
+        InstantTypeConverter::class,
+    ]
+)
 abstract class JourneyDatabase : RoomDatabase() {
 
     abstract fun heroDao(): HeroDao

@@ -19,7 +19,7 @@ import java.time.Instant
 )
 data class DiscoveredPoiEntity(
     @ColumnInfo(name = "poi_id")
-    val poiId: String,
+    val poiId: Long = 0,
     @ColumnInfo(name = "discovered_at")
     val discoveredAt: Instant,
 )

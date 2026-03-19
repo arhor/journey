@@ -79,7 +79,7 @@ class CollectedResourceSpawnDaoTest {
         val firstClaim = CollectedResourceSpawnEntity(
             heroId = "player",
             spawnId = "spawn-1",
-            resourceTypeId = "wood",
+            typeId = "wood",
             collectedAt = Instant.ofEpochMilli(1_700_000_100_000L),
         )
 
@@ -87,7 +87,7 @@ class CollectedResourceSpawnDaoTest {
         val inserted = collectedResourceSpawnDao.insert(firstClaim)
         val duplicate = collectedResourceSpawnDao.insert(
             firstClaim.copy(
-                resourceTypeId = "ore",
+                typeId = "ore",
                 collectedAt = Instant.ofEpochMilli(1_700_000_200_000L),
             ),
         )

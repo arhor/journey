@@ -23,7 +23,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
                 CollectedResourceSpawnEntity(
                     heroId = "player",
                     spawnId = "spawn-2",
-                    resourceTypeId = "stone",
+                    typeId = "stone",
                     collectedAt = collectedAt,
                 ),
             ),
@@ -38,7 +38,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
             CollectedResourceSpawn(
                 heroId = "player",
                 spawnId = "spawn-2",
-                resourceTypeId = "stone",
+                typeId = "stone",
                 collectedAt = collectedAt,
             ),
         )
@@ -53,7 +53,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
                 CollectedResourceSpawnEntity(
                     heroId = "player",
                     spawnId = "spawn-7",
-                    resourceTypeId = "wood",
+                    typeId = "wood",
                     collectedAt = collectedAt,
                 ),
             ),
@@ -94,7 +94,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
             CollectedResourceSpawn(
                 heroId = "player",
                 spawnId = "spawn-8",
-                resourceTypeId = "ore",
+                typeId = "ore",
                 collectedAt = collectedAt,
             ),
         )
