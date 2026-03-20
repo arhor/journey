@@ -254,7 +254,7 @@ internal fun MapContent(
 
                     if (state.debug.isFogOfWarOverlayEnabled) {
                         FogOfWarRendererAdapter(
-                            fogRanges = state.fogOfWar.fogRanges,
+                            fogRenderData = state.fogOfWar.renderData,
                         )
                     }
 
@@ -363,6 +363,7 @@ private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 private val USER_LOCATION_TIMEOUT = 5.seconds
 private val USER_LOCATION_RECENTER_ANIMATION_DURATION = 600.milliseconds
+
 @SuppressLint("MissingPermission")
 @Composable
 private fun rememberUserLocationStateInternal(ctx: Context): UserLocationState {

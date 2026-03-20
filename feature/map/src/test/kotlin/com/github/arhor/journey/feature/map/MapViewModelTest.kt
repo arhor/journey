@@ -35,6 +35,8 @@ import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUse
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.renderer.FogOfWarRenderDataFactory
+import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -45,9 +47,13 @@ import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -62,40 +68,41 @@ import java.time.Instant
 class MapViewModelTest {
 
     @Test
-    fun `uiState should map discovery flags when exploration progress contains discovered points of interest`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    fun `uiState should map discovery flags when exploration progress contains discovered points of interest`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
-        // Given
-        val pointsOfInterest = listOf(
-            pointOfInterest(id = FIRST_POI_ID, lat = 49.0, lon = 24.0),
-            pointOfInterest(id = SECOND_POI_ID, lat = 49.1, lon = 24.1),
-        )
-        val fixture = createFixture(
-            pointsOfInterest = pointsOfInterest,
-            explorationProgress = ExplorationProgress(
-                discovered = setOf(
-                    DiscoveredPoi(
-                        poiId = FIRST_POI_ID,
-                        discoveredAt = Instant.parse("2026-03-01T12:00:00Z"),
+            // Given
+            val pointsOfInterest = listOf(
+                pointOfInterest(id = FIRST_POI_ID, lat = 49.0, lon = 24.0),
+                pointOfInterest(id = SECOND_POI_ID, lat = 49.1, lon = 24.1),
+            )
+            val fixture = createFixture(
+                pointsOfInterest = pointsOfInterest,
+                explorationProgress = ExplorationProgress(
+                    discovered = setOf(
+                        DiscoveredPoi(
+                            poiId = FIRST_POI_ID,
+                            discoveredAt = Instant.parse("2026-03-01T12:00:00Z"),
+                        ),
                     ),
                 ),
-            ),
-        )
-
-        try {
-            // When
-            val actual = fixture.viewModel.awaitContent()
-
-            // Then
-            actual.selectedStyle shouldBe fixture.mapStyle
-            actual.visibleObjects.map { it.id to it.isDiscovered }.toMap() shouldBe mapOf(
-                "${POI_ID_PREFIX}:$FIRST_POI_ID" to true,
-                "${POI_ID_PREFIX}:$SECOND_POI_ID" to false,
             )
-        } finally {
-            tearDownMainDispatcher()
+
+            try {
+                // When
+                val actual = fixture.viewModel.awaitContent()
+
+                // Then
+                actual.selectedStyle shouldBe fixture.mapStyle
+                actual.visibleObjects.map { it.id to it.isDiscovered }.toMap() shouldBe mapOf(
+                    "${POI_ID_PREFIX}:$FIRST_POI_ID" to true,
+                    "${POI_ID_PREFIX}:$SECOND_POI_ID" to false,
+                )
+            } finally {
+                tearDownMainDispatcher()
+            }
         }
-    }
 
     @Test
     fun `uiState should include resource spawns alongside points of interest`() = runTest {
@@ -505,55 +512,56 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should reenable follow mode and increment recenter token when location permission is granted after recenter click`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    fun `dispatch should reenable follow mode and increment recenter token when location permission is granted after recenter click`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
-        // Given
-        val fixture = createFixture(
-            trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
-            ),
-            startTrackingResult = StartExplorationTrackingSessionResult.AlreadyActive,
-        )
-        val manualCameraPosition = CameraPositionState(
-            target = LatLng(latitude = 40.7580, longitude = -73.9855),
-            zoom = 15.0,
-        )
-
-        try {
-            fixture.viewModel.awaitContent {
-                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
-            }
-            fixture.viewModel.dispatch(
-                MapIntent.CameraSettled(
-                    position = manualCameraPosition,
-                    origin = CameraUpdateOrigin.USER,
+            // Given
+            val fixture = createFixture(
+                trackingSession = ExplorationTrackingSession(
+                    lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
                 ),
+                startTrackingResult = StartExplorationTrackingSessionResult.AlreadyActive,
             )
-            advanceUntilIdle()
-            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
-                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+            val manualCameraPosition = CameraPositionState(
+                target = LatLng(latitude = 40.7580, longitude = -73.9855),
+                zoom = 15.0,
             )
-            advanceUntilIdle()
-            fixture.viewModel.awaitContent { it.cameraPosition == manualCameraPosition }
 
-            // When
-            fixture.viewModel.dispatch(MapIntent.RecenterClicked)
-            fixture.viewModel.dispatch(MapIntent.LocationPermissionResult(isGranted = true))
-            advanceUntilIdle()
+            try {
+                fixture.viewModel.awaitContent {
+                    it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+                }
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraSettled(
+                        position = manualCameraPosition,
+                        origin = CameraUpdateOrigin.USER,
+                    ),
+                )
+                advanceUntilIdle()
+                fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                    lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+                )
+                advanceUntilIdle()
+                fixture.viewModel.awaitContent { it.cameraPosition == manualCameraPosition }
 
-            // Then
-            val actual = fixture.viewModel.awaitContent {
-                it.recenterRequestToken == 1 &&
-                    it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
+                // When
+                fixture.viewModel.dispatch(MapIntent.RecenterClicked)
+                fixture.viewModel.dispatch(MapIntent.LocationPermissionResult(isGranted = true))
+                advanceUntilIdle()
+
+                // Then
+                val actual = fixture.viewModel.awaitContent {
+                    it.recenterRequestToken == 1 &&
+                        it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
+                }
+                actual.recenterRequestToken shouldBe 1
+                actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
+                actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+            } finally {
+                tearDownMainDispatcher()
             }
-            actual.recenterRequestToken shouldBe 1
-            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
-            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
-        } finally {
-            tearDownMainDispatcher()
         }
-    }
 
     @Test
     fun `dispatch should emit denial message when location permission is denied after recenter click`() = runTest {
@@ -621,6 +629,80 @@ class MapViewModelTest {
             val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 4L }
             actual.fogOfWar.visibleTileCount shouldBe 4L
             actual.fogOfWar.exploredVisibleTileCount shouldBe 1
+            actual.fogOfWar.renderData.shouldNotBeNull()
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `uiState should not emit stale fog state when canonical zoom changes before new fog tiles arrive`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture(
+            observeExploredTilesFlowFactory = { range ->
+                when (range.zoom) {
+                    ExplorationTilePrototype.CANONICAL_ZOOM -> MutableStateFlow(emptySet())
+                    18 -> flow {
+                        delay(1_000L)
+                        emit(emptySet())
+                    }
+
+                    else -> MutableStateFlow(emptySet())
+                }
+            },
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(initialVisibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            val emissions = mutableListOf<MapUiState.Content>()
+            val collectJob = backgroundScope.launch {
+                fixture.viewModel.uiState
+                    .mapNotNull { it as? MapUiState.Content }
+                    .collect { emissions += it }
+            }
+
+            try {
+                runCurrent()
+
+                // When
+                fixture.viewModel.dispatch(MapIntent.CanonicalZoomChanged(value = 18))
+                runCurrent()
+                advanceTimeBy(999L)
+                runCurrent()
+
+                // Then
+                emissions.none { content ->
+                    content.debug.canonicalZoom == 18 &&
+                        content.fogOfWar.canonicalZoom != 18
+                } shouldBe true
+                emissions.none { content ->
+                    content.debug.canonicalZoom == 18
+                } shouldBe true
+
+                advanceTimeBy(1L)
+                advanceUntilIdle()
+
+                val actual = fixture.viewModel.awaitContent { it.debug.canonicalZoom == 18 }
+                actual.fogOfWar.canonicalZoom shouldBe 18
+            } finally {
+                collectJob.cancel()
+            }
         } finally {
             tearDownMainDispatcher()
         }
@@ -869,6 +951,7 @@ class MapViewModelTest {
         resourceSpawns: List<ResourceSpawn> = emptyList(),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<ExplorationTile> = emptySet(),
+        observeExploredTilesFlowFactory: ((ExplorationTileRange) -> Flow<Set<ExplorationTile>>)? = null,
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: StartExplorationTrackingSessionResult =
@@ -898,7 +981,10 @@ class MapViewModelTest {
         every { observePointsOfInterest.invoke() } returns MutableStateFlow(pointsOfInterest)
         every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(resourceSpawns)
         every { observeExplorationProgress.invoke() } returns MutableStateFlow(explorationProgress)
-        every { observeExploredTiles.invoke(any()) } returns MutableStateFlow(exploredTiles)
+        every { observeExploredTiles.invoke(any()) } answers {
+            observeExploredTilesFlowFactory?.invoke(arg(0))
+                ?: MutableStateFlow(exploredTiles)
+        }
         every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
             mapStyleOutput ?: Output.Success(mapStyle),
         )
@@ -924,6 +1010,7 @@ class MapViewModelTest {
                 getExplorationTileRuntimeConfig = getExplorationTileRuntimeConfig,
                 setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
                 setExplorationTileRevealRadius = setExplorationTileRevealRadius,
+                fogOfWarRenderDataFactory = FogOfWarRenderDataFactory(),
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 stopExplorationTrackingSession = stopTrackingSession,
