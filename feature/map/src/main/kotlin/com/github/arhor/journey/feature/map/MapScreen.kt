@@ -225,6 +225,7 @@ internal fun MapContent(
                         MapStyle.Type.REMOTE -> BaseStyle.Uri(style.value)
                     },
                     cameraState = cameraState,
+                    zoomRange = CAMERA_ZOOM_BOUNDS,
                     styleState = styleState,
                     options = MapOptions(
                         renderOptions = state.debug.renderMode.toRenderOptions(),
@@ -363,6 +364,7 @@ private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 private val USER_LOCATION_TIMEOUT = 5.seconds
 private val USER_LOCATION_RECENTER_ANIMATION_DURATION = 600.milliseconds
+private val CAMERA_ZOOM_BOUNDS = 14f..20f
 
 @SuppressLint("MissingPermission")
 @Composable
