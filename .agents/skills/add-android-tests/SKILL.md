@@ -1,5 +1,5 @@
 ---
-name: add-compose-tests
+name: add-android-tests
 description: Add or review tests for Jetpack Compose UI, ViewModels, and UseCases in this repository. Use when asked to add tests for new features, bug fixes, refactors, or weakly covered code. Do not use for pure UI polish, architecture-only review, or performance-only investigation.
 ---
 
