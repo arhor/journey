@@ -28,16 +28,14 @@ dependencyResolutionManagement {
 
 rootProject.name = "journey"
 
-include(":app")
-
-include(":data")
-
-include(":domain")
-
-include(":core:common")
-include(":core:navigation")
-include(":core:ui")
-
-include(":feature:hero")
-include(":feature:map")
-include(":feature:settings")
+include(
+    ":app",
+    ":data",
+    ":domain",
+    ":core:common",
+    ":core:navigation",
+    ":core:ui",
+    ":feature:hero",
+    ":feature:map",
+    ":feature:settings",
+)
