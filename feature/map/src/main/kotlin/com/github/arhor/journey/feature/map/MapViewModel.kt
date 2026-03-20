@@ -82,6 +82,7 @@ private data class State(
     val fogTileRange: ExplorationTileRange? = null,
     val visibleTileCount: Long = 0,
     val isFogSuppressedByVisibleTileLimit: Boolean = false,
+    val fogMinimumZoom: Double? = null,
     val failureMessage: String? = null,
 )
 
@@ -329,13 +330,24 @@ class MapViewModel @Inject constructor(
         _state.update { state ->
             val updatedState = state.copy(canonicalZoom = canonicalZoom)
             val visibleBounds = state.visibleBounds ?: return@update updatedState
+            val fogViewport = fogViewport(
+                visibleBounds = visibleBounds,
+                canonicalZoom = canonicalZoom,
+            )
+            val fogMinimumZoom = when {
+                fogViewport.isSuppressedByVisibleTileLimit && !state.isFogSuppressedByVisibleTileLimit ->
+                    state.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM
+
+                fogViewport.isSuppressedByVisibleTileLimit ->
+                    state.fogMinimumZoom ?: state.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM
+
+                else -> null
+            }
 
             updatedState.withFogViewport(
                 visibleBounds = visibleBounds,
-                fogViewport = fogViewport(
-                    visibleBounds = visibleBounds,
-                    canonicalZoom = canonicalZoom,
-                ),
+                fogViewport = fogViewport,
+                fogMinimumZoom = fogMinimumZoom,
             )
         }
     }
@@ -415,9 +427,10 @@ class MapViewModel @Inject constructor(
                 } else {
                     state.cameraUpdateOrigin
                 }
+                val clampedCameraPosition = resolvedCameraPosition?.coerceAtLeast(state.fogMinimumZoom)
 
                 MapUiState.Content(
-                    cameraPosition = resolvedCameraPosition,
+                    cameraPosition = clampedCameraPosition,
                     cameraUpdateOrigin = resolvedCameraUpdateOrigin,
                     recenterRequestToken = state.recenterRequestToken,
                     userLocation = userLocation,
@@ -430,7 +443,7 @@ class MapViewModel @Inject constructor(
                         explorationProgress = explorationProgress,
                         resourceSpawns = resourceSpawns,
                     ),
-                    fogOfWar = fogOfWar,
+                    fogOfWar = fogOfWar.copy(minimumZoom = state.fogMinimumZoom),
                     debug = MapDebugUiState(
                         isSheetVisible = state.isDebugControlsSheetVisible,
                         enabledInfoItems = state.enabledDebugInfoItems,
@@ -506,10 +519,13 @@ class MapViewModel @Inject constructor(
 
     private fun onMapTapped(intent: MapIntent.MapTapped) {
         _state.update {
+            val zoom = (it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM)
+                .coerceAtLeast(it.fogMinimumZoom)
+
             it.copy(
                 cameraPosition = CameraPositionState(
                     target = intent.target,
-                    zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
+                    zoom = zoom,
                 ),
                 cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
                 isFollowingUserLocation = false,
@@ -532,20 +548,24 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
-        updateFogViewport(intent.visibleBounds)
+        updateFogViewport(
+            visibleBounds = intent.visibleBounds,
+            cameraZoom = intent.zoom,
+        )
     }
 
     private fun onCameraGestureStarted(intent: MapIntent.CameraGestureStarted) {
         _state.update { state ->
+            val position = intent.position.coerceAtLeast(state.fogMinimumZoom)
             if (
-                state.cameraPosition == intent.position &&
+                state.cameraPosition == position &&
                 state.cameraUpdateOrigin == CameraUpdateOrigin.USER &&
                 !state.isFollowingUserLocation
             ) {
                 state
             } else {
                 state.copy(
-                    cameraPosition = intent.position,
+                    cameraPosition = position,
                     cameraUpdateOrigin = CameraUpdateOrigin.USER,
                     isFollowingUserLocation = false,
                 )
@@ -555,8 +575,9 @@ class MapViewModel @Inject constructor(
 
     private fun onCameraSettled(intent: MapIntent.CameraSettled) {
         _state.update {
+            val position = intent.position.coerceAtLeast(it.fogMinimumZoom)
             it.copy(
-                cameraPosition = intent.position,
+                cameraPosition = position,
                 cameraUpdateOrigin = intent.origin,
                 isFollowingUserLocation = if (intent.origin == CameraUpdateOrigin.USER) {
                     false
@@ -567,16 +588,29 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun updateFogViewport(visibleBounds: GeoBounds) {
-        val fogViewport = fogViewport(
-            visibleBounds = visibleBounds,
-            canonicalZoom = _state.value.canonicalZoom,
-        )
+    private fun updateFogViewport(
+        visibleBounds: GeoBounds,
+        cameraZoom: Double,
+    ) {
+        _state.update { state ->
+            val fogViewport = fogViewport(
+                visibleBounds = visibleBounds,
+                canonicalZoom = state.canonicalZoom,
+            )
+            val fogMinimumZoom = when {
+                fogViewport.isSuppressedByVisibleTileLimit && !state.isFogSuppressedByVisibleTileLimit ->
+                    cameraZoom
 
-        _state.update {
-            it.withFogViewport(
+                fogViewport.isSuppressedByVisibleTileLimit ->
+                    state.fogMinimumZoom ?: cameraZoom
+
+                else -> null
+            }
+
+            state.withFogViewport(
                 visibleBounds = visibleBounds,
                 fogViewport = fogViewport,
+                fogMinimumZoom = fogMinimumZoom,
             )
         }
     }
@@ -616,10 +650,13 @@ class MapViewModel @Inject constructor(
 
         try {
             _state.update {
+                val zoom = (it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM)
+                    .coerceAtLeast(it.fogMinimumZoom)
+
                 it.copy(
                     cameraPosition = CameraPositionState(
                         target = objectUiModel.position,
-                        zoom = it.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
+                        zoom = zoom,
                     ),
                     cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
                     isFollowingUserLocation = false,
@@ -790,18 +827,23 @@ class MapViewModel @Inject constructor(
         val rawId: String,
     )
 
-    private fun State.matches(fogViewport: FogViewport): Boolean {
+    private fun State.matches(
+        fogViewport: FogViewport,
+        fogMinimumZoom: Double?,
+    ): Boolean {
         return visibleTileRange == fogViewport.visibleTileRange
             && fogTileRange == fogViewport.fogTileRange
             && visibleTileCount == fogViewport.visibleTileCount
             && isFogSuppressedByVisibleTileLimit == fogViewport.isSuppressedByVisibleTileLimit
+            && this.fogMinimumZoom == fogMinimumZoom
     }
 
     private fun State.withFogViewport(
         visibleBounds: GeoBounds,
         fogViewport: FogViewport,
+        fogMinimumZoom: Double?,
     ): State {
-        if (this.visibleBounds == visibleBounds && matches(fogViewport)) {
+        if (this.visibleBounds == visibleBounds && matches(fogViewport, fogMinimumZoom)) {
             return copy(visibleBounds = visibleBounds)
         }
 
@@ -811,6 +853,7 @@ class MapViewModel @Inject constructor(
             fogTileRange = fogViewport.fogTileRange,
             visibleTileCount = fogViewport.visibleTileCount,
             isFogSuppressedByVisibleTileLimit = fogViewport.isSuppressedByVisibleTileLimit,
+            fogMinimumZoom = fogMinimumZoom,
         )
     }
 
@@ -829,6 +872,20 @@ class MapViewModel @Inject constructor(
             fogOfWarInputs = toFogOfWarInputs(),
             visibleBounds = visibleBounds,
         )
+
+    private fun Double.coerceAtLeast(minimumZoom: Double?): Double =
+        if (minimumZoom != null && this < minimumZoom) {
+            minimumZoom
+        } else {
+            this
+        }
+
+    private fun CameraPositionState.coerceAtLeast(minimumZoom: Double?): CameraPositionState =
+        if (minimumZoom != null && zoom < minimumZoom) {
+            copy(zoom = minimumZoom)
+        } else {
+            this
+        }
 
     private fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
 

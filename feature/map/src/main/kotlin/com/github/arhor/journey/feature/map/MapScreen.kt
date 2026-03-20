@@ -149,14 +149,19 @@ internal fun MapContent(
         }
 
         snapshotFlow {
-            cameraState.position
-            cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()
+            cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()?.let { visibleBounds ->
+                CameraViewportSnapshot(
+                    zoom = cameraState.position.zoom,
+                    visibleBounds = visibleBounds,
+                )
+            }
         }.filterNotNull()
-            .distinctUntilChanged(::areGeoBoundsEquivalent)
-            .collectLatest { visibleBounds ->
+            .distinctUntilChanged(::areCameraViewportSnapshotsEquivalent)
+            .collectLatest { viewport ->
                 dispatch(
                     MapIntent.CameraViewportChanged(
-                        visibleBounds = visibleBounds,
+                        visibleBounds = viewport.visibleBounds,
+                        zoom = viewport.zoom,
                     ),
                 )
             }
@@ -225,6 +230,9 @@ internal fun MapContent(
                         MapStyle.Type.REMOTE -> BaseStyle.Uri(style.value)
                     },
                     cameraState = cameraState,
+                    zoomRange = state.fogOfWar.minimumZoom?.toFloat()?.let { minimumZoom ->
+                        minimumZoom..20f
+                    } ?: 0f..20f,
                     styleState = styleState,
                     options = MapOptions(
                         renderOptions = state.debug.renderMode.toRenderOptions(),
@@ -444,6 +452,19 @@ private data class CameraSettledSnapshot(
     val origin: CameraUpdateOrigin,
     val isCameraMoving: Boolean,
 )
+
+private data class CameraViewportSnapshot(
+    val zoom: Double,
+    val visibleBounds: GeoBounds,
+)
+
+private fun areCameraViewportSnapshotsEquivalent(
+    a: CameraViewportSnapshot,
+    b: CameraViewportSnapshot,
+): Boolean {
+    return abs(a.zoom - b.zoom) < CAMERA_SETTLE_ZOOM_THRESHOLD &&
+        areGeoBoundsEquivalent(a.visibleBounds, b.visibleBounds)
+}
 
 private fun MapRenderMode.toRenderOptions(): RenderOptions =
     when (this) {

@@ -43,6 +43,7 @@ sealed interface MapIntent {
 
     data class CameraViewportChanged(
         val visibleBounds: GeoBounds,
+        val zoom: Double,
     ) : MapIntent
 
     data class CameraGestureStarted(
