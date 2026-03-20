@@ -7,8 +7,12 @@ import com.github.arhor.journey.domain.model.ResourceSpawnQuery
 import com.github.arhor.journey.domain.model.distanceTo
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
 import com.github.arhor.journey.core.common.ResourceType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -33,11 +37,12 @@ class DeterministicResourceSpawnRepository @Inject constructor() : ResourceSpawn
 
     override fun observeActiveSpawns(query: ResourceSpawnQuery): Flow<List<ResourceSpawn>> = flow {
         emit(getActiveSpawns(query))
-    }
+    }.flowOn(Dispatchers.Default)
 
     override suspend fun getActiveSpawns(query: ResourceSpawnQuery): List<ResourceSpawn> {
         val searchBounds = query.toSearchBounds() ?: return emptyList()
         val day = query.at.toUtcDate()
+        val coroutineContext = currentCoroutineContext()
 
         return buildList {
             val minCellX = floor(searchBounds.west / CELL_SIZE_DEGREES).toLong()
@@ -46,8 +51,11 @@ class DeterministicResourceSpawnRepository @Inject constructor() : ResourceSpawn
             val maxCellY = floor(searchBounds.north / CELL_SIZE_DEGREES).toLong()
 
             for (cellY in minCellY..maxCellY) {
+                coroutineContext.ensureActive()
                 for (cellX in minCellX..maxCellX) {
+                    coroutineContext.ensureActive()
                     for (slot in 0 until SPAWNS_PER_CELL) {
+                        coroutineContext.ensureActive()
                         val spawn = generateSpawn(
                             day = day,
                             cellX = cellX,

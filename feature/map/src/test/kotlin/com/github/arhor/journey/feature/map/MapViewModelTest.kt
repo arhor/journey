@@ -626,7 +626,7 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             // Then
-            val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileCount == 4L }
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.exploredVisibleTileCount == 1 }
             actual.fogOfWar.visibleTileCount shouldBe 4L
             actual.fogOfWar.exploredVisibleTileCount shouldBe 1
             actual.fogOfWar.renderData.shouldNotBeNull()
@@ -636,7 +636,118 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should not emit stale fog state when canonical zoom changes before new fog tiles arrive`() = runTest {
+    fun `dispatch should reuse loaded fog data when the viewport changes inside the current fog buffer`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val shiftedVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 11,
+            maxX = 12,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture(
+            observeExploredTilesFlowFactory = {
+                flow {
+                    delay(1_000L)
+                    emit(emptySet())
+                }
+            },
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(initialVisibleRange),
+                ),
+            )
+            advanceTimeBy(1_000L)
+            advanceUntilIdle()
+            fixture.viewModel.awaitContent { it.fogOfWar.visibleTileRange == initialVisibleRange }
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(shiftedVisibleRange),
+                ),
+            )
+            runCurrent()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleTileRange == shiftedVisibleRange
+            }
+            actual.fogOfWar.renderData.shouldNotBeNull()
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should reuse buffered resource query when the viewport changes inside the current resource bounds`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val initialVisibleRange = ExplorationTileRange(
+                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                minX = 10,
+                maxX = 11,
+                minY = 20,
+                maxY = 21,
+            )
+            val shiftedVisibleRange = ExplorationTileRange(
+                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                minX = 11,
+                maxX = 12,
+                minY = 20,
+                maxY = 21,
+            )
+            val fixture = createFixture(
+                resourceSpawns = listOf(
+                    resourceSpawn(
+                        id = "cell-1-slot-0",
+                        resourceTypeId = "wood",
+                        lat = 50.46,
+                        lon = 30.53,
+                        collectionRadiusMeters = 24.0,
+                    ),
+                ),
+            )
+
+            try {
+                fixture.viewModel.awaitContent()
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBoundsInside(initialVisibleRange),
+                    ),
+                )
+                advanceUntilIdle()
+
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBoundsInside(shiftedVisibleRange),
+                    ),
+                )
+                runCurrent()
+
+                verify(exactly = 1) { fixture.observeCollectibleResourceSpawns.invoke(any()) }
+            } finally {
+                tearDownMainDispatcher()
+            }
+        }
+
+    @Test
+    fun `uiState should emit current canonical zoom immediately when precise fog data is still loading`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -669,40 +780,26 @@ class MapViewModelTest {
                 ),
             )
             advanceUntilIdle()
+            runCurrent()
 
-            val emissions = mutableListOf<MapUiState.Content>()
-            val collectJob = backgroundScope.launch {
-                fixture.viewModel.uiState
-                    .mapNotNull { it as? MapUiState.Content }
-                    .collect { emissions += it }
-            }
+            // When
+            fixture.viewModel.dispatch(MapIntent.CanonicalZoomChanged(value = 18))
+            runCurrent()
+            advanceTimeBy(999L)
+            runCurrent()
 
-            try {
-                runCurrent()
+            // Then
+            val pending = fixture.viewModel.awaitContent { it.debug.canonicalZoom == 18 }
+            pending.fogOfWar.canonicalZoom shouldBe 18
+            pending.fogOfWar.visibleTileRange?.zoom shouldBe 18
+            pending.fogOfWar.fogRanges.all { it.zoom == 18 } shouldBe true
+            pending.fogOfWar.renderData.shouldNotBeNull()
 
-                // When
-                fixture.viewModel.dispatch(MapIntent.CanonicalZoomChanged(value = 18))
-                runCurrent()
-                advanceTimeBy(999L)
-                runCurrent()
+            advanceTimeBy(1L)
+            advanceUntilIdle()
 
-                // Then
-                emissions.none { content ->
-                    content.debug.canonicalZoom == 18 &&
-                        content.fogOfWar.canonicalZoom != 18
-                } shouldBe true
-                emissions.none { content ->
-                    content.debug.canonicalZoom == 18
-                } shouldBe true
-
-                advanceTimeBy(1L)
-                advanceUntilIdle()
-
-                val actual = fixture.viewModel.awaitContent { it.debug.canonicalZoom == 18 }
-                actual.fogOfWar.canonicalZoom shouldBe 18
-            } finally {
-                collectJob.cancel()
-            }
+            val actual = fixture.viewModel.awaitContent { it.debug.canonicalZoom == 18 }
+            actual.fogOfWar.canonicalZoom shouldBe 18
         } finally {
             tearDownMainDispatcher()
         }
@@ -935,6 +1032,8 @@ class MapViewModelTest {
         val viewModel: MapViewModel,
         val mapStyle: MapStyle,
         val trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>,
+        val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
+        val observeExploredTiles: ObserveExploredTilesUseCase,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
         val clearExploredTiles: ClearExploredTilesUseCase,
         val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
@@ -1017,6 +1116,8 @@ class MapViewModelTest {
             ),
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
+            observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
+            observeExploredTiles = observeExploredTiles,
             discoverPointOfInterest = discoverPointOfInterest,
             clearExploredTiles = clearExploredTiles,
             setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
