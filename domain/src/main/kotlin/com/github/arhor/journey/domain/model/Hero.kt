@@ -11,7 +11,6 @@ import java.time.Instant
 data class Hero(
     val id: String,
     val name: String,
-    val stats: HeroStats,
     val progression: Progression,
     val energy: HeroEnergy = HeroEnergy(max = 100),
     val createdAt: Instant,

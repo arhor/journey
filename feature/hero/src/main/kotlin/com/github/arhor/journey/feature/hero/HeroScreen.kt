@@ -19,7 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.feature.hero.components.LoadingIndicator
 import com.github.arhor.journey.feature.hero.components.ResourceRow
-import com.github.arhor.journey.feature.hero.components.StatRow
 
 @Composable
 fun HeroScreen(
@@ -115,24 +114,6 @@ internal fun HeroContent(
                     progress = { progress },
                     modifier = Modifier.fillMaxWidth(),
                 )
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.hero_stats_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                StatRow(label = stringResource(R.string.hero_stat_strength), value = state.strength)
-                StatRow(label = stringResource(R.string.hero_stat_vitality), value = state.vitality)
-                StatRow(label = stringResource(R.string.hero_stat_dexterity), value = state.dexterity)
-                StatRow(label = stringResource(R.string.hero_stat_stamina), value = state.stamina)
             }
         }
 

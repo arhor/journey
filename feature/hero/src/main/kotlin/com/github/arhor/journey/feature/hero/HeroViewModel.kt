@@ -49,10 +49,6 @@ class HeroViewModel @Inject constructor(
             level = hero.progression.level,
             xpInLevel = hero.progression.xpInLevel,
             xpToNextLevel = progressionPolicy.xpToNextLevel(hero.progression.level),
-            strength = hero.stats.strength,
-            vitality = hero.stats.vitality,
-            dexterity = hero.stats.dexterity,
-            stamina = hero.stats.stamina,
             resources = ResourceType.entries.map {
                 HeroResourceAmountUiModel(
                     resourceType = it,

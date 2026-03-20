@@ -15,7 +15,7 @@ class ResourceTypeTest {
         )
 
         // When
-        val actual = ResourceType.all
+        val actual = ResourceType.entries
 
         // Then
         actual shouldBe expected

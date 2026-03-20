@@ -4,7 +4,6 @@ import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroResource
-import com.github.arhor.journey.domain.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import com.github.arhor.journey.domain.model.error.HeroResourcesError
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
@@ -59,12 +58,6 @@ class SpendHeroResourceUseCaseTest {
         Hero(
             id = id,
             name = "Adventurer",
-            stats = HeroStats(
-                strength = 1,
-                vitality = 1,
-                dexterity = 1,
-                stamina = 1,
-            ),
             progression = Progression(level = 1, xpInLevel = 0L),
             energy = HeroEnergy(max = 100),
             createdAt = Instant.parse("2026-03-12T08:00:00Z"),

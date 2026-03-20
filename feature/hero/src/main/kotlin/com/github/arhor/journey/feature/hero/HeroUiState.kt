@@ -17,10 +17,6 @@ sealed interface HeroUiState {
         val level: Int,
         val xpInLevel: Long,
         val xpToNextLevel: Long,
-        val strength: Int,
-        val vitality: Int,
-        val dexterity: Int,
-        val stamina: Int,
         val resources: List<HeroResourceAmountUiModel>,
     ) : HeroUiState
 }

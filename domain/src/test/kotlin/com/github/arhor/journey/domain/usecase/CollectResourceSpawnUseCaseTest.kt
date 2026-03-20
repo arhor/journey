@@ -6,7 +6,6 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroResource
-import com.github.arhor.journey.domain.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.ResourceSpawnCollectionResult
@@ -223,12 +222,6 @@ class CollectResourceSpawnUseCaseTest {
         Hero(
             id = "player",
             name = "Adventurer",
-            stats = HeroStats(
-                strength = 1,
-                vitality = 1,
-                dexterity = 1,
-                stamina = 1,
-            ),
             progression = Progression(level = 1, xpInLevel = 0L),
             energy = HeroEnergy(max = 100),
             createdAt = Instant.parse("2026-03-19T09:00:00Z"),
@@ -345,17 +338,16 @@ class CollectResourceSpawnUseCaseTest {
             if (claims.containsKey(key)) {
                 return false
             }
-
-            return CollectedResourceSpawn(
+            val claim = CollectedResourceSpawn(
                 heroId = heroId,
                 typeId = resourceTypeId,
                 spawnId = spawnId,
                 collectedAt = collectedAt,
-            ).let { claim ->
-                claims[key] = claim
-                recordedClaims += claim
-                true
-            }
+            )
+            claims[key] = claim
+            recordedClaims += claim
+
+            return true
         }
     }
 

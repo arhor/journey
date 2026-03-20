@@ -6,7 +6,6 @@ import com.github.arhor.journey.data.local.seed.DefaultHeroSeed
 import com.github.arhor.journey.data.mapper.toEntity
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
-import com.github.arhor.journey.domain.model.HeroStats
 import com.github.arhor.journey.domain.model.Progression
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -95,12 +94,6 @@ class RoomHeroRepositoryTest {
         Hero(
             id = id,
             name = name,
-            stats = HeroStats(
-                strength = 5,
-                vitality = 6,
-                dexterity = 7,
-                stamina = 8,
-            ),
             progression = Progression(level = 3, xpInLevel = 250L),
             energy = HeroEnergy(now = 40, max = 90),
             createdAt = createdAt,
