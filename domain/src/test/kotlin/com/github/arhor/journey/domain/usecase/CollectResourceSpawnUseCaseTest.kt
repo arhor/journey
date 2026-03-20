@@ -197,9 +197,9 @@ class CollectResourceSpawnUseCaseTest {
             collectedResourceSpawnRepository = collectedRepository,
             resourceSpawnRepository = FakeResourceSpawnRepository(
                 resourceSpawn(
-                    id = "resource-spawn:v1:20527:10:20:1:herb",
+                    id = "resource-spawn:v1:20527:10:20:1:coal",
                     position = GeoPoint(lat = 49.0000, lon = 24.0000),
-                    resourceTypeId = "herb",
+                    resourceTypeId = "coal",
                     radiusMeters = 25.0,
                 ),
             ),
@@ -209,7 +209,7 @@ class CollectResourceSpawnUseCaseTest {
 
         // When
         subject(
-            spawnId = "resource-spawn:v1:20527:10:20:1:herb",
+            spawnId = "resource-spawn:v1:20527:10:20:1:coal",
             collectorLocation = GeoPoint(lat = 49.0000, lon = 24.0000),
         )
 
