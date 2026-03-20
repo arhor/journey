@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.map.renderer
 
+import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
@@ -86,6 +87,28 @@ class MapObjectsRendererAdapterTest {
     }
 
     @Test
+    fun `toFeatureProperties should include resource type when object is a resource spawn`() {
+        // Given
+        val objectUiModel = mapObject(
+            id = "spawn-1",
+            title = "wood",
+            description = null,
+            latitude = 50.45,
+            longitude = 30.52,
+            radiusMeters = 25,
+            isDiscovered = false,
+            kind = MapObjectKind.ResourceSpawn,
+            resourceType = ResourceType.WOOD,
+        )
+
+        // When
+        val actual = objectUiModel.toFeatureProperties()
+
+        // Then
+        actual[PROPERTY_OBJECT_RESOURCE_TYPE_ID]?.jsonPrimitive?.contentOrNull shouldBe "wood"
+    }
+
+    @Test
     fun `resolveObjectId should return first matching object id when features contain object ids`() {
         // Given
         val features = listOf(
@@ -148,6 +171,7 @@ class MapObjectsRendererAdapterTest {
         radiusMeters: Int,
         isDiscovered: Boolean,
         kind: MapObjectKind,
+        resourceType: ResourceType? = null,
     ): MapObjectUiModel = MapObjectUiModel(
         id = id,
         kind = kind,
@@ -156,6 +180,7 @@ class MapObjectsRendererAdapterTest {
         position = LatLng(latitude = latitude, longitude = longitude),
         radiusMeters = radiusMeters,
         isDiscovered = isDiscovered,
+        resourceType = resourceType,
     )
 
     private fun featureWithObjectId(objectId: String?): Feature<Point, kotlinx.serialization.json.JsonObject?> = Feature(

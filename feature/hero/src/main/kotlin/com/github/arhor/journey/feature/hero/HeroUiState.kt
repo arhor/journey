@@ -1,6 +1,7 @@
 package com.github.arhor.journey.feature.hero
 
 import androidx.compose.runtime.Immutable
+import com.github.arhor.journey.core.common.ResourceType
 
 sealed interface HeroUiState {
 
@@ -20,5 +21,12 @@ sealed interface HeroUiState {
         val vitality: Int,
         val dexterity: Int,
         val stamina: Int,
+        val resources: List<HeroResourceAmountUiModel>,
     ) : HeroUiState
 }
+
+@Immutable
+data class HeroResourceAmountUiModel(
+    val resourceType: ResourceType,
+    val amount: Int,
+)

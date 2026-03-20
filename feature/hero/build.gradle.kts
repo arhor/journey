@@ -33,6 +33,7 @@ dependencies {
     ksp(libs.hilt.android.compiler)
 
     implementation(project(":domain"))
+    implementation(project(":core:common"))
     implementation(project(":core:navigation"))
     implementation(project(":core:ui"))
 

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.model.ExplorationProgress
@@ -684,6 +685,7 @@ class MapViewModel @Inject constructor(
             position = position.toLatLng(),
             radiusMeters = collectionRadiusMeters.toInt(),
             isDiscovered = false,
+            resourceType = ResourceType.fromTypeId(typeId),
         )
 
     private fun parseMapObjectId(id: String): ParsedMapObjectId? {

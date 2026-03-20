@@ -6,6 +6,7 @@ import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
 import com.github.arhor.journey.domain.model.distanceTo
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
+import com.github.arhor.journey.core.common.ResourceType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import java.time.Instant
@@ -25,11 +26,7 @@ private const val CELL_PADDING_FRACTION = 0.18
 private const val HASH_FRACTION_GRANULARITY = 10_000.0
 private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
 
-private val RESOURCE_TYPE_IDS = listOf(
-    "wood",
-    "coal",
-    "stone",
-)
+private val RESOURCE_TYPE_IDS = ResourceType.entries.map { it.typeId }
 
 @Singleton
 class DeterministicResourceSpawnRepository @Inject constructor() : ResourceSpawnRepository {

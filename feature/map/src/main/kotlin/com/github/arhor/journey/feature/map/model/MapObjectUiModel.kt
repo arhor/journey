@@ -1,7 +1,7 @@
 package com.github.arhor.journey.feature.map.model
 
 import androidx.compose.runtime.Immutable
-import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.core.common.ResourceType
 
 @Immutable
 data class MapObjectUiModel(
@@ -12,6 +12,7 @@ data class MapObjectUiModel(
     val position: LatLng,
     val radiusMeters: Int,
     val isDiscovered: Boolean,
+    val resourceType: ResourceType? = null,
 )
 
 enum class MapObjectKind(
