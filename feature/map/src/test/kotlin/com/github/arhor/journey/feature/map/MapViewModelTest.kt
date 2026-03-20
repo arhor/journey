@@ -136,7 +136,6 @@ class MapViewModelTest {
             fixture.viewModel.dispatch(
                 MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(visibleRange),
-                    zoom = visibleRange.zoom.toDouble(),
                 ),
             )
             advanceUntilIdle()
@@ -311,7 +310,6 @@ class MapViewModelTest {
             fixture.viewModel.dispatch(
                 MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(initialVisibleRange),
-                    zoom = initialVisibleRange.zoom.toDouble(),
                 ),
             )
             advanceUntilIdle()
@@ -623,7 +621,6 @@ class MapViewModelTest {
             fixture.viewModel.dispatch(
                 MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(visibleRange),
-                    zoom = visibleRange.zoom.toDouble(),
                 ),
             )
             advanceUntilIdle()
@@ -637,81 +634,6 @@ class MapViewModelTest {
             tearDownMainDispatcher()
         }
     }
-
-    @Test
-    fun `dispatch should lock zoom when fog is suppressed and release it when fog becomes visible again`() =
-        runTest {
-            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-            // Given
-            val suppressedVisibleRange = ExplorationTileRange(
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-                minX = 0,
-                maxX = 120,
-                minY = 0,
-                maxY = 120,
-            )
-            val releasedVisibleRange = ExplorationTileRange(
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-                minX = 10,
-                maxX = 11,
-                minY = 20,
-                maxY = 21,
-            )
-            val fixture = createFixture()
-
-            try {
-                fixture.viewModel.awaitContent()
-
-                // When
-                fixture.viewModel.dispatch(
-                    MapIntent.CameraViewportChanged(
-                        visibleBounds = visibleBoundsInside(suppressedVisibleRange),
-                        zoom = 11.5,
-                    ),
-                )
-                advanceUntilIdle()
-
-                // Then
-                val suppressed = fixture.viewModel.awaitContent {
-                    it.fogOfWar.isSuppressedByVisibleTileLimit
-                }
-                suppressed.fogOfWar.minimumZoom shouldBe 11.5
-                suppressed.fogOfWar.renderData shouldBe null
-
-                // When
-                fixture.viewModel.dispatch(
-                    MapIntent.CameraViewportChanged(
-                        visibleBounds = visibleBoundsInside(suppressedVisibleRange),
-                        zoom = 10.0,
-                    ),
-                )
-                advanceUntilIdle()
-
-                // Then
-                val locked = fixture.viewModel.awaitContent {
-                    it.fogOfWar.isSuppressedByVisibleTileLimit
-                }
-                locked.fogOfWar.minimumZoom shouldBe 11.5
-
-                // When
-                fixture.viewModel.dispatch(
-                    MapIntent.CameraViewportChanged(
-                        visibleBounds = visibleBoundsInside(releasedVisibleRange),
-                        zoom = 12.0,
-                    ),
-                )
-                advanceUntilIdle()
-
-                // Then
-                val released = fixture.viewModel.awaitContent {
-                    !it.fogOfWar.isSuppressedByVisibleTileLimit
-                }
-                released.fogOfWar.minimumZoom shouldBe null
-            } finally {
-                tearDownMainDispatcher()
-            }
-        }
 
     @Test
     fun `uiState should not emit stale fog state when canonical zoom changes before new fog tiles arrive`() = runTest {
@@ -744,7 +666,6 @@ class MapViewModelTest {
             fixture.viewModel.dispatch(
                 MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(initialVisibleRange),
-                    zoom = initialVisibleRange.zoom.toDouble(),
                 ),
             )
             advanceUntilIdle()
@@ -944,7 +865,6 @@ class MapViewModelTest {
             fixture.viewModel.dispatch(
                 MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(visibleRange),
-                    zoom = visibleRange.zoom.toDouble(),
                 ),
             )
             advanceUntilIdle()

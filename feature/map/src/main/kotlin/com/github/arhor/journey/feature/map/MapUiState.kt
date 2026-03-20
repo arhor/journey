@@ -46,5 +46,4 @@ data class FogOfWarUiState(
     val visibleTileCount: Long,
     val exploredVisibleTileCount: Int,
     val isSuppressedByVisibleTileLimit: Boolean,
-    val minimumZoom: Double? = null,
 )
