@@ -3,20 +3,20 @@
 ## Maintenance Note For Coding Agents
 This file must stay in sync with the repo.
 If you add or remove modules, move source sets, change architecture conventions,
-update toolchain requirements, or change the recommended build/test commands,
+update toolchain requirements, or change recommended build/test commands,
 update `AGENTS.md` in the same change.
 
 ## Project Structure & Module Organization
 This repository is a multi-module Android app built with Kotlin, Jetpack Compose, Hilt, Room, and DataStore.
 
-Current Gradle modules:
+Gradle modules:
 
-- `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, app-level Hilt modules, and the foreground exploration tracking service/runtime.
+- `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, app-level Hilt modules, and foreground exploration tracking runtime.
 - `:domain` - pure Kotlin/JVM domain layer with models, repository contracts, use cases, and progression logic.
 - `:data` - Android data layer with Room database/DAOs/entities, DataStore-backed repositories, mappers, and seeds.
 - `:core:common` - shared non-UI primitives such as `Output`, `DomainError`, and qualifiers.
 - `:core:navigation` - shared navigation types such as `BottomNavDestination`.
-- `:core:ui` - shared UI architecture support; currently this is primarily `MviViewModel`, not a shared widget library.
+- `:core:ui` - shared UI architecture support; currently mainly `MviViewModel`.
 - `:feature:hero` - hero screen, route, navigation contract, and view model.
 - `:feature:map` - map flow, POI flows, map rendering helpers, tracking session UI, and related view models.
 - `:feature:settings` - settings screen, navigation contract, Health Connect entry points, and view model.
@@ -45,7 +45,7 @@ Build configuration lives in:
 - `.github/workflows/android-ci.yml`
 
 ## Architecture & Dependency Rules
-Keep the module dependency direction intact:
+Keep dependency direction intact:
 
 - `:app -> :data, :domain, :core:*, :feature:*`
 - `:feature:* -> :domain, :core:*`
@@ -55,41 +55,35 @@ Keep the module dependency direction intact:
 Practical rules:
 
 - Keep `:domain` Android-free.
-- Put new app wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
+- Treat `:app` as the composition root, not as the default place for new business logic.
+- Put app-wide wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
 - Keep long-running exploration tracking, foreground services, notifications, and platform location session orchestration in `app/src/main/kotlin/com/github/arhor/journey/tracking`.
 - Keep feature-specific platform bindings inside the owning feature module when they are not truly app-wide.
-- Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`;
-  features own their typed destinations and `*Graph(...)` builders.
-- Use typed navigation contracts with `@Serializable` destinations and
-  `composable<T>` routes, matching the existing feature modules.
-- Treat `app` as the composition root, not as the default place for new business logic.
-- `:feature:map` may start/stop or observe exploration tracking sessions, but it must not own the continuous location collection or tile-reveal pipeline.
+- Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`; features own typed destinations and `*Graph(...)` builders.
+- Use typed navigation contracts with `@Serializable` destinations and `composable<T>` routes, matching existing feature modules.
+- `:feature:map` may start, stop, or observe exploration tracking sessions, but it must not own continuous location collection or the tile-reveal pipeline.
 
-UI/state-management conventions:
+## UI & State Management Conventions
+Main screen pattern:
 
-- The main screen pattern is MVI with explicit `Intent`, `UiState`, and `Effect` types.
-- For `MviViewModel` screens, implement `buildUiState()` by combining
-  internal `MutableStateFlow` state with domain flows.
-- Update internal state via `_state.update { ... }` reducers inside intent handlers.
-- Emit transient UI events through `effects`; do not smuggle one-off events into persistent UI state.
+- Prefer MVI with explicit `Intent`, `UiState`, and `Effect` types.
+- For `MviViewModel` screens, derive `buildUiState()` from internal `MutableStateFlow` state plus domain flows.
+- Update internal state with `_state.update { ... }` reducers inside intent handlers.
+- Emit one-off UI events through `effects`, not through persistent UI state.
 - Keep domain-to-UI mapping in pure helpers when possible.
-- Not every screen has to extend `MviViewModel`;
-  simple flows such as `AddPoiViewModel` can stay as plain `ViewModel`
-  implementations when that is the better fit.
+- Not every screen has to extend `MviViewModel`; simple flows can stay plain `ViewModel` when that is the better fit.
 
 Shared UI placement:
 
 - Keep feature-local reusable UI in the owning feature module.
-- Keep app-shell UI in `app/ui` (`App`, bottom bar, theme, root-level components).
-- If a Compose component or UI helper is reused across multiple features,
-  prefer moving it into `:core:ui` instead of `:app`.
+- Keep app-shell UI in `app/ui`.
+- If a Compose component or UI helper is reused across multiple features, prefer moving it into `:core:ui` instead of `:app`.
 
-Data/domain conventions:
+## Data & Domain Conventions
 
 - Repository interfaces live in `:domain`; implementations live in `:data`.
 - Room entities, DAOs, and mappers stay in `:data`.
-- Use the existing typed `Output<T, E : DomainError>` pattern for
-  recoverable domain/data flows that already model success/failure explicitly.
+- Use the existing typed `Output<T, E : DomainError>` pattern for recoverable domain/data flows that already model success/failure explicitly.
 
 ## Build, Test, and Development Commands
 Use the Gradle wrapper from repo root. JDK 17 is required; CI uses Temurin 17.
@@ -114,15 +108,14 @@ Style is enforced via `.editorconfig` and Gradle settings:
 - Type names: PascalCase
 - Test files: `*Test.kt`
 
-Follow the existing naming and structure patterns in each feature:
+Follow existing naming and structure patterns in each feature:
 
 - `FeatureIntent`, `FeatureUiState`, `FeatureEffect`, `FeatureViewModel`
 - `FeatureRoute`, `FeatureScreen`, `FeatureNavigationContract`
 - `Observe...UseCase`, `Set...UseCase`, `Add...UseCase`, etc.
 
 Do not reintroduce the old `app/ui/views/<feature>` layout.
-New features belong in their own `feature/<feature>` module unless the
-architecture is intentionally being changed.
+New features belong in their own `feature/<feature>` module unless the architecture is intentionally being changed.
 
 ## Testing Guidelines
 Put tests in the module that owns the code:
@@ -141,7 +134,7 @@ Current test stack includes:
 - Compose UI test APIs
 - Hilt Android testing
 
-Test conventions used in the repo:
+Repo test conventions:
 
 - Prefer backtick test names in the form `{function/method/action} should {expected behavior} when {given context}`.
 - Split tests visually into `// Given`, `// When`, and `// Then`.
