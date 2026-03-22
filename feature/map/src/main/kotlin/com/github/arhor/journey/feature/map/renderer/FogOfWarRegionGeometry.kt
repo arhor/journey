@@ -39,35 +39,83 @@ internal data class GridPoint(
     val y: Double,
 )
 
+internal data class TileRegionGeometriesBuildResult(
+    val geometries: List<TileRegionGeometry>,
+    val metrics: FogOfWarGeometryMetrics,
+)
+
+internal data class FogOfWarGeometryMetrics(
+    val expandedCellCount: Long = 0,
+    val connectedRegionCount: Int = 0,
+    val boundaryEdgeCount: Int = 0,
+    val loopCount: Int = 0,
+    val ringPointCount: Int = 0,
+)
+
 internal fun List<ExplorationTileRange>.toTileRegionGeometries(
     cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
     arcSegmentsPerCorner: Int = DEFAULT_ARC_SEGMENTS_PER_CORNER,
     checkCancelled: () -> Unit = {},
-): List<TileRegionGeometry> {
+): List<TileRegionGeometry> = toTileRegionGeometriesBuildResult(
+    cornerRadiusTiles = cornerRadiusTiles,
+    arcSegmentsPerCorner = arcSegmentsPerCorner,
+    checkCancelled = checkCancelled,
+).geometries
+
+internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
+    cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
+    arcSegmentsPerCorner: Int = DEFAULT_ARC_SEGMENTS_PER_CORNER,
+    checkCancelled: () -> Unit = {},
+): TileRegionGeometriesBuildResult {
     require(cornerRadiusTiles >= 0.0) { "cornerRadiusTiles must be >= 0." }
     require(arcSegmentsPerCorner >= 1) { "arcSegmentsPerCorner must be >= 1." }
 
     checkCancelled()
 
-    return groupBy(ExplorationTileRange::zoom)
+    var expandedCellCount = 0L
+    var connectedRegionCount = 0
+    var boundaryEdgeCount = 0
+    var loopCount = 0
+    var ringPointCount = 0
+
+    val geometries = groupBy(ExplorationTileRange::zoom)
         .toSortedMap()
         .flatMap { (zoom, ranges) ->
             checkCancelled()
-            ranges.toTileCells(checkCancelled = checkCancelled)
-                .connectedComponents(checkCancelled = checkCancelled)
+            val cells = ranges.toTileCells(checkCancelled = checkCancelled)
+            expandedCellCount += cells.size.toLong()
+            val components = cells.connectedComponents(checkCancelled = checkCancelled)
+            connectedRegionCount += components.size
+
+            components
                 .map { cells ->
-                    cells.toTileRegionGeometry(
+                    val geometryResult = cells.toTileRegionGeometryBuildResult(
                         zoom = zoom,
                         cornerRadiusTiles = cornerRadiusTiles,
                         arcSegmentsPerCorner = arcSegmentsPerCorner,
                         checkCancelled = checkCancelled,
                     )
+                    boundaryEdgeCount += geometryResult.metrics.boundaryEdgeCount
+                    loopCount += geometryResult.metrics.loopCount
+                    ringPointCount += geometryResult.metrics.ringPointCount
+                    geometryResult.geometry
                 }
                 .sortedWith(
                     compareBy<TileRegionGeometry> { it.outerRing.points.first().y }
                         .thenBy { it.outerRing.points.first().x },
                 )
         }
+
+    return TileRegionGeometriesBuildResult(
+        geometries = geometries,
+        metrics = FogOfWarGeometryMetrics(
+            expandedCellCount = expandedCellCount,
+            connectedRegionCount = connectedRegionCount,
+            boundaryEdgeCount = boundaryEdgeCount,
+            loopCount = loopCount,
+            ringPointCount = ringPointCount,
+        ),
+    )
 }
 
 internal fun List<GridPoint>.roundOrthogonalLoop(
@@ -198,8 +246,21 @@ private fun Set<TileCell>.toTileRegionGeometry(
     cornerRadiusTiles: Double,
     arcSegmentsPerCorner: Int,
     checkCancelled: () -> Unit = {},
-): TileRegionGeometry {
-    val boundaryLoops = extractBoundaryLoops(checkCancelled = checkCancelled)
+): TileRegionGeometry = toTileRegionGeometryBuildResult(
+    zoom = zoom,
+    cornerRadiusTiles = cornerRadiusTiles,
+    arcSegmentsPerCorner = arcSegmentsPerCorner,
+    checkCancelled = checkCancelled,
+).geometry
+
+private fun Set<TileCell>.toTileRegionGeometryBuildResult(
+    zoom: Int,
+    cornerRadiusTiles: Double,
+    arcSegmentsPerCorner: Int,
+    checkCancelled: () -> Unit = {},
+): TileRegionGeometryBuildResult {
+    val boundaryLoopResult = extractBoundaryLoops(checkCancelled = checkCancelled)
+    val boundaryLoops = boundaryLoopResult.loops
     val exteriorLoop = boundaryLoops.maxBy { loop -> kotlin.math.abs(loop.signedAreaGeo()) }
     val holeLoops = boundaryLoops
         .filterNot { it === exteriorLoop }
@@ -208,7 +269,7 @@ private fun Set<TileCell>.toTileRegionGeometry(
                 .thenBy { it.minOf(GridPoint::x) },
         )
 
-    return TileRegionGeometry(
+    val geometry = TileRegionGeometry(
         zoom = zoom,
         outerRing = TileRegionRing(
             exteriorLoop
@@ -234,9 +295,18 @@ private fun Set<TileCell>.toTileRegionGeometry(
             )
         },
     )
+
+    return TileRegionGeometryBuildResult(
+        geometry = geometry,
+        metrics = TileRegionGeometryMetrics(
+            boundaryEdgeCount = boundaryLoopResult.boundaryEdgeCount,
+            loopCount = boundaryLoops.size,
+            ringPointCount = geometry.outerRing.points.size + geometry.holeRings.sumOf { it.points.size },
+        ),
+    )
 }
 
-private fun Set<TileCell>.extractBoundaryLoops(checkCancelled: () -> Unit = {}): List<List<GridPoint>> {
+private fun Set<TileCell>.extractBoundaryLoops(checkCancelled: () -> Unit = {}): BoundaryLoopsResult {
     val edgesByStart = mutableMapOf<GridVertex, DirectedEdge>()
 
     for (cell in this) {
@@ -297,8 +367,27 @@ private fun Set<TileCell>.extractBoundaryLoops(checkCancelled: () -> Unit = {}):
         loops += vertices.simplifyOrthogonalLoop()
     }
 
-    return loops
+    return BoundaryLoopsResult(
+        loops = loops,
+        boundaryEdgeCount = edgesByStart.size,
+    )
 }
+
+private data class TileRegionGeometryBuildResult(
+    val geometry: TileRegionGeometry,
+    val metrics: TileRegionGeometryMetrics,
+)
+
+private data class TileRegionGeometryMetrics(
+    val boundaryEdgeCount: Int,
+    val loopCount: Int,
+    val ringPointCount: Int,
+)
+
+private data class BoundaryLoopsResult(
+    val loops: List<List<GridPoint>>,
+    val boundaryEdgeCount: Int,
+)
 
 private fun MutableMap<GridVertex, DirectedEdge>.addBoundaryEdge(
     start: GridVertex,

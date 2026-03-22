@@ -8,6 +8,7 @@ import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
+import com.github.arhor.journey.feature.map.model.FogOfWarDiagnostics
 import com.github.arhor.journey.feature.map.model.FogOfWarRenderData
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
@@ -51,4 +52,5 @@ data class FogOfWarUiState(
     val exploredVisibleTileCount: Int,
     val isSuppressedByVisibleTileLimit: Boolean,
     val isRecomputing: Boolean,
+    val diagnostics: FogOfWarDiagnostics = FogOfWarDiagnostics(),
 )

@@ -256,6 +256,11 @@ internal fun MapContent(
                     if (state.debug.isFogOfWarOverlayEnabled) {
                         FogOfWarRendererAdapter(
                             fogRenderData = state.fogOfWar.renderData,
+                            onSourceDataUpdated = { elapsedMillis ->
+                                if (BuildConfig.DEBUG) {
+                                    dispatch(MapIntent.FogOfWarSourceUpdated(elapsedMillis))
+                                }
+                            },
                         )
                     }
 

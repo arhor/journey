@@ -303,23 +303,11 @@ internal fun MapDebugInfoOverlay(
                             if (state.fogOfWar.isSuppressedByVisibleTileLimit) {
                                 stringResource(R.string.map_debug_info_fog_hidden)
                             } else {
-                                stringResource(
-                                    R.string.map_debug_info_fog_regions_value,
-                                    state.fogOfWar.fogRanges.size,
-                                )
+                                state.fogOfWar.toFogSummaryDebugString()
                             }
                         }
 
-                        MapDebugInfoItem.FogBuffering -> buildString {
-                            append("FOW buffer: loading=")
-                            append(state.fogOfWar.isRecomputing)
-                            append(" viewport=")
-                            append(state.fogOfWar.visibleBounds.toDebugString())
-                            append(" trigger=")
-                            append(state.fogOfWar.triggerBounds.toDebugString())
-                            append(" buffered=")
-                            append(state.fogOfWar.bufferedBounds.toDebugString())
-                        }
+                        MapDebugInfoItem.FogBuffering -> state.fogOfWar.toFogBufferingDebugString()
 
                         MapDebugInfoItem.TrackingStatus -> stringResource(
                             R.string.map_debug_info_tracking_status_value,
@@ -475,6 +463,69 @@ private fun GeoBounds?.toDebugString(): String {
     return this?.let { bounds ->
         "[${bounds.south.debugCoord()},${bounds.west.debugCoord()} .. ${bounds.north.debugCoord()},${bounds.east.debugCoord()}]"
     } ?: "n/a"
+}
+
+private fun FogOfWarUiState.toFogSummaryDebugString(): String = buildString {
+    append("Fog ranges=")
+    append(fogRanges.size)
+    append(" features=")
+    append(diagnostics.lastPreparation.featureCount)
+    append(" cells=")
+    append(diagnostics.lastPreparation.expandedFogCellCount)
+    append(" explored=")
+    append(diagnostics.lastPreparation.exploredTileCount)
+    append(" loops=")
+    append(diagnostics.lastPreparation.loopCount)
+    append(" points=")
+    append(diagnostics.lastPreparation.ringPointCount)
+}
+
+private fun FogOfWarUiState.toFogBufferingDebugString(): String = buildString {
+    append("FOW buffer: loading=")
+    append(isRecomputing)
+    append(" viewport=")
+    append(visibleBounds.toDebugString())
+    append(" trigger=")
+    append(triggerBounds.toDebugString())
+    append(" buffered=")
+    append(bufferedBounds.toDebugString())
+    append('\n')
+    append("prepare(ms): total=")
+    append(diagnostics.lastPreparation.totalPrepareMillis)
+    append(" calc=")
+    append(diagnostics.lastPreparation.calculateFogRangesMillis)
+    append(" render=")
+    append(diagnostics.lastPreparation.buildRenderDataMillis)
+    append(" geom=")
+    append(diagnostics.lastPreparation.geometryBuildMillis)
+    append(" geojson=")
+    append(diagnostics.lastPreparation.featureCollectionBuildMillis)
+    append(" setData=")
+    append(diagnostics.sourceUpdate.lastSetDataMillis)
+    append('\n')
+    append("tiles: visible=")
+    append(diagnostics.lastPreparation.visibleTileCount)
+    append(" buffered=")
+    append(diagnostics.lastPreparation.bufferedTileCount)
+    append(" regions=")
+    append(diagnostics.lastPreparation.connectedRegionCount)
+    append(" edges=")
+    append(diagnostics.lastPreparation.boundaryEdgeCount)
+    append('\n')
+    append("cache: hit=")
+    append(diagnostics.lastPreparation.renderCacheHit)
+    append(" render=")
+    append(diagnostics.cache.renderHits)
+    append('/')
+    append(diagnostics.cache.renderMisses)
+    append(" full=")
+    append(diagnostics.cache.fullRangeHits)
+    append('/')
+    append(diagnostics.cache.fullRangeMisses)
+    append(" updates=")
+    append(diagnostics.sourceUpdate.updateCount)
+    append(" cancelled=")
+    append(diagnostics.prepareCancellationCount)
 }
 
 private fun Double.debugCoord(): String = (this * 10_000.0).roundToInt()

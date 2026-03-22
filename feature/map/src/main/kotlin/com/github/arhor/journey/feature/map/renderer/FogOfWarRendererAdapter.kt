@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import com.github.arhor.journey.feature.map.model.FogOfWarRenderData
+import kotlin.time.TimeSource
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.FillLayer
 import org.maplibre.compose.sources.GeoJsonSource
@@ -14,6 +15,7 @@ import org.maplibre.compose.util.MaplibreComposable
 @MaplibreComposable
 fun FogOfWarRendererAdapter(
     fogRenderData: FogOfWarRenderData?,
+    onSourceDataUpdated: (Long) -> Unit = {},
 ) {
     val geoJsonData = fogRenderData?.geoJsonData ?: return
     val source = remember {
@@ -25,7 +27,9 @@ fun FogOfWarRendererAdapter(
     }
 
     LaunchedEffect(source, geoJsonData) {
+        val startedAt = TimeSource.Monotonic.markNow()
         source.setData(geoJsonData)
+        onSourceDataUpdated(startedAt.elapsedNow().inWholeMilliseconds)
     }
 
     FillLayer(

@@ -77,4 +77,8 @@ sealed interface MapIntent {
     data class MapLoadFailed(
         val message: String? = null,
     ) : MapIntent
+
+    data class FogOfWarSourceUpdated(
+        val elapsedMillis: Long,
+    ) : MapIntent
 }

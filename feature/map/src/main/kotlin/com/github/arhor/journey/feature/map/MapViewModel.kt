@@ -34,12 +34,16 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
+import com.github.arhor.journey.feature.map.model.FogOfWarDiagnostics
+import com.github.arhor.journey.feature.map.model.FogOfWarPreparationMetrics
 import com.github.arhor.journey.feature.map.model.FogOfWarRenderData
+import com.github.arhor.journey.feature.map.model.FogOfWarSourceUpdateMetrics
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import com.github.arhor.journey.feature.map.renderer.FogOfWarRenderDataFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -59,6 +63,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.TimeSource
 import javax.inject.Inject
 
 private const val DEFAULT_CAMERA_ZOOM = 17.0
@@ -75,6 +80,7 @@ private data class DisplayedFogData(
     val exploredTiles: Set<ExplorationTile>,
     val fogRanges: List<ExplorationTileRange>,
     val renderData: FogOfWarRenderData?,
+    val preparationMetrics: FogOfWarPreparationMetrics,
 )
 
 @Immutable
@@ -100,6 +106,8 @@ private data class State(
     val visibleTileCount: Long = 0,
     val isFogSuppressedByVisibleTileLimit: Boolean = false,
     val isFogRecomputationInProgress: Boolean = false,
+    val fogSourceUpdateMetrics: FogOfWarSourceUpdateMetrics = FogOfWarSourceUpdateMetrics(),
+    val fogPreparationCancellationCount: Long = 0,
     val failureMessage: String? = null,
 )
 
@@ -217,6 +225,7 @@ class MapViewModel @Inject constructor(
             MapIntent.AddPoiClicked -> onAddPoiClicked()
             is MapIntent.ResetExploredTilesClicked -> onClearExploredTilesClicked()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
+            is MapIntent.FogOfWarSourceUpdated -> onFogOfWarSourceUpdated(intent)
         }
     }
 
@@ -235,20 +244,35 @@ class MapViewModel @Inject constructor(
     private suspend fun prepareFogBufferData(
         buffer: FogBufferRegion,
         exploredTiles: Set<ExplorationTile>,
+        visibleTileCount: Long,
     ): PreparedFogBuffer {
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
             val checkCancelled = { coroutineContext.ensureActive() }
+            val diagnosticsEnabled = BuildConfig.DEBUG
+            val totalStartedAt = if (diagnosticsEnabled) TimeSource.Monotonic.markNow() else null
+            val calculateFogRangesStartedAt = if (diagnosticsEnabled) TimeSource.Monotonic.markNow() else null
             val fogRanges = calculateUnexploredFogRanges(
                 tileRange = buffer.bufferedTileRange,
                 exploredTiles = exploredTiles,
                 checkCancelled = checkCancelled,
             )
-            val renderData = fogOfWarRenderDataFactory.create(
+            val calculateFogRangesMillis = calculateFogRangesStartedAt?.elapsedNow()?.inWholeMilliseconds ?: 0
+            val buildRenderDataStartedAt = if (diagnosticsEnabled) TimeSource.Monotonic.markNow() else null
+            val renderOutput = if (diagnosticsEnabled) {
+                fogOfWarRenderDataFactory.createDetailed(
+                    fogRanges = fogRanges,
+                    checkCancelled = checkCancelled,
+                )
+            } else {
+                null
+            }
+            val renderData = renderOutput?.renderData ?: fogOfWarRenderDataFactory.create(
                 fogRanges = fogRanges,
                 checkCancelled = checkCancelled,
             )
+            val buildRenderDataMillis = buildRenderDataStartedAt?.elapsedNow()?.inWholeMilliseconds ?: 0
 
             PreparedFogBuffer(
                 buffer = buffer,
@@ -256,6 +280,24 @@ class MapViewModel @Inject constructor(
                     exploredTiles = exploredTiles,
                     fogRanges = fogRanges,
                     renderData = renderData,
+                    preparationMetrics = FogOfWarPreparationMetrics(
+                        totalPrepareMillis = totalStartedAt?.elapsedNow()?.inWholeMilliseconds ?: 0,
+                        calculateFogRangesMillis = calculateFogRangesMillis,
+                        buildRenderDataMillis = buildRenderDataMillis,
+                        geometryBuildMillis = renderOutput?.metrics?.geometryBuildMillis ?: 0,
+                        featureCollectionBuildMillis = renderOutput?.metrics?.featureCollectionBuildMillis ?: 0,
+                        visibleTileCount = visibleTileCount,
+                        bufferedTileCount = buffer.bufferedTileRange.tileCount,
+                        exploredTileCount = exploredTiles.size,
+                        fogRangeCount = fogRanges.size,
+                        expandedFogCellCount = renderOutput?.metrics?.expandedFogCellCount ?: 0,
+                        connectedRegionCount = renderOutput?.metrics?.connectedRegionCount ?: 0,
+                        boundaryEdgeCount = renderOutput?.metrics?.boundaryEdgeCount ?: 0,
+                        loopCount = renderOutput?.metrics?.loopCount ?: 0,
+                        featureCount = renderOutput?.metrics?.featureCount ?: 0,
+                        ringPointCount = renderOutput?.metrics?.ringPointCount ?: 0,
+                        renderCacheHit = renderOutput?.metrics?.cacheHit ?: false,
+                    ),
                 ),
             )
         }
@@ -381,6 +423,11 @@ class MapViewModel @Inject constructor(
             ?: fallbackFogTileRange
                 ?.takeIf { state.isFogOfWarOverlayEnabled }
                 ?.let(fogOfWarRenderDataFactory::createFullRange)
+        val preparationMetrics = displayedFogData?.preparationMetrics ?: fallbackPreparationMetrics(
+            state = state,
+            fogRanges = fogRanges,
+            hasRenderData = renderData != null,
+        )
 
         return FogOfWarUiState(
             canonicalZoom = state.canonicalZoom,
@@ -394,6 +441,16 @@ class MapViewModel @Inject constructor(
             exploredVisibleTileCount = exploredVisibleTileCount,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
             isRecomputing = state.isFogRecomputationInProgress,
+            diagnostics = if (BuildConfig.DEBUG) {
+                FogOfWarDiagnostics(
+                    lastPreparation = preparationMetrics,
+                    cache = fogOfWarRenderDataFactory.cacheMetricsSnapshot(),
+                    sourceUpdate = state.fogSourceUpdateMetrics,
+                    prepareCancellationCount = state.fogPreparationCancellationCount,
+                )
+            } else {
+                FogOfWarDiagnostics(lastPreparation = preparationMetrics)
+            },
         )
     }
 
@@ -466,6 +523,17 @@ class MapViewModel @Inject constructor(
     private fun onMapLoadFailed(intent: MapIntent.MapLoadFailed) {
         _state.update {
             it.copy(failureMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
+        }
+    }
+
+    private fun onFogOfWarSourceUpdated(intent: MapIntent.FogOfWarSourceUpdated) {
+        _state.update { state ->
+            state.copy(
+                fogSourceUpdateMetrics = state.fogSourceUpdateMetrics.copy(
+                    updateCount = state.fogSourceUpdateMetrics.updateCount + 1,
+                    lastSetDataMillis = intent.elapsedMillis,
+                ),
+            )
         }
     }
 
@@ -677,10 +745,16 @@ class MapViewModel @Inject constructor(
 
         pendingFogPreparationJob = viewModelScope.launch {
             val exploredTiles = observeFogExploredTiles(buffer.bufferedTileRange).first()
-            val preparedFogBuffer = prepareFogBufferData(
-                buffer = buffer,
-                exploredTiles = exploredTiles,
-            )
+            val preparedFogBuffer = try {
+                prepareFogBufferData(
+                    buffer = buffer,
+                    exploredTiles = exploredTiles,
+                    visibleTileCount = _state.value.visibleTileCount,
+                )
+            } catch (exception: CancellationException) {
+                recordFogPreparationCancellation()
+                throw exception
+            }
             var didSwap = false
             var shouldPrepareAnotherBuffer = false
 
@@ -734,10 +808,16 @@ class MapViewModel @Inject constructor(
                     }
 
                     shouldSkipSeed = false
-                    val preparedFogBuffer = prepareFogBufferData(
-                        buffer = buffer,
-                        exploredTiles = exploredTiles,
-                    )
+                    val preparedFogBuffer = try {
+                        prepareFogBufferData(
+                            buffer = buffer,
+                            exploredTiles = exploredTiles,
+                            visibleTileCount = _state.value.visibleTileCount,
+                        )
+                    } catch (exception: CancellationException) {
+                        recordFogPreparationCancellation()
+                        throw exception
+                    }
 
                     _state.update { current ->
                         if (current.displayedFogBuffer != buffer || current.isFogSuppressedByVisibleTileLimit) {
@@ -747,6 +827,14 @@ class MapViewModel @Inject constructor(
                         }
                     }
                 }
+        }
+    }
+
+    private fun recordFogPreparationCancellation() {
+        _state.update { state ->
+            state.copy(
+                fogPreparationCancellationCount = state.fogPreparationCancellationCount + 1,
+            )
         }
     }
 
@@ -916,6 +1004,18 @@ class MapViewModel @Inject constructor(
             horizontalFraction = RESOURCE_QUERY_BUFFER_FRACTION,
             verticalFraction = RESOURCE_QUERY_BUFFER_FRACTION,
         )
+
+    private fun fallbackPreparationMetrics(
+        state: State,
+        fogRanges: List<ExplorationTileRange>,
+        hasRenderData: Boolean,
+    ): FogOfWarPreparationMetrics = FogOfWarPreparationMetrics(
+        visibleTileCount = state.visibleTileCount,
+        bufferedTileCount = state.displayedFogBuffer?.bufferedTileRange?.tileCount ?: 0,
+        fogRangeCount = fogRanges.size,
+        featureCount = if (hasRenderData) 1 else 0,
+        ringPointCount = if (hasRenderData) 5 else 0,
+    )
 
     private fun GeoBounds.expandedBy(
         horizontalFraction: Double,

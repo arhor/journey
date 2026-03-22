@@ -630,6 +630,36 @@ class MapViewModelTest {
             actual.fogOfWar.visibleTileCount shouldBe 4L
             actual.fogOfWar.exploredVisibleTileCount shouldBe 1
             actual.fogOfWar.renderData.shouldNotBeNull()
+            actual.fogOfWar.diagnostics.lastPreparation.visibleTileCount shouldBe 4L
+            actual.fogOfWar.diagnostics.lastPreparation.exploredTileCount shouldBe 1
+            actual.fogOfWar.diagnostics.lastPreparation.fogRangeCount shouldBe actual.fogOfWar.fogRanges.size
+            actual.fogOfWar.diagnostics.lastPreparation.featureCount shouldBe 1
+            actual.fogOfWar.diagnostics.cache.renderMisses shouldBe 1
+            actual.fogOfWar.diagnostics.sourceUpdate.updateCount shouldBe 0
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should track fog source update timing diagnostics`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.FogOfWarSourceUpdated(elapsedMillis = 12))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.diagnostics.sourceUpdate.updateCount == 1L
+            }
+            actual.fogOfWar.diagnostics.sourceUpdate.lastSetDataMillis shouldBe 12
         } finally {
             tearDownMainDispatcher()
         }
