@@ -41,6 +41,9 @@ import com.github.arhor.journey.feature.map.model.FogOfWarSourceUpdateMetrics
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
+import com.github.arhor.journey.feature.map.model.MapViewportSize
+import com.github.arhor.journey.feature.map.prewarm.MapTilePrewarmRequest
+import com.github.arhor.journey.feature.map.prewarm.MapTilePrewarmer
 import com.github.arhor.journey.feature.map.renderer.FogOfWarRenderDataFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -64,6 +67,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.time.TimeSource
+import kotlin.time.Duration.Companion.milliseconds
 import javax.inject.Inject
 
 private const val DEFAULT_CAMERA_ZOOM = 17.0
@@ -74,6 +78,12 @@ private const val MIN_LONGITUDE = -180.0
 private const val MAX_LONGITUDE = 180.0 - 1e-9
 private const val MIN_LATITUDE = -85.05112878
 private const val MAX_LATITUDE = 85.05112878
+private const val CAMERA_PREWARM_REQUEST_KEY = "main-map-camera"
+private const val STATIC_CAMERA_PREWARM_SAMPLE_COUNT = 1
+private const val ANIMATED_CAMERA_PREWARM_SAMPLE_COUNT = 4
+private const val STATIC_CAMERA_PREWARM_BURST_LIMIT = 48
+private const val ANIMATED_CAMERA_PREWARM_BURST_LIMIT = 96
+private val USER_LOCATION_RECENTER_PREWARM_DURATION = 600.milliseconds
 
 @Immutable
 private data class DisplayedFogData(
@@ -98,6 +108,7 @@ private data class State(
     val revealRadiusMeters: Int,
     val mapRenderMode: MapRenderMode = MapRenderMode.Standard,
     val visibleBounds: GeoBounds? = null,
+    val viewportSize: MapViewportSize? = null,
     val resourceQueryBounds: GeoBounds? = null,
     val visibleTileRange: ExplorationTileRange? = null,
     val displayedFogBuffer: FogBufferRegion? = null,
@@ -128,6 +139,7 @@ class MapViewModel @Inject constructor(
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
     private val stopExplorationTrackingSession: StopExplorationTrackingSessionUseCase,
+    private val mapTilePrewarmer: MapTilePrewarmer,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -243,6 +255,7 @@ class MapViewModel @Inject constructor(
             MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
             MapIntent.StopTrackingClicked -> onStopTrackingClicked()
             is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
+            is MapIntent.MapViewportSizeChanged -> onMapViewportSizeChanged(intent)
             is MapIntent.CameraGestureStarted -> onCameraGestureStarted(intent)
             is MapIntent.CameraSettled -> onCameraSettled(intent)
             is MapIntent.CurrentLocationUnavailable -> onCurrentLocationUnavailable()
@@ -581,6 +594,23 @@ class MapViewModel @Inject constructor(
             startTrackingSessionIfNeeded()
 
             if (wasAwaitingLocationPermissionResult) {
+                trackingSession.value.lastKnownLocation
+                    ?.toLatLng()
+                    ?.toCameraPosition(
+                        zoom = (uiState.value as? MapUiState.Content)
+                            ?.cameraPosition
+                            ?.zoom
+                            ?: DEFAULT_CAMERA_ZOOM,
+                    )
+                    ?.let { targetCamera ->
+                        requestTilePrewarm(
+                            targetCamera = targetCamera,
+                            animationDuration = USER_LOCATION_RECENTER_PREWARM_DURATION,
+                            sampleCount = ANIMATED_CAMERA_PREWARM_SAMPLE_COUNT,
+                            burstLimit = ANIMATED_CAMERA_PREWARM_BURST_LIMIT,
+                        )
+                    }
+
                 _state.update {
                     it.copy(
                         cameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC,
@@ -607,6 +637,19 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onMapTapped(intent: MapIntent.MapTapped) {
+        requestTilePrewarm(
+            targetCamera = CameraPositionState(
+                target = intent.target,
+                zoom = (uiState.value as? MapUiState.Content)
+                    ?.cameraPosition
+                    ?.zoom
+                    ?: DEFAULT_CAMERA_ZOOM,
+            ),
+            animationDuration = kotlin.time.Duration.ZERO,
+            sampleCount = STATIC_CAMERA_PREWARM_SAMPLE_COUNT,
+            burstLimit = STATIC_CAMERA_PREWARM_BURST_LIMIT,
+        )
+
         _state.update {
             it.copy(
                 cameraPosition = CameraPositionState(
@@ -635,6 +678,16 @@ class MapViewModel @Inject constructor(
 
     private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
         updateFogViewport(intent.visibleBounds)
+    }
+
+    private fun onMapViewportSizeChanged(intent: MapIntent.MapViewportSizeChanged) {
+        _state.update { state ->
+            if (state.viewportSize == intent.viewportSize) {
+                state
+            } else {
+                state.copy(viewportSize = intent.viewportSize)
+            }
+        }
     }
 
     private fun onCameraGestureStarted(intent: MapIntent.CameraGestureStarted) {
@@ -871,6 +924,16 @@ class MapViewModel @Inject constructor(
         val parsedId = parseMapObjectId(objectUiModel.id) ?: return
 
         try {
+            requestTilePrewarm(
+                targetCamera = CameraPositionState(
+                    target = objectUiModel.position,
+                    zoom = contentState.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
+                ),
+                animationDuration = kotlin.time.Duration.ZERO,
+                sampleCount = STATIC_CAMERA_PREWARM_SAMPLE_COUNT,
+                burstLimit = STATIC_CAMERA_PREWARM_BURST_LIMIT,
+            )
+
             _state.update {
                 it.copy(
                     cameraPosition = CameraPositionState(
@@ -899,6 +962,30 @@ class MapViewModel @Inject constructor(
         } catch (e: Throwable) {
             emitEffect(MapEffect.ShowMessage(e.message ?: EXPLORATION_CLEAR_FAILED_MESSAGE))
         }
+    }
+
+    private fun requestTilePrewarm(
+        targetCamera: CameraPositionState,
+        animationDuration: kotlin.time.Duration,
+        sampleCount: Int,
+        burstLimit: Int,
+    ) {
+        val contentState = uiState.value as? MapUiState.Content ?: return
+        val selectedStyle = contentState.selectedStyle ?: return
+
+        mapTilePrewarmer.prewarm(
+            MapTilePrewarmRequest(
+                requestKey = CAMERA_PREWARM_REQUEST_KEY,
+                style = selectedStyle,
+                currentCamera = contentState.cameraPosition,
+                targetCamera = targetCamera,
+                currentVisibleBounds = _state.value.visibleBounds,
+                viewportSize = _state.value.viewportSize,
+                animationDuration = animationDuration,
+                sampleCount = sampleCount,
+                burstLimit = burstLimit,
+            ),
+        )
     }
 
     private fun PointOfInterest.toUiModel(isDiscovered: Boolean): MapObjectUiModel =

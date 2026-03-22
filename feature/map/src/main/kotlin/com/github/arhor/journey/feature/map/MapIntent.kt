@@ -4,6 +4,7 @@ import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.model.MapViewportSize
 
 sealed interface MapIntent {
     data object MapOpened : MapIntent
@@ -43,6 +44,10 @@ sealed interface MapIntent {
 
     data class CameraViewportChanged(
         val visibleBounds: GeoBounds,
+    ) : MapIntent
+
+    data class MapViewportSizeChanged(
+        val viewportSize: MapViewportSize,
     ) : MapIntent
 
     data class CameraGestureStarted(

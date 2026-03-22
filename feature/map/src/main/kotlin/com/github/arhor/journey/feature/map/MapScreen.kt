@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.renderer.FogOfWarRendererAdapter
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
 import com.github.arhor.journey.feature.map.renderer.TilesGridRendererAdapter
@@ -238,7 +240,18 @@ internal fun MapContent(
         state.selectedStyle?.let { style ->
             key(style) {
                 MaplibreMap(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { size ->
+                            dispatch(
+                                MapIntent.MapViewportSizeChanged(
+                                    viewportSize = MapViewportSize(
+                                        widthPx = size.width,
+                                        heightPx = size.height,
+                                    ),
+                                ),
+                            )
+                        },
                     baseStyle = when (style.type) {
                         MapStyle.Type.BUNDLE -> BaseStyle.Json(style.value)
                         MapStyle.Type.REMOTE -> BaseStyle.Uri(style.value)

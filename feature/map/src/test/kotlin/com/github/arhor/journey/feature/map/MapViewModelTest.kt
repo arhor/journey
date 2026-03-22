@@ -35,6 +35,8 @@ import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUse
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.model.MapViewportSize
+import com.github.arhor.journey.feature.map.prewarm.MapTilePrewarmer
 import com.github.arhor.journey.feature.map.renderer.FogOfWarRenderDataFactory
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -46,6 +48,7 @@ import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -620,6 +623,11 @@ class MapViewModelTest {
                 )
                 advanceUntilIdle()
                 fixture.viewModel.awaitContent { it.cameraPosition == manualCameraPosition }
+                fixture.viewModel.dispatch(
+                    MapIntent.MapViewportSizeChanged(
+                        viewportSize = MapViewportSize(widthPx = 1080, heightPx = 1920),
+                    ),
+                )
 
                 // When
                 fixture.viewModel.dispatch(MapIntent.RecenterClicked)
@@ -634,6 +642,21 @@ class MapViewModelTest {
                 actual.recenterRequestToken shouldBe 1
                 actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
                 actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+                verify(exactly = 1) {
+                    fixture.mapTilePrewarmer.prewarm(
+                        match { request ->
+                            request.style == fixture.mapStyle &&
+                                request.currentCamera == manualCameraPosition &&
+                                request.targetCamera == CameraPositionState(
+                                    target = LatLng(latitude = 40.7306, longitude = -73.9352),
+                                    zoom = manualCameraPosition.zoom,
+                                ) &&
+                                request.viewportSize == MapViewportSize(widthPx = 1080, heightPx = 1920) &&
+                                request.sampleCount == 4 &&
+                                request.burstLimit == 96
+                        },
+                    )
+                }
             } finally {
                 tearDownMainDispatcher()
             }
@@ -1004,9 +1027,14 @@ class MapViewModelTest {
         val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
 
         try {
-            fixture.viewModel.awaitContent {
+            val initial = fixture.viewModel.awaitContent {
                 it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
             }
+            fixture.viewModel.dispatch(
+                MapIntent.MapViewportSizeChanged(
+                    viewportSize = MapViewportSize(widthPx = 1080, heightPx = 1920),
+                ),
+            )
 
             // When
             fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
@@ -1022,6 +1050,21 @@ class MapViewModelTest {
             }
             actual.cameraPosition?.target shouldBe tappedLocation
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+            verify(exactly = 1) {
+                fixture.mapTilePrewarmer.prewarm(
+                    match { request ->
+                        request.style == fixture.mapStyle &&
+                            request.currentCamera == initial.cameraPosition &&
+                            request.targetCamera == CameraPositionState(
+                                target = tappedLocation,
+                                zoom = initial.cameraPosition.shouldNotBeNull().zoom,
+                            ) &&
+                            request.viewportSize == MapViewportSize(widthPx = 1080, heightPx = 1920) &&
+                            request.sampleCount == 1 &&
+                            request.burstLimit == 48
+                    },
+                )
+            }
         } finally {
             tearDownMainDispatcher()
         }
@@ -1218,6 +1261,7 @@ class MapViewModelTest {
         val viewModel: MapViewModel,
         val mapStyle: MapStyle,
         val trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>,
+        val mapTilePrewarmer: MapTilePrewarmer,
         val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
         val observeExploredTiles: ObserveExploredTilesUseCase,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
@@ -1255,6 +1299,7 @@ class MapViewModelTest {
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
         val stopTrackingSession = mockk<StopExplorationTrackingSessionUseCase>()
+        val mapTilePrewarmer = mockk<MapTilePrewarmer>()
 
         val mapStyle = MapStyle.remote(
             id = "style-remote",
@@ -1277,6 +1322,7 @@ class MapViewModelTest {
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow
         every { setExplorationTileCanonicalZoom.invoke(any()) } just runs
         every { setExplorationTileRevealRadius.invoke(any()) } just runs
+        every { mapTilePrewarmer.prewarm(any()) } returns Job()
 
         coEvery { discoverPointOfInterest.invoke(any()) } just runs
         coEvery { clearExploredTiles.invoke() } just runs
@@ -1299,9 +1345,11 @@ class MapViewModelTest {
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 stopExplorationTrackingSession = stopTrackingSession,
+                mapTilePrewarmer = mapTilePrewarmer,
             ),
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
+            mapTilePrewarmer = mapTilePrewarmer,
             observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
             observeExploredTiles = observeExploredTiles,
             discoverPointOfInterest = discoverPointOfInterest,
