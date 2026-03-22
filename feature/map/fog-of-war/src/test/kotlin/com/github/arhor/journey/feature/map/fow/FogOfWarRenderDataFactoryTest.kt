@@ -1,7 +1,6 @@
-package com.github.arhor.journey.feature.map.renderer
+package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTileRange
-import com.github.arhor.journey.feature.map.model.FogOfWarCacheMetrics
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.junit.Test

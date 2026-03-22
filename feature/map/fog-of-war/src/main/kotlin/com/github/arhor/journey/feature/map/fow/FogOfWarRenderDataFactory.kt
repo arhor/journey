@@ -1,10 +1,8 @@
-package com.github.arhor.journey.feature.map.renderer
+package com.github.arhor.journey.feature.map.fow
 
 import androidx.collection.LruCache
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTileRange
-import com.github.arhor.journey.feature.map.model.FogOfWarCacheMetrics
-import com.github.arhor.journey.feature.map.model.FogOfWarRenderData
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject

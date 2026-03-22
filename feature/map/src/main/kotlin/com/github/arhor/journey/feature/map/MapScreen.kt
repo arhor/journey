@@ -5,10 +5,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BugReport
@@ -33,11 +31,11 @@ import com.github.arhor.journey.core.ui.components.LoadingIndicator
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.feature.map.fow.ApplyFogOfWar
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
-import com.github.arhor.journey.feature.map.renderer.FogOfWarRendererAdapter
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
 import com.github.arhor.journey.feature.map.renderer.TilesGridRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
@@ -285,16 +283,14 @@ internal fun MapContent(
                         )
                     }
 
-                    if (state.debug.isFogOfWarOverlayEnabled) {
-                        FogOfWarRendererAdapter(
-                            fogRenderData = state.fogOfWar.renderData,
-                            onSourceDataUpdated = { elapsedMillis ->
-                                if (BuildConfig.DEBUG) {
-                                    dispatch(MapIntent.FogOfWarSourceUpdated(elapsedMillis))
-                                }
-                            },
-                        )
-                    }
+                    ApplyFogOfWar(
+                        state = state.fogOfWar,
+                        onSourceDataUpdated = { elapsedMillis ->
+                            if (BuildConfig.DEBUG) {
+                                dispatch(MapIntent.FogOfWarSourceUpdated(elapsedMillis))
+                            }
+                        },
+                    )
 
                     if (
                         state.debug.isTilesGridOverlayEnabled &&

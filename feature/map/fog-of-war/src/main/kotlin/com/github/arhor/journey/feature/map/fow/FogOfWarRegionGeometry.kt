@@ -1,10 +1,12 @@
-package com.github.arhor.journey.feature.map.renderer
+package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import org.maplibre.spatialk.geojson.Polygon
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.min
@@ -261,7 +263,7 @@ private fun Set<TileCell>.toTileRegionGeometryBuildResult(
 ): TileRegionGeometryBuildResult {
     val boundaryLoopResult = extractBoundaryLoops(checkCancelled = checkCancelled)
     val boundaryLoops = boundaryLoopResult.loops
-    val exteriorLoop = boundaryLoops.maxBy { loop -> kotlin.math.abs(loop.signedAreaGeo()) }
+    val exteriorLoop = boundaryLoops.maxBy { loop -> abs(loop.signedAreaGeo()) }
     val holeLoops = boundaryLoops
         .filterNot { it === exteriorLoop }
         .sortedWith(
@@ -428,8 +430,8 @@ private fun quarterArcPoints(
         x = entry.x + exit.x - corner.x,
         y = entry.y + exit.y - corner.y,
     )
-    val startAngle = kotlin.math.atan2(entry.y - center.y, entry.x - center.x)
-    val endAngle = kotlin.math.atan2(exit.y - center.y, exit.x - center.x)
+    val startAngle = atan2(entry.y - center.y, entry.x - center.x)
+    val endAngle = atan2(exit.y - center.y, exit.x - center.x)
     val angleDelta = shortestAngleDelta(startAngle, endAngle)
 
     return (0..arcSegmentsPerCorner).map { step ->
@@ -541,8 +543,8 @@ private fun GridPoint.normalized(): GridPoint {
 private fun GridPoint.approximatelyEquals(
     other: GridPoint,
     epsilon: Double = GEOMETRY_EPSILON,
-): Boolean = kotlin.math.abs(x - other.x) <= epsilon &&
-    kotlin.math.abs(y - other.y) <= epsilon
+): Boolean = abs(x - other.x) <= epsilon &&
+    abs(y - other.y) <= epsilon
 
 private fun areCollinear(
     previous: GridVertex,
@@ -561,7 +563,7 @@ private fun areCollinear(
 private fun Double.approximatelyEquals(
     other: Double,
     epsilon: Double = GEOMETRY_EPSILON,
-): Boolean = kotlin.math.abs(this - other) <= epsilon
+): Boolean = abs(this - other) <= epsilon
 
 private operator fun GridPoint.plus(other: GridPoint): GridPoint = GridPoint(
     x = x + other.x,

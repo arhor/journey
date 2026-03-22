@@ -9,18 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -33,14 +27,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.model.GeoBounds
-import kotlin.math.roundToInt
+import com.github.arhor.journey.feature.map.fow.toBufferingDebugString
+import com.github.arhor.journey.feature.map.fow.toSummaryDebugString
 
 @Immutable
 data class MapDebugUiState(
     val isSheetVisible: Boolean,
     val enabledInfoItems: Set<MapDebugInfoItem>,
-    val isFogOfWarOverlayEnabled: Boolean,
     val isTilesGridOverlayEnabled: Boolean,
     val canonicalZoom: Int,
     val revealRadiusMeters: Int,
@@ -108,7 +101,7 @@ internal fun MapDebugControlsSheet(
             ) {
                 DebugSwitchRow(
                     label = stringResource(R.string.map_debug_fog_overlay_label),
-                    checked = state.debug.isFogOfWarOverlayEnabled,
+                    checked = state.fogOfWar.isOverlayEnabled,
                     onCheckedChange = { isChecked ->
                         dispatch(MapIntent.FogOfWarOverlayToggled(isEnabled = isChecked))
                     },
@@ -293,12 +286,12 @@ internal fun MapDebugInfoOverlay(
                             if (state.fogOfWar.isSuppressedByVisibleTileLimit) {
                                 stringResource(R.string.map_debug_info_fog_hidden)
                             } else {
-                                state.fogOfWar.toFogSummaryDebugString()
+                                state.fogOfWar.toSummaryDebugString()
                             }
                         }
 
                         MapDebugInfoItem.FogBuffering -> {
-                            state.fogOfWar.toFogBufferingDebugString()
+                            state.fogOfWar.toBufferingDebugString()
                         }
 
                         MapDebugInfoItem.TrackingStatus -> {
@@ -451,80 +444,7 @@ private fun MapRenderMode.labelRes(): Int =
     when (this) {
         MapRenderMode.Standard -> R.string.map_debug_render_mode_standard
         MapRenderMode.Debug -> R.string.map_debug_render_mode_debug
-    }
-
-private fun GeoBounds?.toDebugString(): String {
-    return this?.let { bounds ->
-        "[${bounds.south.debugCoord()},${bounds.west.debugCoord()} .. ${bounds.north.debugCoord()},${bounds.east.debugCoord()}]"
-    } ?: "n/a"
 }
-
-private fun FogOfWarUiState.toFogSummaryDebugString(): String = buildString {
-    append("Fog ranges=")
-    append(fogRanges.size)
-    append(" features=")
-    append(diagnostics.lastPreparation.featureCount)
-    append(" cells=")
-    append(diagnostics.lastPreparation.expandedFogCellCount)
-    append(" explored=")
-    append(diagnostics.lastPreparation.exploredTileCount)
-    append(" loops=")
-    append(diagnostics.lastPreparation.loopCount)
-    append(" points=")
-    append(diagnostics.lastPreparation.ringPointCount)
-}
-
-private fun FogOfWarUiState.toFogBufferingDebugString(): String = buildString {
-    append("FOW buffer: loading=")
-    append(isRecomputing)
-    append(" viewport=")
-    append(visibleBounds.toDebugString())
-    append(" trigger=")
-    append(triggerBounds.toDebugString())
-    append(" buffered=")
-    append(bufferedBounds.toDebugString())
-    append('\n')
-    append("prepare(ms): total=")
-    append(diagnostics.lastPreparation.totalPrepareMillis)
-    append(" calc=")
-    append(diagnostics.lastPreparation.calculateFogRangesMillis)
-    append(" render=")
-    append(diagnostics.lastPreparation.buildRenderDataMillis)
-    append(" geom=")
-    append(diagnostics.lastPreparation.geometryBuildMillis)
-    append(" geojson=")
-    append(diagnostics.lastPreparation.featureCollectionBuildMillis)
-    append(" setData=")
-    append(diagnostics.sourceUpdate.lastSetDataMillis)
-    append('\n')
-    append("tiles: visible=")
-    append(diagnostics.lastPreparation.visibleTileCount)
-    append(" buffered=")
-    append(diagnostics.lastPreparation.bufferedTileCount)
-    append(" regions=")
-    append(diagnostics.lastPreparation.connectedRegionCount)
-    append(" edges=")
-    append(diagnostics.lastPreparation.boundaryEdgeCount)
-    append('\n')
-    append("cache: hit=")
-    append(diagnostics.lastPreparation.renderCacheHit)
-    append(" render=")
-    append(diagnostics.cache.renderHits)
-    append('/')
-    append(diagnostics.cache.renderMisses)
-    append(" full=")
-    append(diagnostics.cache.fullRangeHits)
-    append('/')
-    append(diagnostics.cache.fullRangeMisses)
-    append(" updates=")
-    append(diagnostics.sourceUpdate.updateCount)
-    append(" cancelled=")
-    append(diagnostics.prepareCancellationCount)
-}
-
-private fun Double.debugCoord(): String = (this * 10_000.0).roundToInt()
-    .div(10_000.0)
-    .toString()
 
 @StringRes
 internal fun MapUiState.Content.trackingStatusMessageRes(): Int {

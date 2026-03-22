@@ -37,5 +37,6 @@ include(
     ":core:ui",
     ":feature:hero",
     ":feature:map",
+    ":feature:map:fog-of-war",
     ":feature:settings",
 )

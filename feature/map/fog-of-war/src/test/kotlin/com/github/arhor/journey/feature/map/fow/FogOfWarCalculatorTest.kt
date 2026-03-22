@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.map
+package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange

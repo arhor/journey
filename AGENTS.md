@@ -18,7 +18,8 @@ Gradle modules:
 - `:core:navigation` - shared navigation types such as `BottomNavDestination`.
 - `:core:ui` - shared UI architecture support; currently mainly `MviViewModel`.
 - `:feature:hero` - hero screen, route, navigation contract, and view model.
-- `:feature:map` - map flow, POI flows, map rendering helpers, tracking session UI, and related view models.
+- `:feature:map` - map flow, POI flows, map rendering integration, tracking session UI, and related view models.
+- `:feature:map:fog-of-war` - fog-of-war state, buffering, render-data preparation, diagnostics, and map overlay application.
 - `:feature:settings` - settings screen, navigation contract, Health Connect entry points, and view model.
 
 Primary source locations:
@@ -30,6 +31,7 @@ Primary source locations:
 - Core navigation: `core/navigation/src/main/kotlin/com/github/arhor/journey/core/navigation`
 - Core UI: `core/ui/src/main/kotlin/com/github/arhor/journey/core/ui`
 - Features: `feature/<name>/src/main/kotlin/com/github/arhor/journey/feature/<name>`
+- Map fog of war: `feature/map/fog-of-war/src/main/kotlin/com/github/arhor/journey/feature/map/fow`
 - App resources: `app/src/main/res`
 
 Build configuration lives in:
@@ -50,6 +52,7 @@ Keep dependency direction intact:
 - `:app -> :data, :domain, :core:*, :feature:*`
 - `:core:ui -> :core:common`
 - `:feature:* -> :domain, :core:*`
+- `:feature:map -> :feature:map:fog-of-war`
 - `:data -> :domain, :core:common`
 - `:domain -> :core:common`
 
@@ -63,6 +66,7 @@ Practical rules:
 - Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`; features own typed destinations and `*Graph(...)` builders.
 - Use typed navigation contracts with `@Serializable` destinations and `composable<T>` routes, matching existing feature modules.
 - `:feature:map` may start, stop, or observe exploration tracking sessions, but it must not own continuous location collection or the tile-reveal pipeline.
+- Keep fog-of-war implementation details in `:feature:map:fog-of-war`; `:feature:map` should consume its public state/controller API instead of rebuilding fog logic locally.
 
 ## UI & State Management Conventions
 Main screen pattern:

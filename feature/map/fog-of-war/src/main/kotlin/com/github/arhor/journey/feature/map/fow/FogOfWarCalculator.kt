@@ -1,9 +1,9 @@
-package com.github.arhor.journey.feature.map
+package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 
-internal fun calculateUnexploredFogRanges(
+fun calculateUnexploredFogRanges(
     tileRange: ExplorationTileRange?,
     exploredTiles: Set<ExplorationTile>,
     checkCancelled: () -> Unit = {},

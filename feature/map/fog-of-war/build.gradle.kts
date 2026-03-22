@@ -7,8 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.github.arhor.journey.feature.map"
-
+    namespace = "com.github.arhor.journey.feature.map.fow"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -37,7 +36,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:navigation"))
     implementation(project(":core:ui"))
-    implementation(project(":feature:map:fog-of-war"))
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.material3)

@@ -1,19 +1,19 @@
-package com.github.arhor.journey.feature.map.renderer
+package com.github.arhor.journey.feature.map.fow
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import com.github.arhor.journey.feature.map.model.FogOfWarRenderData
 import kotlin.time.TimeSource
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.FillLayer
+import org.maplibre.compose.sources.GeoJsonOptions
 import org.maplibre.compose.sources.GeoJsonSource
 import org.maplibre.compose.util.MaplibreComposable
 
 @Composable
 @MaplibreComposable
-fun FogOfWarRendererAdapter(
+internal fun FogOfWarRendererAdapter(
     fogRenderData: FogOfWarRenderData?,
     onSourceDataUpdated: (Long) -> Unit = {},
 ) {
@@ -22,7 +22,7 @@ fun FogOfWarRendererAdapter(
         GeoJsonSource(
             id = FOG_OF_WAR_SOURCE_ID,
             data = geoJsonData,
-            options = org.maplibre.compose.sources.GeoJsonOptions(),
+            options = GeoJsonOptions(),
         )
     }
 

@@ -32,12 +32,14 @@ import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUs
 import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
+import com.github.arhor.journey.feature.map.fow.FogOfWarController
+import com.github.arhor.journey.feature.map.fow.FogOfWarRenderDataFactory
+import com.github.arhor.journey.feature.map.fow.createFogBufferRegion
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.prewarm.MapTilePrewarmer
-import com.github.arhor.journey.feature.map.renderer.FogOfWarRenderDataFactory
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -56,7 +58,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.mapNotNull
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -248,7 +249,7 @@ class MapViewModelTest {
             // Then
             actual.debug.isSheetVisible shouldBe false
             actual.debug.enabledInfoItems shouldBe emptySet()
-            actual.debug.isFogOfWarOverlayEnabled shouldBe true
+            actual.fogOfWar.isOverlayEnabled shouldBe true
             actual.debug.isTilesGridOverlayEnabled shouldBe false
             actual.debug.canonicalZoom shouldBe ExplorationTilePrototype.CANONICAL_ZOOM
             actual.debug.revealRadiusMeters shouldBe ExplorationTilePrototype.REVEAL_RADIUS_METERS.toInt()
@@ -355,11 +356,11 @@ class MapViewModelTest {
 
             // Then
             val actual = fixture.viewModel.awaitContent {
-                !it.debug.isFogOfWarOverlayEnabled &&
+                !it.fogOfWar.isOverlayEnabled &&
                     it.debug.isTilesGridOverlayEnabled &&
                     it.debug.renderMode == MapRenderMode.Debug
             }
-            actual.debug.isFogOfWarOverlayEnabled shouldBe false
+            actual.fogOfWar.isOverlayEnabled shouldBe false
             actual.debug.isTilesGridOverlayEnabled shouldBe true
             actual.debug.renderMode shouldBe MapRenderMode.Debug
             coVerify(exactly = 0) { fixture.clearExploredTiles.invoke() }
@@ -1334,14 +1335,16 @@ class MapViewModelTest {
                 observePointsOfInterest = observePointsOfInterest,
                 observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
                 observeExplorationProgress = observeExplorationProgress,
-                observeExploredTiles = observeExploredTiles,
                 observeSelectedMapStyle = observeSelectedMapStyle,
                 discoverPointOfInterest = discoverPointOfInterest,
                 clearExploredTiles = clearExploredTiles,
                 getExplorationTileRuntimeConfig = getExplorationTileRuntimeConfig,
                 setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
                 setExplorationTileRevealRadius = setExplorationTileRevealRadius,
-                fogOfWarRenderDataFactory = FogOfWarRenderDataFactory(),
+                fogOfWarController = FogOfWarController(
+                    observeExploredTiles = observeExploredTiles,
+                    renderDataFactory = FogOfWarRenderDataFactory(),
+                ),
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 stopExplorationTrackingSession = stopTrackingSession,

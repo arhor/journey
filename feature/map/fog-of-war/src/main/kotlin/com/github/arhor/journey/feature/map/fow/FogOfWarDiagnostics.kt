@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.map.model
+package com.github.arhor.journey.feature.map.fow
 
 import androidx.compose.runtime.Immutable
 

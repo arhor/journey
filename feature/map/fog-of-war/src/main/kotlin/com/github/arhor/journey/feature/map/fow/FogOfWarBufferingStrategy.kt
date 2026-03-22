@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.map
+package com.github.arhor.journey.feature.map.fow
 
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
@@ -11,14 +11,14 @@ private const val BUFFERED_TILE_PADDING_MULTIPLIER = 1.0
 private const val MIN_TILE_PADDING = 1
 
 @Immutable
-internal data class FogViewportSnapshot(
+data class FogViewportSnapshot(
     val visibleBounds: GeoBounds,
     val visibleTileRange: ExplorationTileRange,
     val visibleTileCount: Long,
 )
 
 @Immutable
-internal data class FogBufferRegion(
+data class FogBufferRegion(
     val triggerBounds: GeoBounds,
     val bufferedBounds: GeoBounds,
     val triggerTileRange: ExplorationTileRange,
@@ -28,7 +28,7 @@ internal data class FogBufferRegion(
     fun shouldRecompute(visibleBounds: GeoBounds): Boolean = !triggerBounds.strictlyContains(visibleBounds)
 }
 
-internal fun createFogViewportSnapshot(
+fun createFogViewportSnapshot(
     visibleBounds: GeoBounds,
     canonicalZoom: Int,
 ): FogViewportSnapshot {
@@ -44,7 +44,7 @@ internal fun createFogViewportSnapshot(
     )
 }
 
-internal fun createFogBufferRegion(
+fun createFogBufferRegion(
     visibleTileRange: ExplorationTileRange,
 ): FogBufferRegion {
     val visibleTileWidth = visibleTileRange.widthInTiles()
@@ -82,7 +82,7 @@ internal fun createFogBufferRegion(
     )
 }
 
-internal fun createFogBufferRegion(
+fun createFogBufferRegion(
     visibleBounds: GeoBounds,
     canonicalZoom: Int,
 ): FogBufferRegion = createFogBufferRegion(
@@ -92,21 +92,21 @@ internal fun createFogBufferRegion(
     ).visibleTileRange,
 )
 
-internal fun GeoBounds.containsInclusive(other: GeoBounds): Boolean {
+fun GeoBounds.containsInclusive(other: GeoBounds): Boolean {
     return other.south >= south &&
         other.west >= west &&
         other.north <= north &&
         other.east <= east
 }
 
-internal fun GeoBounds.strictlyContains(other: GeoBounds): Boolean {
+fun GeoBounds.strictlyContains(other: GeoBounds): Boolean {
     return other.south > south &&
         other.west > west &&
         other.north < north &&
         other.east < east
 }
 
-internal fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
+fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
     return zoom == other.zoom &&
         other.minX >= minX &&
         other.maxX <= maxX &&
@@ -114,9 +114,9 @@ internal fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean
         other.maxY <= maxY
 }
 
-internal fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
+fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
 
-internal fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
+fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
 
 private fun bufferedTilePaddingFor(
     visibleSpan: Int,
