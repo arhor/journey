@@ -18,6 +18,7 @@ subprojects {
             freeCompilerArgs.addAll(
                 "-XXLanguage:+ContextParameters",
                 "-XXLanguage:+PropertyParamAnnotationDefaultTargetMode",
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
                 "-opt-in=kotlin.contracts.ExperimentalContracts",
                 "-opt-in=kotlin.contracts.ExperimentalExtendedContracts",
                 "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -60,23 +61,6 @@ enum class MapRenderMode {
     Debug,
 }
 
-@Composable
-internal fun MapDebugButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SmallFloatingActionButton(
-        onClick = onClick,
-        modifier = modifier,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.BugReport,
-            contentDescription = stringResource(R.string.map_debug_button_content_description),
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun MapDebugControlsSheet(
     state: MapUiState.Content,
@@ -284,20 +268,26 @@ internal fun MapDebugInfoOverlay(
 
                 Text(
                     text = when (item) {
-                        MapDebugInfoItem.FogZoom -> stringResource(
-                            R.string.map_debug_info_fog_zoom_value,
-                            state.fogOfWar.canonicalZoom,
-                        )
+                        MapDebugInfoItem.FogZoom -> {
+                            stringResource(
+                                R.string.map_debug_info_fog_zoom_value,
+                                state.fogOfWar.canonicalZoom,
+                            )
+                        }
 
-                        MapDebugInfoItem.VisibleTiles -> stringResource(
-                            R.string.map_debug_info_visible_tiles_value,
-                            state.fogOfWar.visibleTileCount,
-                        )
+                        MapDebugInfoItem.VisibleTiles -> {
+                            stringResource(
+                                R.string.map_debug_info_visible_tiles_value,
+                                state.fogOfWar.visibleTileCount,
+                            )
+                        }
 
-                        MapDebugInfoItem.ExploredHere -> stringResource(
-                            R.string.map_debug_info_explored_here_value,
-                            state.fogOfWar.exploredVisibleTileCount,
-                        )
+                        MapDebugInfoItem.ExploredHere -> {
+                            stringResource(
+                                R.string.map_debug_info_explored_here_value,
+                                state.fogOfWar.exploredVisibleTileCount,
+                            )
+                        }
 
                         MapDebugInfoItem.FogSummary -> {
                             if (state.fogOfWar.isSuppressedByVisibleTileLimit) {
@@ -307,12 +297,16 @@ internal fun MapDebugInfoOverlay(
                             }
                         }
 
-                        MapDebugInfoItem.FogBuffering -> state.fogOfWar.toFogBufferingDebugString()
+                        MapDebugInfoItem.FogBuffering -> {
+                            state.fogOfWar.toFogBufferingDebugString()
+                        }
 
-                        MapDebugInfoItem.TrackingStatus -> stringResource(
-                            R.string.map_debug_info_tracking_status_value,
-                            stringResource(state.trackingStatusMessageRes()),
-                        )
+                        MapDebugInfoItem.TrackingStatus -> {
+                            stringResource(
+                                R.string.map_debug_info_tracking_status_value,
+                                stringResource(state.trackingStatusMessageRes()),
+                            )
+                        }
                     },
                     style = MaterialTheme.typography.bodySmall,
                 )

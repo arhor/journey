@@ -21,12 +21,16 @@ private val LOCATION_PERMISSIONS = arrayOf(
 @Composable
 fun MapRoute(
     vm: MapViewModel = hiltViewModel(),
+    hudVm: MapHudViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
+    onOpenHero: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenObjectDetails: (String) -> Unit,
     onOpenAddPoi: (Double, Double) -> Unit,
 ) {
     val context = LocalContext.current
     val state by vm.uiState.collectAsStateWithLifecycle()
+    val hudState by hudVm.uiState.collectAsStateWithLifecycle()
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
         onResult = { grants ->
@@ -66,7 +70,10 @@ fun MapRoute(
 
     MapScreen(
         state = state,
+        hudState = hudState,
         dispatch = vm::dispatch,
+        onOpenHero = onOpenHero,
+        onOpenSettings = onOpenSettings,
     )
 }
 

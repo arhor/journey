@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -67,14 +69,20 @@ import kotlin.time.Duration.Companion.seconds
 @Composable
 fun MapScreen(
     state: MapUiState,
+    hudState: MapHudUiState,
     dispatch: (MapIntent) -> Unit,
+    onOpenHero: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     when (state) {
         is MapUiState.Loading -> LoadingIndicator()
         is MapUiState.Failure -> ErrorMessage(message = state.errorMessage)
         is MapUiState.Content -> MapContent(
             state = state,
+            hudState = hudState,
             dispatch = dispatch,
+            onOpenHero = onOpenHero,
+            onOpenSettings = onOpenSettings,
         )
     }
 }
@@ -82,7 +90,10 @@ fun MapScreen(
 @Composable
 internal fun MapContent(
     state: MapUiState.Content,
+    hudState: MapHudUiState,
     dispatch: (MapIntent) -> Unit,
+    onOpenHero: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val userLocationState = rememberUserLocationStateInternal(context)
@@ -294,17 +305,22 @@ internal fun MapContent(
                 state = state,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(16.dp),
+                    .padding(start = 16.dp, top = 110.dp, end = 16.dp),
             )
 
-            MapDebugButton(
+            FloatingActionButton(
                 onClick = {
                     dispatch(MapIntent.DebugControlsClicked)
                 },
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp),
-            )
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 88.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.BugReport,
+                    contentDescription = stringResource(R.string.map_debug_button_content_description),
+                )
+            }
         }
 
         FloatingActionButton(
@@ -313,12 +329,7 @@ internal fun MapContent(
             },
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(
-                    PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 24.dp,
-                    ),
-                ),
+                .padding(horizontal = 16.dp, vertical = 24.dp),
         ) {
             Icon(
                 imageVector = Icons.Filled.Add,
@@ -332,12 +343,7 @@ internal fun MapContent(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(
-                    PaddingValues(
-                        horizontal = 16.dp,
-                        vertical = 24.dp,
-                    ),
-                ),
+                .padding(horizontal = 16.dp, vertical = 24.dp),
         ) {
             Icon(
                 imageVector = Icons.Filled.MyLocation,
@@ -363,6 +369,15 @@ internal fun MapContent(
                 dispatch = dispatch,
             )
         }
+
+        MapPlayerHud(
+            state = hudState,
+            onHeroClick = onOpenHero,
+            onSettingsClick = onOpenSettings,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(16.dp),
+        )
     }
 }
 

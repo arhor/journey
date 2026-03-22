@@ -11,12 +11,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.github.arhor.journey.feature.hero.HeroBottomNavDestination
 import com.github.arhor.journey.feature.map.mapBottomNavDestination
 import com.github.arhor.journey.feature.settings.settingsBottomNavDestination
+import com.github.arhor.journey.ui.navigation.navigateToTopLevel
 
 val bottomNavDestinations = listOf(
     HeroBottomNavDestination,
@@ -44,13 +44,7 @@ fun AppBottomBar(navController: NavHostController) {
                 modifier = Modifier.testTag(destination.testTag),
                 selected = graphHierarchy.any { it.hasRoute(destination.destination::class) },
                 onClick = {
-                    navController.navigate(destination.destination) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = false
-                        }
-                        launchSingleTop = true
-                        restoreState = false
-                    }
+                    navController.navigateToTopLevel(destination.destination)
                 },
                 icon = {
                     Icon(

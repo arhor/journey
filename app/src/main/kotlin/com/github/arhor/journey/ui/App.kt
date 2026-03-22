@@ -9,8 +9,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.navigation.compose.rememberNavController
 import com.github.arhor.journey.ui.components.AppBottomBar
-import com.github.arhor.journey.ui.theme.AppTheme
 import com.github.arhor.journey.ui.navigation.AppNavGraph
+import com.github.arhor.journey.ui.theme.AppTheme
 
 val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> {
     error("SnackbarHostState provider is missing")
@@ -30,7 +30,7 @@ fun App() {
                 snackbarHost = { SnackbarHost(snackbarHostState) },
             ) { innerPadding ->
                 AppNavGraph(
-                    navController = navController,
+                    controller = navController,
                     innerPadding = innerPadding,
                     snackbarHostState = snackbarHostState,
                 )

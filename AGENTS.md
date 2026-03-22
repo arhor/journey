@@ -48,6 +48,7 @@ Build configuration lives in:
 Keep dependency direction intact:
 
 - `:app -> :data, :domain, :core:*, :feature:*`
+- `:core:ui -> :core:common`
 - `:feature:* -> :domain, :core:*`
 - `:data -> :domain, :core:common`
 - `:domain -> :core:common`

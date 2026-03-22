@@ -34,10 +34,14 @@ val mapBottomNavDestination = BottomNavDestination(
 fun NavGraphBuilder.mapGraph(
     navController: NavController,
     snackbarHostState: SnackbarHostState,
+    onOpenHero: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     composable<MapDestination> {
         MapRoute(
             snackbarHostState = snackbarHostState,
+            onOpenHero = onOpenHero,
+            onOpenSettings = onOpenSettings,
             onOpenObjectDetails = { poiId ->
                 navController.navigate(PoiDetailsDestination(poiId = poiId))
             },
