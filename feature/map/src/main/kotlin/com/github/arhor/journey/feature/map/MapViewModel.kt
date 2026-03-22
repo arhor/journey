@@ -10,7 +10,6 @@ import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.ExplorationTile
-import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
@@ -35,27 +34,30 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
+import com.github.arhor.journey.feature.map.model.FogOfWarRenderData
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import com.github.arhor.journey.feature.map.renderer.FogOfWarRenderDataFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -67,6 +69,13 @@ private const val MIN_LONGITUDE = -180.0
 private const val MAX_LONGITUDE = 180.0 - 1e-9
 private const val MIN_LATITUDE = -85.05112878
 private const val MAX_LATITUDE = 85.05112878
+
+@Immutable
+private data class DisplayedFogData(
+    val exploredTiles: Set<ExplorationTile>,
+    val fogRanges: List<ExplorationTileRange>,
+    val renderData: FogOfWarRenderData?,
+)
 
 @Immutable
 private data class State(
@@ -85,9 +94,12 @@ private data class State(
     val visibleBounds: GeoBounds? = null,
     val resourceQueryBounds: GeoBounds? = null,
     val visibleTileRange: ExplorationTileRange? = null,
-    val fogTileRange: ExplorationTileRange? = null,
+    val displayedFogBuffer: FogBufferRegion? = null,
+    val pendingFogBuffer: FogBufferRegion? = null,
+    val displayedFogData: DisplayedFogData? = null,
     val visibleTileCount: Long = 0,
     val isFogSuppressedByVisibleTileLimit: Boolean = false,
+    val isFogRecomputationInProgress: Boolean = false,
     val failureMessage: String? = null,
 )
 
@@ -124,6 +136,8 @@ class MapViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = ExplorationTrackingSession(),
         )
+    private var displayedFogObservationJob: Job? = null
+    private var pendingFogPreparationJob: Job? = null
 
     override fun buildUiState(): Flow<MapUiState> =
         combine(
@@ -142,19 +156,15 @@ class MapViewModel @Inject constructor(
                     explorationProgress = explorationProgress,
                 )
             },
-            observeFogDerivedData(),
             observeResourceDerivedData(),
-        ) { inputs, fogDerivedData, resourceDerivedData ->
+        ) { inputs, resourceDerivedData ->
             intoUiState(
                 state = inputs.state,
                 trackingSession = inputs.trackingSession,
                 mapStyleOutput = inputs.mapStyleOutput,
                 pointsOfInterest = inputs.pointsOfInterest,
                 explorationProgress = inputs.explorationProgress,
-                fogOfWar = fogOfWarUiState(
-                    state = inputs.state,
-                    derivedData = fogDerivedData.takeIf { it.key == inputs.state.toFogDerivedKey() },
-                ),
+                fogOfWar = fogOfWarUiState(state = inputs.state),
                 resourceSpawns = resourceDerivedData.takeIf {
                     it.queryBounds == inputs.state.resourceQueryBounds
                 }?.resourceSpawns ?: emptyList(),
@@ -168,20 +178,6 @@ class MapViewModel @Inject constructor(
                 )
             }
             .distinctUntilChanged()
-
-    private fun observeFogDerivedData(): Flow<FogDerivedData> =
-        _state
-            .map { it.toFogDerivedKey() }
-            .distinctUntilChanged()
-            .flatMapLatest { key ->
-                observeFogExploredTiles(key.fogTileRange)
-                    .mapLatest { exploredTiles ->
-                        fogDerivedData(
-                            key = key,
-                            exploredTiles = exploredTiles,
-                        )
-                    }
-            }
 
     private fun observeResourceDerivedData(): Flow<ResourceDerivedData> =
         _state
@@ -236,42 +232,31 @@ class MapViewModel @Inject constructor(
         ?.let(observeCollectibleResourceSpawns::invoke)
         ?: flowOf(emptyList())
 
-    private suspend fun fogDerivedData(
-        key: FogDerivedKey,
+    private suspend fun prepareFogBufferData(
+        buffer: FogBufferRegion,
         exploredTiles: Set<ExplorationTile>,
-    ): FogDerivedData {
-        if (key.fogTileRange == null) {
-            return FogDerivedData(
-                key = key,
-                exploredTiles = exploredTiles,
-                fogRanges = emptyList(),
-                renderData = null,
-            )
-        }
-
+    ): PreparedFogBuffer {
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
             val checkCancelled = { coroutineContext.ensureActive() }
             val fogRanges = calculateUnexploredFogRanges(
-                tileRange = key.fogTileRange,
+                tileRange = buffer.bufferedTileRange,
                 exploredTiles = exploredTiles,
                 checkCancelled = checkCancelled,
             )
-            val renderData = if (key.isFogOfWarOverlayEnabled) {
-                fogOfWarRenderDataFactory.create(
-                    fogRanges = fogRanges,
-                    checkCancelled = checkCancelled,
-                )
-            } else {
-                null
-            }
-
-            FogDerivedData(
-                key = key,
-                exploredTiles = exploredTiles,
+            val renderData = fogOfWarRenderDataFactory.create(
                 fogRanges = fogRanges,
-                renderData = renderData,
+                checkCancelled = checkCancelled,
+            )
+
+            PreparedFogBuffer(
+                buffer = buffer,
+                data = DisplayedFogData(
+                    exploredTiles = exploredTiles,
+                    fogRanges = fogRanges,
+                    renderData = renderData,
+                ),
             )
         }
     }
@@ -324,20 +309,13 @@ class MapViewModel @Inject constructor(
             maximumValue = ExplorationTileRuntimeConfig.MAX_CANONICAL_ZOOM,
         )
         setExplorationTileCanonicalZoom(canonicalZoom)
+        val visibleBounds = _state.value.visibleBounds
 
         _state.update { state ->
-            val updatedState = state.copy(canonicalZoom = canonicalZoom)
-            val visibleBounds = state.visibleBounds ?: return@update updatedState
-
-            updatedState.withFogViewport(
-                visibleBounds = visibleBounds,
-                fogViewport = fogViewport(
-                    visibleBounds = visibleBounds,
-                    canonicalZoom = canonicalZoom,
-                    currentFogTileRange = updatedState.fogTileRange,
-                ),
-            )
+            state.copy(canonicalZoom = canonicalZoom)
         }
+
+        visibleBounds?.let { updateFogViewport(it, forceDisplayedBufferReplacement = true) }
     }
 
     private fun onRevealRadiusMetersChanged(intent: MapIntent.RevealRadiusMetersChanged) {
@@ -388,31 +366,34 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun fogOfWarUiState(
-        state: State,
-        derivedData: FogDerivedData?,
-    ): FogOfWarUiState {
+    private fun fogOfWarUiState(state: State): FogOfWarUiState {
+        val displayedFogData = state.displayedFogData
         val exploredVisibleTileCount = state.visibleTileRange?.let { visibleRange ->
-            derivedData?.exploredTiles?.count(visibleRange::contains)
+            displayedFogData?.exploredTiles?.count(visibleRange::contains)
         } ?: 0
-        val fallbackFogTileRange = state.fogTileRange
+        val fallbackFogTileRange = state.displayedFogBuffer
+            ?.bufferedTileRange
             .takeUnless { state.isFogSuppressedByVisibleTileLimit }
-        val fogRanges = derivedData?.fogRanges
+        val fogRanges = displayedFogData?.fogRanges
             ?: fallbackFogTileRange?.let(::listOf)
             ?: emptyList()
-        val renderData = derivedData?.renderData
+        val renderData = displayedFogData?.renderData
             ?: fallbackFogTileRange
                 ?.takeIf { state.isFogOfWarOverlayEnabled }
                 ?.let(fogOfWarRenderDataFactory::createFullRange)
 
         return FogOfWarUiState(
             canonicalZoom = state.canonicalZoom,
+            visibleBounds = state.visibleBounds,
+            triggerBounds = state.displayedFogBuffer?.triggerBounds,
+            bufferedBounds = state.displayedFogBuffer?.bufferedBounds,
             visibleTileRange = state.visibleTileRange,
             fogRanges = fogRanges,
             renderData = renderData,
             visibleTileCount = state.visibleTileCount,
             exploredVisibleTileCount = exploredVisibleTileCount,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
+            isRecomputing = state.isFogRecomputationInProgress,
         )
     }
 
@@ -595,54 +576,178 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun updateFogViewport(visibleBounds: GeoBounds) {
-        _state.update {
-            val fogViewport = fogViewport(
-                visibleBounds = visibleBounds,
-                canonicalZoom = it.canonicalZoom,
-                currentFogTileRange = it.fogTileRange,
-            )
-            val resourceQueryBounds = resolveResourceQueryBounds(
-                visibleBounds = visibleBounds,
-                currentQueryBounds = it.resourceQueryBounds,
-            )
+    private fun updateFogViewport(
+        visibleBounds: GeoBounds,
+        forceDisplayedBufferReplacement: Boolean = false,
+    ) {
+        val currentState = _state.value
+        val viewport = createFogViewportSnapshot(
+            visibleBounds = visibleBounds,
+            canonicalZoom = currentState.canonicalZoom,
+        )
+        val nextFogBuffer = createFogBufferRegion(viewport.visibleTileRange)
+        val resourceQueryBounds = resolveResourceQueryBounds(
+            visibleBounds = visibleBounds,
+            currentQueryBounds = currentState.resourceQueryBounds,
+        )
+        val isSuppressedByVisibleTileLimit = viewport.visibleTileCount > MAX_VISIBLE_FOG_TILE_COUNT
+        val isSuppressedByBufferedTileLimit = nextFogBuffer.bufferedTileRange.tileCount > MAX_BUFFERED_FOG_TILE_COUNT
+        val isFogSuppressed = isSuppressedByVisibleTileLimit || isSuppressedByBufferedTileLimit
 
-            it.withFogViewport(
+        _state.update {
+            it.copy(
                 visibleBounds = visibleBounds,
-                fogViewport = fogViewport,
-            ).copy(resourceQueryBounds = resourceQueryBounds)
+                resourceQueryBounds = resourceQueryBounds,
+                visibleTileRange = viewport.visibleTileRange,
+                visibleTileCount = viewport.visibleTileCount,
+                isFogSuppressedByVisibleTileLimit = isFogSuppressed,
+            )
+        }
+
+        if (isFogSuppressed) {
+            clearFogBufferState()
+            return
+        }
+
+        val updatedState = _state.value
+        val displayedFogBuffer = updatedState.displayedFogBuffer
+            ?.takeIf { it.bufferedTileRange.zoom == updatedState.canonicalZoom }
+        val pendingFogBuffer = updatedState.pendingFogBuffer
+            ?.takeIf { it.bufferedTileRange.zoom == updatedState.canonicalZoom }
+
+        when {
+            forceDisplayedBufferReplacement || displayedFogBuffer == null -> {
+                activateDisplayedFogBuffer(nextFogBuffer)
+            }
+
+            !displayedFogBuffer.shouldRecompute(visibleBounds) -> Unit
+
+            pendingFogBuffer?.shouldRecompute(visibleBounds) == false -> Unit
+
+            else -> {
+                preparePendingFogBuffer(nextFogBuffer)
+            }
         }
     }
 
-    private fun fogViewport(
-        visibleBounds: GeoBounds,
-        canonicalZoom: Int,
-        currentFogTileRange: ExplorationTileRange?,
-    ): FogViewport {
-        val visibleTileRange = ExplorationTileGrid.tileRange(
-            bounds = visibleBounds,
-            zoom = canonicalZoom,
-        )
-        val visibleTileWidth = visibleTileRange.widthInTiles()
-        val visibleTileHeight = visibleTileRange.heightInTiles()
-        val fogTileRange = currentFogTileRange
-            ?.takeIf {
-                it.contains(visibleTileRange) && it.tileCount <= MAX_BUFFERED_FOG_TILE_COUNT
-            }
-            ?: visibleTileRange.expandedBy(
-                horizontalTilePadding = visibleTileWidth,
-                verticalTilePadding = visibleTileHeight,
-            )
-        val visibleTileCount = visibleTileRange.tileCount
-        val isSuppressedByVisibleTileLimit = visibleTileCount > MAX_VISIBLE_FOG_TILE_COUNT
-        val isSuppressedByBufferedTileLimit = fogTileRange.tileCount > MAX_BUFFERED_FOG_TILE_COUNT
+    private fun clearFogBufferState() {
+        displayedFogObservationJob?.cancel()
+        displayedFogObservationJob = null
+        pendingFogPreparationJob?.cancel()
+        pendingFogPreparationJob = null
 
-        return FogViewport(
-            visibleTileRange = visibleTileRange,
-            fogTileRange = fogTileRange,
-            visibleTileCount = visibleTileCount,
-            isSuppressedByVisibleTileLimit = isSuppressedByVisibleTileLimit || isSuppressedByBufferedTileLimit,
-        )
+        _state.update {
+            it.copy(
+                displayedFogBuffer = null,
+                pendingFogBuffer = null,
+                displayedFogData = null,
+                isFogRecomputationInProgress = false,
+            )
+        }
+    }
+
+    private fun activateDisplayedFogBuffer(buffer: FogBufferRegion) {
+        pendingFogPreparationJob?.cancel()
+        pendingFogPreparationJob = null
+
+        _state.update {
+            it.copy(
+                displayedFogBuffer = buffer,
+                pendingFogBuffer = null,
+                displayedFogData = null,
+                isFogRecomputationInProgress = false,
+            )
+        }
+
+        startObservingDisplayedFogBuffer(buffer)
+    }
+
+    private fun preparePendingFogBuffer(buffer: FogBufferRegion) {
+        if (_state.value.pendingFogBuffer == buffer && pendingFogPreparationJob?.isActive == true) {
+            return
+        }
+
+        pendingFogPreparationJob?.cancel()
+        _state.update {
+            it.copy(
+                pendingFogBuffer = buffer,
+                isFogRecomputationInProgress = true,
+            )
+        }
+
+        pendingFogPreparationJob = viewModelScope.launch {
+            val exploredTiles = observeFogExploredTiles(buffer.bufferedTileRange).first()
+            val preparedFogBuffer = prepareFogBufferData(
+                buffer = buffer,
+                exploredTiles = exploredTiles,
+            )
+            var didSwap = false
+            var shouldPrepareAnotherBuffer = false
+
+            // Keep the old fog source active until the replacement render payload is fully ready.
+            _state.update { current ->
+                if (current.pendingFogBuffer != buffer || current.isFogSuppressedByVisibleTileLimit) {
+                    current
+                } else {
+                    didSwap = true
+                    val updatedState = current.copy(
+                        displayedFogBuffer = buffer,
+                        pendingFogBuffer = null,
+                        displayedFogData = preparedFogBuffer.data,
+                        isFogRecomputationInProgress = false,
+                    )
+                    shouldPrepareAnotherBuffer = updatedState.visibleBounds?.let(buffer::shouldRecompute) == true
+                    updatedState
+                }
+            }
+
+            if (!didSwap) {
+                return@launch
+            }
+
+            pendingFogPreparationJob = null
+            startObservingDisplayedFogBuffer(
+                buffer = buffer,
+                seedExploredTiles = preparedFogBuffer.data.exploredTiles,
+            )
+
+            if (shouldPrepareAnotherBuffer) {
+                _state.value.visibleBounds?.let(::updateFogViewport)
+            }
+        }
+    }
+
+    private fun startObservingDisplayedFogBuffer(
+        buffer: FogBufferRegion,
+        seedExploredTiles: Set<ExplorationTile>? = null,
+    ) {
+        displayedFogObservationJob?.cancel()
+        displayedFogObservationJob = viewModelScope.launch {
+            var shouldSkipSeed = seedExploredTiles != null
+
+            observeFogExploredTiles(buffer.bufferedTileRange)
+                .distinctUntilChanged()
+                .collectLatest { exploredTiles ->
+                    if (shouldSkipSeed && exploredTiles == seedExploredTiles) {
+                        shouldSkipSeed = false
+                        return@collectLatest
+                    }
+
+                    shouldSkipSeed = false
+                    val preparedFogBuffer = prepareFogBufferData(
+                        buffer = buffer,
+                        exploredTiles = exploredTiles,
+                    )
+
+                    _state.update { current ->
+                        if (current.displayedFogBuffer != buffer || current.isFogSuppressedByVisibleTileLimit) {
+                            current
+                        } else {
+                            current.copy(displayedFogData = preparedFogBuffer.data)
+                        }
+                    }
+                }
+        }
     }
 
     private suspend fun onObjectTapped(objectId: String) {
@@ -776,14 +881,6 @@ class MapViewModel @Inject constructor(
     }
 
     @Immutable
-    private data class FogViewport(
-        val visibleTileRange: ExplorationTileRange,
-        val fogTileRange: ExplorationTileRange,
-        val visibleTileCount: Long,
-        val isSuppressedByVisibleTileLimit: Boolean,
-    )
-
-    @Immutable
     private data class UiStateInputs(
         val state: State,
         val trackingSession: ExplorationTrackingSession,
@@ -793,17 +890,9 @@ class MapViewModel @Inject constructor(
     )
 
     @Immutable
-    private data class FogDerivedKey(
-        val fogTileRange: ExplorationTileRange?,
-        val isFogOfWarOverlayEnabled: Boolean,
-    )
-
-    @Immutable
-    private data class FogDerivedData(
-        val key: FogDerivedKey,
-        val exploredTiles: Set<ExplorationTile>,
-        val fogRanges: List<ExplorationTileRange>,
-        val renderData: com.github.arhor.journey.feature.map.model.FogOfWarRenderData?,
+    private data class PreparedFogBuffer(
+        val buffer: FogBufferRegion,
+        val data: DisplayedFogData,
     )
 
     @Immutable
@@ -818,64 +907,15 @@ class MapViewModel @Inject constructor(
         val rawId: String,
     )
 
-    private fun State.matches(fogViewport: FogViewport): Boolean {
-        return visibleTileRange == fogViewport.visibleTileRange
-            && fogTileRange == fogViewport.fogTileRange
-            && visibleTileCount == fogViewport.visibleTileCount
-            && isFogSuppressedByVisibleTileLimit == fogViewport.isSuppressedByVisibleTileLimit
-    }
-
-    private fun State.withFogViewport(
-        visibleBounds: GeoBounds,
-        fogViewport: FogViewport,
-    ): State {
-        if (this.visibleBounds == visibleBounds && matches(fogViewport)) {
-            return copy(visibleBounds = visibleBounds)
-        }
-
-        return copy(
-            visibleBounds = visibleBounds,
-            visibleTileRange = fogViewport.visibleTileRange,
-            fogTileRange = fogViewport.fogTileRange,
-            visibleTileCount = fogViewport.visibleTileCount,
-            isFogSuppressedByVisibleTileLimit = fogViewport.isSuppressedByVisibleTileLimit,
-        )
-    }
-
-    private fun State.toFogDerivedKey(): FogDerivedKey =
-        FogDerivedKey(
-            fogTileRange = fogTileRange.takeUnless { isFogSuppressedByVisibleTileLimit },
-            isFogOfWarOverlayEnabled = isFogOfWarOverlayEnabled,
-        )
-
-    private fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
-
-    private fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
-
-    private fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
-        return zoom == other.zoom &&
-            other.minX >= minX &&
-            other.maxX <= maxX &&
-            other.minY >= minY &&
-            other.maxY <= maxY
-    }
-
     private fun resolveResourceQueryBounds(
         visibleBounds: GeoBounds,
         currentQueryBounds: GeoBounds?,
     ): GeoBounds = currentQueryBounds
-        ?.takeIf { it.contains(visibleBounds) }
+        ?.takeIf { it.containsInclusive(visibleBounds) }
         ?: visibleBounds.expandedBy(
             horizontalFraction = RESOURCE_QUERY_BUFFER_FRACTION,
             verticalFraction = RESOURCE_QUERY_BUFFER_FRACTION,
         )
-
-    private fun GeoBounds.contains(other: GeoBounds): Boolean {
-        return other.south >= south &&
-            other.west >= west &&
-            other.north <= north &&
-            other.east <= east
-    }
 
     private fun GeoBounds.expandedBy(
         horizontalFraction: Double,

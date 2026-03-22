@@ -636,7 +636,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should reuse loaded fog data when the viewport changes inside the current fog buffer`() = runTest {
+    fun `dispatch should avoid fog recomputation while the viewport stays inside the trigger bounds`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -655,12 +655,7 @@ class MapViewModelTest {
             maxY = 21,
         )
         val fixture = createFixture(
-            observeExploredTilesFlowFactory = {
-                flow {
-                    delay(1_000L)
-                    emit(emptySet())
-                }
-            },
+            observeExploredTilesFlowFactory = { MutableStateFlow(emptySet()) },
         )
 
         try {
@@ -687,6 +682,91 @@ class MapViewModelTest {
                 it.fogOfWar.visibleTileRange == shiftedVisibleRange
             }
             actual.fogOfWar.renderData.shouldNotBeNull()
+            actual.fogOfWar.isRecomputing shouldBe false
+            verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should keep the displayed fog buffer active until the replacement buffer is ready`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val shiftedVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 12,
+            maxX = 13,
+            minY = 20,
+            maxY = 21,
+        )
+        val initialVisibleBounds = visibleBoundsInside(initialVisibleRange)
+        val shiftedVisibleBounds = visibleBoundsInside(shiftedVisibleRange)
+        val initialBuffer = createFogBufferRegion(
+            visibleBounds = initialVisibleBounds,
+            canonicalZoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+        )
+        val shiftedBuffer = createFogBufferRegion(
+            visibleBounds = shiftedVisibleBounds,
+            canonicalZoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+        )
+        val fixture = createFixture(
+            observeExploredTilesFlowFactory = { range ->
+                when (range) {
+                    initialBuffer.bufferedTileRange -> MutableStateFlow(emptySet())
+                    shiftedBuffer.bufferedTileRange -> flow {
+                        delay(1_000L)
+                        emit(emptySet())
+                    }
+
+                    else -> MutableStateFlow(emptySet())
+                }
+            },
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = initialVisibleBounds,
+                ),
+            )
+            advanceUntilIdle()
+
+            val initial = fixture.viewModel.awaitContent {
+                it.fogOfWar.bufferedBounds == initialBuffer.bufferedBounds
+            }
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = shiftedVisibleBounds,
+                ),
+            )
+            runCurrent()
+
+            // Then
+            val pending = fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleTileRange == shiftedVisibleRange && it.fogOfWar.isRecomputing
+            }
+            pending.fogOfWar.bufferedBounds shouldBe initial.fogOfWar.bufferedBounds
+            pending.fogOfWar.triggerBounds shouldBe initial.fogOfWar.triggerBounds
+
+            advanceTimeBy(1_000L)
+            advanceUntilIdle()
+
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.bufferedBounds == shiftedBuffer.bufferedBounds && !it.fogOfWar.isRecomputing
+            }
+            actual.fogOfWar.triggerBounds shouldBe shiftedBuffer.triggerBounds
         } finally {
             tearDownMainDispatcher()
         }

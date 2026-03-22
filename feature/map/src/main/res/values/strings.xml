@@ -12,6 +12,7 @@
     <string name="map_debug_info_item_visible_tiles">Visible tiles</string>
     <string name="map_debug_info_item_explored_here">Explored here</string>
     <string name="map_debug_info_item_fog_summary">Fog summary</string>
+    <string name="map_debug_info_item_fog_buffering">Fog buffering</string>
     <string name="map_debug_info_item_tracking_status">Tracking status</string>
     <string name="map_debug_fog_overlay_label">Fog of war enabled</string>
     <string name="map_debug_tiles_grid_label">Tiles grid enabled</string>

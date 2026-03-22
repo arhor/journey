@@ -32,6 +32,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
+import com.github.arhor.journey.domain.model.GeoBounds
+import kotlin.math.roundToInt
 
 @Immutable
 data class MapDebugUiState(
@@ -49,6 +51,7 @@ enum class MapDebugInfoItem {
     VisibleTiles,
     ExploredHere,
     FogSummary,
+    FogBuffering,
     TrackingStatus,
 }
 
@@ -307,6 +310,17 @@ internal fun MapDebugInfoOverlay(
                             }
                         }
 
+                        MapDebugInfoItem.FogBuffering -> buildString {
+                            append("FOW buffer: loading=")
+                            append(state.fogOfWar.isRecomputing)
+                            append(" viewport=")
+                            append(state.fogOfWar.visibleBounds.toDebugString())
+                            append(" trigger=")
+                            append(state.fogOfWar.triggerBounds.toDebugString())
+                            append(" buffered=")
+                            append(state.fogOfWar.bufferedBounds.toDebugString())
+                        }
+
                         MapDebugInfoItem.TrackingStatus -> stringResource(
                             R.string.map_debug_info_tracking_status_value,
                             stringResource(state.trackingStatusMessageRes()),
@@ -446,6 +460,7 @@ private fun MapDebugInfoItem.labelRes(): Int =
         MapDebugInfoItem.VisibleTiles -> R.string.map_debug_info_item_visible_tiles
         MapDebugInfoItem.ExploredHere -> R.string.map_debug_info_item_explored_here
         MapDebugInfoItem.FogSummary -> R.string.map_debug_info_item_fog_summary
+        MapDebugInfoItem.FogBuffering -> R.string.map_debug_info_item_fog_buffering
         MapDebugInfoItem.TrackingStatus -> R.string.map_debug_info_item_tracking_status
     }
 
@@ -455,6 +470,16 @@ private fun MapRenderMode.labelRes(): Int =
         MapRenderMode.Standard -> R.string.map_debug_render_mode_standard
         MapRenderMode.Debug -> R.string.map_debug_render_mode_debug
     }
+
+private fun GeoBounds?.toDebugString(): String {
+    return this?.let { bounds ->
+        "[${bounds.south.debugCoord()},${bounds.west.debugCoord()} .. ${bounds.north.debugCoord()},${bounds.east.debugCoord()}]"
+    } ?: "n/a"
+}
+
+private fun Double.debugCoord(): String = (this * 10_000.0).roundToInt()
+    .div(10_000.0)
+    .toString()
 
 @StringRes
 internal fun MapUiState.Content.trackingStatusMessageRes(): Int {
