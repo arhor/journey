@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -91,6 +92,11 @@ internal fun MapContent(
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
     val latestUserLocation by rememberUpdatedState(state.userLocation)
+    val onObjectTapped = remember(dispatch) {
+        { objectId: String ->
+            dispatch(MapIntent.ObjectTapped(objectId))
+        }
+    }
 
     LaunchedEffect(
         state.cameraPosition,
@@ -275,9 +281,7 @@ internal fun MapContent(
 
                     MapObjectsRendererAdapter(
                         objects = state.visibleObjects,
-                        onObjectTapped = { objectId ->
-                            dispatch(MapIntent.ObjectTapped(objectId))
-                        },
+                        onObjectTapped = onObjectTapped,
                     )
                 }
             }

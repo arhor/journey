@@ -156,6 +156,82 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `uiState should reuse visible objects list when camera updates do not change objects`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            pointsOfInterest = listOf(
+                pointOfInterest(id = FIRST_POI_ID, lat = 50.45, lon = 30.52),
+            ),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = "cell-1-slot-0",
+                    resourceTypeId = "wood",
+                    lat = 50.46,
+                    lon = 30.53,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+        )
+        val visibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val initialVisibleBounds = visibleBoundsInside(visibleRange)
+        val updatedVisibleBounds = GeoBounds(
+            south = initialVisibleBounds.south + VIEWPORT_BOUNDS_EPSILON,
+            west = initialVisibleBounds.west + VIEWPORT_BOUNDS_EPSILON,
+            north = initialVisibleBounds.north - VIEWPORT_BOUNDS_EPSILON,
+            east = initialVisibleBounds.east - VIEWPORT_BOUNDS_EPSILON,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = initialVisibleBounds,
+                ),
+            )
+            advanceUntilIdle()
+
+            val initial = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects.any { it.id == "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0" }
+            }
+            val initialVisibleObjects = initial.visibleObjects
+            val cameraPosition = initial.cameraPosition.shouldNotBeNull()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = updatedVisibleBounds,
+                ),
+            )
+            fixture.viewModel.dispatch(
+                MapIntent.CameraSettled(
+                    position = cameraPosition,
+                    origin = CameraUpdateOrigin.USER,
+                ),
+            )
+            advanceUntilIdle()
+
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.fogOfWar.visibleBounds == updatedVisibleBounds &&
+                    content.cameraUpdateOrigin == CameraUpdateOrigin.USER
+            }
+
+            // Then
+            actual.visibleObjects shouldBe initialVisibleObjects
+            (actual.visibleObjects === initialVisibleObjects) shouldBe true
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `uiState should expose clean debug defaults by default`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 

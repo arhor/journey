@@ -143,9 +143,10 @@ class MapViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
             initialValue = ExplorationTrackingSession(),
-        )
+    )
     private var displayedFogObservationJob: Job? = null
     private var pendingFogPreparationJob: Job? = null
+    private var cachedVisibleObjects: List<MapObjectUiModel> = emptyList()
 
     override fun buildUiState(): Flow<MapUiState> =
         combine(
@@ -154,28 +155,23 @@ class MapViewModel @Inject constructor(
                 trackingSession,
                 observeSelectedMapStyle(),
                 observePointsOfInterest(),
-                observeExplorationProgress(),
-            ) { state, session, mapStyleOutput, pointsOfInterest, explorationProgress ->
+            ) { state, session, mapStyleOutput, pointsOfInterest ->
                 UiStateInputs(
                     state = state,
                     trackingSession = session,
                     mapStyleOutput = mapStyleOutput,
                     pointsOfInterest = pointsOfInterest,
-                    explorationProgress = explorationProgress,
                 )
             },
-            observeResourceDerivedData(),
-        ) { inputs, resourceDerivedData ->
+            observeVisibleMapObjects(),
+        ) { inputs, visibleObjects ->
             intoUiState(
                 state = inputs.state,
                 trackingSession = inputs.trackingSession,
                 mapStyleOutput = inputs.mapStyleOutput,
                 pointsOfInterest = inputs.pointsOfInterest,
-                explorationProgress = inputs.explorationProgress,
                 fogOfWar = fogOfWarUiState(state = inputs.state),
-                resourceSpawns = resourceDerivedData.takeIf {
-                    it.queryBounds == inputs.state.resourceQueryBounds
-                }?.resourceSpawns ?: emptyList(),
+                visibleObjects = visibleObjects,
             )
         }
             .catch {
@@ -184,6 +180,38 @@ class MapViewModel @Inject constructor(
                         errorMessage = it.message ?: MAP_LOADING_FAILED_MESSAGE,
                     ),
                 )
+            }
+            .distinctUntilChanged()
+
+    private fun observeVisibleMapObjects(): Flow<List<MapObjectUiModel>> =
+        combine(
+            observePointOfInterestObjects(),
+            observeVisibleResourceSpawnObjects(),
+        ) { pointOfInterestObjects, resourceSpawnObjects ->
+            pointOfInterestObjects + resourceSpawnObjects
+        }
+            .distinctUntilChanged()
+
+    private fun observePointOfInterestObjects(): Flow<List<MapObjectUiModel>> =
+        combine(
+            observePointsOfInterest(),
+            observeExplorationProgress(),
+        ) { pointsOfInterest, explorationProgress ->
+            val discoveredPoiIds = explorationProgress.discovered
+                .mapTo(mutableSetOf()) { it.poiId }
+
+            pointsOfInterest.map { pointOfInterest ->
+                pointOfInterest.toUiModel(isDiscovered = pointOfInterest.id in discoveredPoiIds)
+            }
+        }
+            .distinctUntilChanged()
+
+    private fun observeVisibleResourceSpawnObjects(): Flow<List<MapObjectUiModel>> =
+        observeResourceDerivedData()
+            .map { resourceDerivedData ->
+                resourceDerivedData.resourceSpawns.map { resourceSpawn ->
+                    resourceSpawn.toUiModel()
+                }
             }
             .distinctUntilChanged()
 
@@ -459,10 +487,11 @@ class MapViewModel @Inject constructor(
         trackingSession: ExplorationTrackingSession,
         mapStyleOutput: Output<MapStyle?, DomainError>,
         pointsOfInterest: List<PointOfInterest>,
-        explorationProgress: ExplorationProgress,
         fogOfWar: FogOfWarUiState,
-        resourceSpawns: List<ResourceSpawn>,
+        visibleObjects: List<MapObjectUiModel>,
     ): MapUiState = if (state.failureMessage == null) {
+        val resolvedVisibleObjects = reuseVisibleObjects(visibleObjects)
+
         mapStyleOutput.fold(
             onSuccess = {
                 val userLocation = trackingSession.lastKnownLocation?.toLatLng()
@@ -491,11 +520,7 @@ class MapViewModel @Inject constructor(
                     explorationTrackingCadence = trackingSession.cadence,
                     explorationTrackingStatus = trackingSession.status,
                     selectedStyle = it,
-                    visibleObjects = mapObjects(
-                        pointsOfInterest = pointsOfInterest,
-                        explorationProgress = explorationProgress,
-                        resourceSpawns = resourceSpawns,
-                    ),
+                    visibleObjects = resolvedVisibleObjects,
                     fogOfWar = fogOfWar,
                     debug = MapDebugUiState(
                         isSheetVisible = state.isDebugControlsSheetVisible,
@@ -876,20 +901,6 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun mapObjects(
-        pointsOfInterest: List<PointOfInterest>,
-        explorationProgress: ExplorationProgress,
-        resourceSpawns: List<ResourceSpawn>,
-    ): List<MapObjectUiModel> {
-        val discoveredPoiIds = explorationProgress.discovered
-            .map { it.poiId }
-            .toSet()
-
-        return pointsOfInterest.map { poi ->
-            poi.toUiModel(isDiscovered = poi.id in discoveredPoiIds)
-        } + resourceSpawns.map { it.toUiModel() }
-    }
-
     private fun PointOfInterest.toUiModel(isDiscovered: Boolean): MapObjectUiModel =
         MapObjectUiModel(
             id = mapObjectId(
@@ -974,7 +985,6 @@ class MapViewModel @Inject constructor(
         val trackingSession: ExplorationTrackingSession,
         val mapStyleOutput: Output<MapStyle?, DomainError>,
         val pointsOfInterest: List<PointOfInterest>,
-        val explorationProgress: ExplorationProgress,
     )
 
     @Immutable
@@ -994,6 +1004,15 @@ class MapViewModel @Inject constructor(
         val kind: MapObjectKind,
         val rawId: String,
     )
+
+    private fun reuseVisibleObjects(visibleObjects: List<MapObjectUiModel>): List<MapObjectUiModel> {
+        if (cachedVisibleObjects == visibleObjects) {
+            return cachedVisibleObjects
+        }
+
+        cachedVisibleObjects = visibleObjects
+        return visibleObjects
+    }
 
     private fun resolveResourceQueryBounds(
         visibleBounds: GeoBounds,

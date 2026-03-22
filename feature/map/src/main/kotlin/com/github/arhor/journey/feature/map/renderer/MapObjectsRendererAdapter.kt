@@ -5,10 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.arhor.journey.core.common.ResourceType
@@ -67,23 +67,44 @@ fun MapObjectsRendererAdapter(
         source.setData(geoJsonData)
     }
 
-    val woodPainter = rememberResourceTypePainter(ResourceType.WOOD)
-    val coalPainter = rememberResourceTypePainter(ResourceType.COAL)
-    val stonePainter = rememberResourceTypePainter(ResourceType.STONE)
-    val resourceSpawnIcon = remember(woodPainter, coalPainter, stonePainter) {
+    val woodBitmap = rememberResourceTypeImageBitmap(ResourceType.WOOD)
+    val coalBitmap = rememberResourceTypeImageBitmap(ResourceType.COAL)
+    val stoneBitmap = rememberResourceTypeImageBitmap(ResourceType.STONE)
+    val density = LocalDensity.current
+    val resourceIconScale = remember(
+        density.density,
+        woodBitmap.width,
+        woodBitmap.height,
+        coalBitmap.width,
+        coalBitmap.height,
+        stoneBitmap.width,
+        stoneBitmap.height,
+    ) {
+        with(density) {
+            RESOURCE_ICON_SIZE.toPx() / maxOf(
+                woodBitmap.width,
+                woodBitmap.height,
+                coalBitmap.width,
+                coalBitmap.height,
+                stoneBitmap.width,
+                stoneBitmap.height,
+            ).toFloat()
+        }
+    }
+    val resourceSpawnIcon = remember(woodBitmap, coalBitmap, stoneBitmap) {
         switch(
             input = feature[PROPERTY_OBJECT_RESOURCE_TYPE_ID].asString(const("")),
             case(
                 label = ResourceType.WOOD.typeId,
-                output = image(woodPainter, size = RESOURCE_ICON_SIZE),
+                output = image(woodBitmap),
             ),
             case(
                 label = ResourceType.COAL.typeId,
-                output = image(coalPainter, size = RESOURCE_ICON_SIZE),
+                output = image(coalBitmap),
             ),
             case(
                 label = ResourceType.STONE.typeId,
-                output = image(stonePainter, size = RESOURCE_ICON_SIZE),
+                output = image(stoneBitmap),
             ),
             fallback = nil(),
         )
@@ -141,6 +162,7 @@ fun MapObjectsRendererAdapter(
         minZoom = DECLUSTER_ZOOM.toFloat(),
         filter = feature[PROPERTY_OBJECT_KIND].asString(const("")) eq const(MapObjectKind.ResourceSpawn.idPrefix),
         iconImage = resourceSpawnIcon,
+        iconSize = const(resourceIconScale),
         iconAllowOverlap = const(true),
         iconIgnorePlacement = const(true),
         onClick = { features ->
@@ -208,10 +230,10 @@ internal const val PROPERTY_CLUSTER_POINT_COUNT_ABBREVIATED = "point_count_abbre
 
 internal const val DECLUSTER_ZOOM = 12
 internal const val CLUSTER_RADIUS = 60
-private val RESOURCE_ICON_SIZE = DpSize(32.dp, 32.dp)
+private val RESOURCE_ICON_SIZE = 20.dp
 
 @Composable
-private fun rememberResourceTypePainter(resourceType: ResourceType): Painter {
+private fun rememberResourceTypeImageBitmap(resourceType: ResourceType): ImageBitmap {
     val context = LocalContext.current
     val drawableId = remember(context.packageName, resourceType) {
         context.resolveDrawableId(resourceType.drawableName)
@@ -221,7 +243,7 @@ private fun rememberResourceTypePainter(resourceType: ResourceType): Painter {
         "Missing drawable resource for ${resourceType.typeId}."
     }
 
-    return painterResource(id = drawableId)
+    return ImageBitmap.imageResource(id = drawableId)
 }
 
 private fun Context.resolveDrawableId(drawableName: String): Int =
