@@ -97,7 +97,7 @@ class MapViewModel @Inject constructor(
     private val getExplorationTileRuntimeConfig: GetExplorationTileRuntimeConfigUseCase,
     private val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
     private val setExplorationTileRevealRadius: SetExplorationTileRevealRadiusUseCase,
-    private val fogOfWarController: FogOfWarController,
+    private val fogOfWarControllerFactory: FogOfWarController.Factory,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
     private val stopExplorationTrackingSession: StopExplorationTrackingSessionUseCase,
@@ -105,6 +105,10 @@ class MapViewModel @Inject constructor(
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
+    private val fogOfWarController: FogOfWarController by lazy(LazyThreadSafetyMode.NONE) {
+        fogOfWarControllerFactory.create(viewModelScope)
+    }
+
     private val initialTileRuntimeConfig = getExplorationTileRuntimeConfig()
     private val _state = MutableStateFlow(
         State(
@@ -119,11 +123,6 @@ class MapViewModel @Inject constructor(
             initialValue = ExplorationTrackingSession(),
     )
     private var cachedVisibleObjects: List<MapObjectUiModel> = emptyList()
-
-    init {
-        fogOfWarController.attach(viewModelScope)
-        fogOfWarController.setCanonicalZoom(initialTileRuntimeConfig.canonicalZoom)
-    }
 
     override fun buildUiState(): Flow<MapUiState> =
         combine(
@@ -288,11 +287,9 @@ class MapViewModel @Inject constructor(
         )
         setExplorationTileCanonicalZoom(canonicalZoom)
 
-        _state.update { state ->
-            state.copy(canonicalZoom = canonicalZoom)
+        _state.update {
+            it.copy(canonicalZoom = canonicalZoom)
         }
-
-        fogOfWarController.setCanonicalZoom(canonicalZoom)
     }
 
     private fun onRevealRadiusMetersChanged(intent: MapIntent.RevealRadiusMetersChanged) {

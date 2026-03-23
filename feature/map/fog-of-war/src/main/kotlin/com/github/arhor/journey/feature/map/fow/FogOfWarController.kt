@@ -3,12 +3,17 @@ package com.github.arhor.journey.feature.map.fow
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.ExplorationTilePrototype
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
+import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderData
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +23,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -25,57 +31,57 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
 
 private const val MAX_VISIBLE_FOG_TILE_COUNT = 8_192L
 private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
 
 @Stable
-class FogOfWarController @Inject constructor(
+class FogOfWarController @AssistedInject constructor(
+    private val observeExplorationTileRuntimeConfig: ObserveExplorationTileRuntimeConfigUseCase,
     private val observeExploredTiles: ObserveExploredTilesUseCase,
     private val renderDataFactory: FowRenderDataFactory,
     private val fogOfWarCalculator: FogOfWarCalculator,
+    @Assisted private val scope: CoroutineScope,
 ) {
-    private val state = MutableStateFlow(State())
-    private var scope: CoroutineScope? = null
+    @AssistedFactory
+    fun interface Factory {
+        fun create(scope: CoroutineScope): FogOfWarController
+    }
+
+    private val _state = MutableStateFlow(State())
     private var displayedFogObservationJob: Job? = null
     private var pendingFogPreparationJob: Job? = null
 
-    val uiState: Flow<FogOfWarUiState> = state
+    val uiState: Flow<FogOfWarUiState> = combine(
+        _state,
+        observeExplorationTileRuntimeConfig(),
+    ) { state, config -> state.copy(canonicalZoom = config.canonicalZoom) }
         .map(::buildUiState)
         .distinctUntilChanged()
 
-    fun attach(scope: CoroutineScope) {
-        val existingScope = this.scope
-        require(existingScope == null || existingScope === scope) {
-            "FogOfWarController is already attached to a different CoroutineScope."
-        }
-        this.scope = scope
-    }
-
-    fun setCanonicalZoom(canonicalZoom: Int) {
-        if (state.value.canonicalZoom == canonicalZoom) {
-            return
-        }
-
-        state.update {
-            it.copy(canonicalZoom = canonicalZoom)
-        }
-
-        state.value.visibleBounds?.let { visibleBounds ->
-            updateFogViewport(
-                visibleBounds = visibleBounds,
-                forceDisplayedBufferReplacement = true,
-            )
-        }
-    }
+//    fun setCanonicalZoom(canonicalZoom: Int) {
+//        if (state.value.canonicalZoom == canonicalZoom) {
+//            return
+//        }
+//
+//        _state.update {
+//            it.copy(canonicalZoom = canonicalZoom)
+//        }
+//
+//        _state.value.visibleBounds?.let { visibleBounds ->
+//            updateFogViewport(
+//                visibleBounds = visibleBounds,
+//                forceDisplayedBufferReplacement = true,
+//            )
+//        }
+//    }
 
     fun setOverlayEnabled(isEnabled: Boolean) {
-        if (state.value.isOverlayEnabled == isEnabled) {
+        if (_state.value.isOverlayEnabled == isEnabled) {
             return
         }
 
-        state.update {
+        _state.update {
             it.copy(isOverlayEnabled = isEnabled)
         }
     }
@@ -163,7 +169,7 @@ class FogOfWarController @Inject constructor(
         visibleBounds: GeoBounds,
         forceDisplayedBufferReplacement: Boolean = false,
     ) {
-        val currentState = state.value
+        val currentState = _state.value
         val viewport = createFogViewportSnapshot(
             visibleBounds = visibleBounds,
             canonicalZoom = currentState.canonicalZoom,
@@ -173,7 +179,7 @@ class FogOfWarController @Inject constructor(
         val isSuppressedByBufferedTileLimit = nextFogBuffer.bufferedTileRange.tileCount > MAX_BUFFERED_FOG_TILE_COUNT
         val isFogSuppressed = isSuppressedByVisibleTileLimit || isSuppressedByBufferedTileLimit
 
-        state.update {
+        _state.update {
             it.copy(
                 visibleBounds = visibleBounds,
                 visibleTileRange = viewport.visibleTileRange,
@@ -187,7 +193,7 @@ class FogOfWarController @Inject constructor(
             return
         }
 
-        val updatedState = state.value
+        val updatedState = _state.value
         val displayedFogBuffer = updatedState.displayedFogBuffer
             ?.takeIf { it.bufferedTileRange.zoom == updatedState.canonicalZoom }
         val pendingFogBuffer = updatedState.pendingFogBuffer
@@ -214,7 +220,7 @@ class FogOfWarController @Inject constructor(
         pendingFogPreparationJob?.cancel()
         pendingFogPreparationJob = null
 
-        state.update {
+        _state.update {
             it.copy(
                 displayedFogBuffer = null,
                 pendingFogBuffer = null,
@@ -228,7 +234,7 @@ class FogOfWarController @Inject constructor(
         pendingFogPreparationJob?.cancel()
         pendingFogPreparationJob = null
 
-        state.update {
+        _state.update {
             it.copy(
                 displayedFogBuffer = buffer,
                 pendingFogBuffer = null,
@@ -241,19 +247,19 @@ class FogOfWarController @Inject constructor(
     }
 
     private fun preparePendingFogBuffer(buffer: FogBufferRegion) {
-        if (state.value.pendingFogBuffer == buffer && pendingFogPreparationJob?.isActive == true) {
+        if (_state.value.pendingFogBuffer == buffer && pendingFogPreparationJob?.isActive == true) {
             return
         }
 
         pendingFogPreparationJob?.cancel()
-        state.update {
+        _state.update {
             it.copy(
                 pendingFogBuffer = buffer,
                 isFogRecomputationInProgress = true,
             )
         }
 
-        pendingFogPreparationJob = requireScope().launch {
+        pendingFogPreparationJob = scope.launch {
             val exploredTiles = observeFogExploredTiles(buffer.bufferedTileRange).first()
             val preparedFogBuffer = try {
                 prepareFogBufferData(
@@ -268,7 +274,7 @@ class FogOfWarController @Inject constructor(
             var shouldPrepareAnotherBuffer = false
 
             // Keep the old fog source active until the replacement render payload is fully ready.
-            state.update { current ->
+            _state.update { current ->
                 if (current.pendingFogBuffer != buffer || current.isFogSuppressedByVisibleTileLimit) {
                     current
                 } else {
@@ -295,7 +301,7 @@ class FogOfWarController @Inject constructor(
             )
 
             if (shouldPrepareAnotherBuffer) {
-                state.value.visibleBounds?.let(::updateFogViewport)
+                _state.value.visibleBounds?.let(::updateFogViewport)
             }
         }
     }
@@ -305,7 +311,7 @@ class FogOfWarController @Inject constructor(
         seedExploredTiles: Set<ExplorationTile>? = null,
     ) {
         displayedFogObservationJob?.cancel()
-        displayedFogObservationJob = requireScope().launch {
+        displayedFogObservationJob = scope.launch {
             var shouldSkipSeed = seedExploredTiles != null
 
             observeFogExploredTiles(buffer.bufferedTileRange)
@@ -327,7 +333,7 @@ class FogOfWarController @Inject constructor(
                         throw exception
                     }
 
-                    state.update { current ->
+                    _state.update { current ->
                         if (current.displayedFogBuffer != buffer || current.isFogSuppressedByVisibleTileLimit) {
                             current
                         } else {
@@ -339,23 +345,17 @@ class FogOfWarController @Inject constructor(
     }
 
     private fun recordFogPreparationCancellation() {
-        state.update { current ->
+        _state.update { current ->
             current.copy(
                 fogPreparationCancellationCount = current.fogPreparationCancellationCount + 1,
             )
         }
     }
 
-    private fun requireScope(): CoroutineScope {
-        return requireNotNull(scope) {
-            "FogOfWarController must be attached to a CoroutineScope before use."
-        }
-    }
-
     @Immutable
     private data class State(
         val isOverlayEnabled: Boolean = true,
-        val canonicalZoom: Int = 0,
+        val canonicalZoom: Int = ExplorationTilePrototype.CANONICAL_ZOOM,
         val visibleBounds: GeoBounds? = null,
         val visibleTileRange: ExplorationTileRange? = null,
         val displayedFogBuffer: FogBufferRegion? = null,
