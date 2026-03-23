@@ -31,7 +31,7 @@ import com.github.arhor.journey.core.ui.components.LoadingIndicator
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.feature.map.fow.ApplyFogOfWar
+import com.github.arhor.journey.feature.map.fow.ui.ApplyFogOfWar
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -285,11 +285,6 @@ internal fun MapContent(
 
                     ApplyFogOfWar(
                         state = state.fogOfWar,
-                        onSourceDataUpdated = { elapsedMillis ->
-                            if (BuildConfig.DEBUG) {
-                                dispatch(MapIntent.FogOfWarSourceUpdated(elapsedMillis))
-                            }
-                        },
                     )
 
                     if (

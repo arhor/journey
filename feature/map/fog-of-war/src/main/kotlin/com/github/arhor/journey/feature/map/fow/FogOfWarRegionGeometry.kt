@@ -1,7 +1,17 @@
 package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTileRange
-import org.maplibre.spatialk.geojson.Polygon
+import com.github.arhor.journey.feature.map.fow.model.BoundaryLoopsResult
+import com.github.arhor.journey.feature.map.fow.model.DirectedEdge
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarGeometryMetrics
+import com.github.arhor.journey.feature.map.fow.model.GridPoint
+import com.github.arhor.journey.feature.map.fow.model.GridVertex
+import com.github.arhor.journey.feature.map.fow.model.TileCell
+import com.github.arhor.journey.feature.map.fow.model.TileRegionGeometriesBuildResult
+import com.github.arhor.journey.feature.map.fow.model.TileRegionGeometry
+import com.github.arhor.journey.feature.map.fow.model.TileRegionGeometryBuildResult
+import com.github.arhor.journey.feature.map.fow.model.TileRegionGeometryMetrics
+import com.github.arhor.journey.feature.map.fow.model.TileRegionRing
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.PI
 import kotlin.math.abs
@@ -12,47 +22,6 @@ import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sinh
-
-internal data class TileRegionGeometry(
-    val zoom: Int,
-    val outerRing: TileRegionRing,
-    val holeRings: List<TileRegionRing> = emptyList(),
-) {
-    fun toPolygon(): Polygon = Polygon(
-        coordinates = listOf(
-            outerRing.points.map { it.toPosition(zoom) },
-        ) + holeRings.map { ring ->
-            ring.points.map { it.toPosition(zoom) }
-        },
-    )
-}
-
-internal data class TileRegionRing(
-    val points: List<GridPoint>,
-) {
-    init {
-        require(points.size >= 4) { "A tile region ring must contain at least 4 points." }
-        require(points.first().approximatelyEquals(points.last())) { "A tile region ring must be closed." }
-    }
-}
-
-internal data class GridPoint(
-    val x: Double,
-    val y: Double,
-)
-
-internal data class TileRegionGeometriesBuildResult(
-    val geometries: List<TileRegionGeometry>,
-    val metrics: FogOfWarGeometryMetrics,
-)
-
-internal data class FogOfWarGeometryMetrics(
-    val expandedCellCount: Long = 0,
-    val connectedRegionCount: Int = 0,
-    val boundaryEdgeCount: Int = 0,
-    val loopCount: Int = 0,
-    val ringPointCount: Int = 0,
-)
 
 internal fun List<ExplorationTileRange>.toTileRegionGeometries(
     cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
@@ -172,21 +141,6 @@ internal fun List<GridPoint>.roundOrthogonalLoop(
 
     return roundedLoop
 }
-
-private data class TileCell(
-    val x: Int,
-    val y: Int,
-)
-
-private data class GridVertex(
-    val x: Int,
-    val y: Int,
-)
-
-private data class DirectedEdge(
-    val start: GridVertex,
-    val end: GridVertex,
-)
 
 private fun List<ExplorationTileRange>.toTileCells(checkCancelled: () -> Unit = {}): Set<TileCell> {
     val cells = linkedSetOf<TileCell>()
@@ -375,22 +329,6 @@ private fun Set<TileCell>.extractBoundaryLoops(checkCancelled: () -> Unit = {}):
     )
 }
 
-private data class TileRegionGeometryBuildResult(
-    val geometry: TileRegionGeometry,
-    val metrics: TileRegionGeometryMetrics,
-)
-
-private data class TileRegionGeometryMetrics(
-    val boundaryEdgeCount: Int,
-    val loopCount: Int,
-    val ringPointCount: Int,
-)
-
-private data class BoundaryLoopsResult(
-    val loops: List<List<GridPoint>>,
-    val boundaryEdgeCount: Int,
-)
-
 private fun MutableMap<GridVertex, DirectedEdge>.addBoundaryEdge(
     start: GridVertex,
     end: GridVertex,
@@ -502,7 +440,7 @@ private fun List<GridPoint>.signedAreaGeo(): Double {
     return area / 2.0
 }
 
-private fun GridPoint.toPosition(zoom: Int): Position {
+internal fun GridPoint.toPosition(zoom: Int): Position {
     val tilesPerAxis = tilesPerAxis(zoom)
     val longitude = x / tilesPerAxis * FULL_LONGITUDE_SPAN - HALF_LONGITUDE_SPAN
     val latitude = tileYToLatitude(y, zoom)
@@ -540,7 +478,7 @@ private fun GridPoint.normalized(): GridPoint {
     return this * (1.0 / length)
 }
 
-private fun GridPoint.approximatelyEquals(
+internal fun GridPoint.approximatelyEquals(
     other: GridPoint,
     epsilon: Double = GEOMETRY_EPSILON,
 ): Boolean = abs(x - other.x) <= epsilon &&

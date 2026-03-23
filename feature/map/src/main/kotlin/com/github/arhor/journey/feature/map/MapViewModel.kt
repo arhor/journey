@@ -29,7 +29,7 @@ import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUse
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
-import com.github.arhor.journey.feature.map.fow.FogOfWarUiState
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -50,9 +50,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val DEFAULT_CAMERA_ZOOM = 17.0
 private const val RESOURCE_QUERY_BUFFER_FRACTION = 0.5
@@ -231,10 +230,9 @@ class MapViewModel @Inject constructor(
             is MapIntent.MapTapped -> onMapTapped(intent)
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
-            MapIntent.AddPoiClicked -> onAddPoiClicked()
+            is MapIntent.AddPoiClicked -> onAddPoiClicked()
             is MapIntent.ResetExploredTilesClicked -> onClearExploredTilesClicked()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
-            is MapIntent.FogOfWarSourceUpdated -> onFogOfWarSourceUpdated(intent)
         }
     }
     private fun observeVisibleResourceSpawns(
@@ -411,10 +409,6 @@ class MapViewModel @Inject constructor(
         _state.update {
             it.copy(failureMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
         }
-    }
-
-    private fun onFogOfWarSourceUpdated(intent: MapIntent.FogOfWarSourceUpdated) {
-        fogOfWarController.recordSourceDataUpdated(intent.elapsedMillis)
     }
 
     private fun onRecenterClicked() {

@@ -2,6 +2,8 @@ package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
+import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
+import com.github.arhor.journey.feature.map.fow.shouldRecompute
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 

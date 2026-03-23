@@ -6,8 +6,9 @@ import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
-import javax.inject.Inject
-import kotlin.time.TimeSource
+import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderData
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 private const val MAX_VISIBLE_FOG_TILE_COUNT = 8_192L
 private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
@@ -31,7 +33,7 @@ private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
 @Stable
 class FogOfWarController @Inject constructor(
     private val observeExploredTiles: ObserveExploredTilesUseCase,
-    private val renderDataFactory: FogOfWarRenderDataFactory,
+    private val renderDataFactory: FowRenderDataFactory,
 ) {
     private val state = MutableStateFlow(State())
     private var scope: CoroutineScope? = null
@@ -81,17 +83,6 @@ class FogOfWarController @Inject constructor(
         updateFogViewport(visibleBounds = visibleBounds)
     }
 
-    fun recordSourceDataUpdated(elapsedMillis: Long) {
-        state.update { current ->
-            current.copy(
-                fogSourceUpdateMetrics = current.fogSourceUpdateMetrics.copy(
-                    updateCount = current.fogSourceUpdateMetrics.updateCount + 1,
-                    lastSetDataMillis = elapsedMillis,
-                ),
-            )
-        }
-    }
-
     private fun observeFogExploredTiles(
         fogTileRange: ExplorationTileRange?,
     ): Flow<Set<ExplorationTile>> = fogTileRange
@@ -108,15 +99,11 @@ class FogOfWarController @Inject constructor(
             val coroutineContext = currentCoroutineContext()
             val checkCancelled = { coroutineContext.ensureActive() }
             val diagnosticsEnabled = BuildConfig.DEBUG
-            val totalStartedAt = if (diagnosticsEnabled) TimeSource.Monotonic.markNow() else null
-            val calculateFogRangesStartedAt = if (diagnosticsEnabled) TimeSource.Monotonic.markNow() else null
             val fogRanges = calculateUnexploredFogRanges(
                 tileRange = buffer.bufferedTileRange,
                 exploredTiles = exploredTiles,
                 checkCancelled = checkCancelled,
             )
-            val calculateFogRangesMillis = calculateFogRangesStartedAt?.elapsedNow()?.inWholeMilliseconds ?: 0
-            val buildRenderDataStartedAt = if (diagnosticsEnabled) TimeSource.Monotonic.markNow() else null
             val renderOutput = if (diagnosticsEnabled) {
                 renderDataFactory.createDetailed(
                     fogRanges = fogRanges,
@@ -129,31 +116,12 @@ class FogOfWarController @Inject constructor(
                 fogRanges = fogRanges,
                 checkCancelled = checkCancelled,
             )
-            val buildRenderDataMillis = buildRenderDataStartedAt?.elapsedNow()?.inWholeMilliseconds ?: 0
 
             PreparedFogBuffer(
                 data = DisplayedFogData(
                     exploredTiles = exploredTiles,
                     fogRanges = fogRanges,
                     renderData = renderData,
-                    preparationMetrics = FogOfWarPreparationMetrics(
-                        totalPrepareMillis = totalStartedAt?.elapsedNow()?.inWholeMilliseconds ?: 0,
-                        calculateFogRangesMillis = calculateFogRangesMillis,
-                        buildRenderDataMillis = buildRenderDataMillis,
-                        geometryBuildMillis = renderOutput?.metrics?.geometryBuildMillis ?: 0,
-                        featureCollectionBuildMillis = renderOutput?.metrics?.featureCollectionBuildMillis ?: 0,
-                        visibleTileCount = visibleTileCount,
-                        bufferedTileCount = buffer.bufferedTileRange.tileCount,
-                        exploredTileCount = exploredTiles.size,
-                        fogRangeCount = fogRanges.size,
-                        expandedFogCellCount = renderOutput?.metrics?.expandedFogCellCount ?: 0,
-                        connectedRegionCount = renderOutput?.metrics?.connectedRegionCount ?: 0,
-                        boundaryEdgeCount = renderOutput?.metrics?.boundaryEdgeCount ?: 0,
-                        loopCount = renderOutput?.metrics?.loopCount ?: 0,
-                        featureCount = renderOutput?.metrics?.featureCount ?: 0,
-                        ringPointCount = renderOutput?.metrics?.ringPointCount ?: 0,
-                        renderCacheHit = renderOutput?.metrics?.cacheHit ?: false,
-                    ),
                 ),
             )
         }
@@ -174,11 +142,6 @@ class FogOfWarController @Inject constructor(
             ?: fallbackFogTileRange
                 ?.takeIf { state.isOverlayEnabled }
                 ?.let(renderDataFactory::createFullRange)
-        val preparationMetrics = displayedFogData?.preparationMetrics ?: fallbackPreparationMetrics(
-            state = state,
-            fogRanges = fogRanges,
-            hasRenderData = renderData != null,
-        )
 
         return FogOfWarUiState(
             isOverlayEnabled = state.isOverlayEnabled,
@@ -193,16 +156,6 @@ class FogOfWarController @Inject constructor(
             exploredVisibleTileCount = exploredVisibleTileCount,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
             isRecomputing = state.isFogRecomputationInProgress,
-            diagnostics = if (BuildConfig.DEBUG) {
-                FogOfWarDiagnostics(
-                    lastPreparation = preparationMetrics,
-                    cache = renderDataFactory.cacheMetricsSnapshot(),
-                    sourceUpdate = state.fogSourceUpdateMetrics,
-                    prepareCancellationCount = state.fogPreparationCancellationCount,
-                )
-            } else {
-                FogOfWarDiagnostics(lastPreparation = preparationMetrics)
-            },
         )
     }
 
@@ -401,18 +354,6 @@ class FogOfWarController @Inject constructor(
         }
     }
 
-    private fun fallbackPreparationMetrics(
-        state: State,
-        fogRanges: List<ExplorationTileRange>,
-        hasRenderData: Boolean,
-    ): FogOfWarPreparationMetrics = FogOfWarPreparationMetrics(
-        visibleTileCount = state.visibleTileCount,
-        bufferedTileCount = state.displayedFogBuffer?.bufferedTileRange?.tileCount ?: 0,
-        fogRangeCount = fogRanges.size,
-        featureCount = if (hasRenderData) 1 else 0,
-        ringPointCount = if (hasRenderData) 5 else 0,
-    )
-
     @Immutable
     private data class State(
         val isOverlayEnabled: Boolean = true,
@@ -425,7 +366,6 @@ class FogOfWarController @Inject constructor(
         val visibleTileCount: Long = 0,
         val isFogSuppressedByVisibleTileLimit: Boolean = false,
         val isFogRecomputationInProgress: Boolean = false,
-        val fogSourceUpdateMetrics: FogOfWarSourceUpdateMetrics = FogOfWarSourceUpdateMetrics(),
         val fogPreparationCancellationCount: Long = 0,
     )
 
@@ -434,7 +374,6 @@ class FogOfWarController @Inject constructor(
         val exploredTiles: Set<ExplorationTile>,
         val fogRanges: List<ExplorationTileRange>,
         val renderData: FogOfWarRenderData?,
-        val preparationMetrics: FogOfWarPreparationMetrics,
     )
 
     @Immutable

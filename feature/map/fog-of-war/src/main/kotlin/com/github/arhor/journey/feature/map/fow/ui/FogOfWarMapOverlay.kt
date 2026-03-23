@@ -1,13 +1,13 @@
-package com.github.arhor.journey.feature.map.fow
+package com.github.arhor.journey.feature.map.fow.ui
 
 import androidx.compose.runtime.Composable
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
 import org.maplibre.compose.util.MaplibreComposable
 
 @Composable
 @MaplibreComposable
 fun ApplyFogOfWar(
     state: FogOfWarUiState,
-    onSourceDataUpdated: (Long) -> Unit = {},
 ) {
     if (!state.isOverlayEnabled) {
         return
@@ -15,6 +15,5 @@ fun ApplyFogOfWar(
 
     FogOfWarRendererAdapter(
         fogRenderData = state.renderData,
-        onSourceDataUpdated = onSourceDataUpdated,
     )
 }

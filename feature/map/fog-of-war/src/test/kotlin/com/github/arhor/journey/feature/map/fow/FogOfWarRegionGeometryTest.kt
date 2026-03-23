@@ -1,6 +1,7 @@
 package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTileRange
+import com.github.arhor.journey.feature.map.fow.model.GridPoint
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 
@@ -160,13 +161,13 @@ class FogOfWarRegionGeometryTest {
         rounded.containsPointNear(x = 10.0, y = 20.0) shouldBe false
         unrounded.containsPointNear(x = 10.0, y = 20.0) shouldBe true
     }
-}
 
-private fun List<GridPoint>.containsPointNear(
-    x: Double,
-    y: Double,
-    tolerance: Double = 1e-9,
-): Boolean = any { point ->
-    kotlin.math.abs(point.x - x) <= tolerance &&
-        kotlin.math.abs(point.y - y) <= tolerance
+    private fun List<GridPoint>.containsPointNear(
+        x: Double,
+        y: Double,
+        tolerance: Double = 1e-9,
+    ): Boolean = any { point ->
+        kotlin.math.abs(point.x - x) <= tolerance &&
+            kotlin.math.abs(point.y - y) <= tolerance
+    }
 }

@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.feature.map.fow.FogOfWarUiState
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng

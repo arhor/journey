@@ -3,15 +3,18 @@ package com.github.arhor.journey.feature.map.fow
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import kotlinx.serialization.json.JsonObject
 import org.junit.Test
+import org.maplibre.spatialk.geojson.FeatureCollection
+import org.maplibre.spatialk.geojson.Polygon
 import java.util.concurrent.CancellationException
 
-class FogOfWarRenderDataFactoryTest {
+class FowRenderDataFactoryTest {
 
     @Test
     fun `create should return null when fog ranges are empty`() {
         // Given
-        val factory = FogOfWarRenderDataFactory()
+        val factory = FowRenderDataFactory()
 
         // When
         val actual = factory.create(emptyList())
@@ -23,7 +26,7 @@ class FogOfWarRenderDataFactoryTest {
     @Test
     fun `create should reuse cached render data for equivalent fog inputs`() {
         // Given
-        val factory = FogOfWarRenderDataFactory()
+        val factory = FowRenderDataFactory()
         val fogRanges = listOf(
             ExplorationTileRange(
                 zoom = 16,
@@ -52,50 +55,9 @@ class FogOfWarRenderDataFactoryTest {
     }
 
     @Test
-    fun `createDetailed should expose geometry metrics and cache hits for equivalent fog inputs`() {
-        // Given
-        val factory = FogOfWarRenderDataFactory()
-        val fogRanges = listOf(
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 34567,
-                maxX = 34568,
-                minY = 22345,
-                maxY = 22345,
-            ),
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 34567,
-                maxX = 34567,
-                minY = 22346,
-                maxY = 22346,
-            ),
-        )
-
-        // When
-        val first = factory.createDetailed(fogRanges)
-        val second = factory.createDetailed(fogRanges.asReversed())
-
-        // Then
-        first.shouldNotBeNull()
-        second.shouldNotBeNull()
-        first.metrics.cacheHit shouldBe false
-        first.metrics.expandedFogCellCount shouldBe 3L
-        first.metrics.connectedRegionCount shouldBe 1
-        first.metrics.featureCount shouldBe 1
-        second.metrics.cacheHit shouldBe true
-        factory.cacheMetricsSnapshot() shouldBe FogOfWarCacheMetrics(
-            renderHits = 1,
-            renderMisses = 1,
-            fullRangeHits = 0,
-            fullRangeMisses = 0,
-        )
-    }
-
-    @Test
     fun `create should stop geometry preparation when cancellation is requested`() {
         // Given
-        val factory = FogOfWarRenderDataFactory()
+        val factory = FowRenderDataFactory()
         val fogRanges = listOf(
             ExplorationTileRange(
                 zoom = 16,
@@ -148,4 +110,11 @@ class FogOfWarRenderDataFactoryTest {
         // Then
         (actual.features.single().geometry.coordinates.single().size > 5) shouldBe true
     }
+
+    internal fun List<ExplorationTileRange>.toFeatureCollection(
+        checkCancelled: () -> Unit = {},
+    ): FeatureCollection<Polygon, JsonObject?> =
+        this.toTileRegionGeometriesBuildResult(checkCancelled = checkCancelled)
+            .geometries
+            .toPolygonFeatureCollection(checkCancelled = checkCancelled)
 }

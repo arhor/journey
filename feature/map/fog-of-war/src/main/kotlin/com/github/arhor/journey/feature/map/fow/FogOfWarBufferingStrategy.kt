@@ -1,34 +1,17 @@
 package com.github.arhor.journey.feature.map.fow
 
-import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
+import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
+import com.github.arhor.journey.feature.map.fow.model.FogViewportSnapshot
 import kotlin.math.ceil
 
 private const val TRIGGER_TILE_PADDING_MULTIPLIER = 0.5
 private const val BUFFERED_TILE_PADDING_MULTIPLIER = 1.0
 private const val MIN_TILE_PADDING = 1
 
-@Immutable
-data class FogViewportSnapshot(
-    val visibleBounds: GeoBounds,
-    val visibleTileRange: ExplorationTileRange,
-    val visibleTileCount: Long,
-)
-
-@Immutable
-data class FogBufferRegion(
-    val triggerBounds: GeoBounds,
-    val bufferedBounds: GeoBounds,
-    val triggerTileRange: ExplorationTileRange,
-    val bufferedTileRange: ExplorationTileRange,
-) {
-    // Treat touching the trigger edge as a handoff point so the next buffer starts early.
-    fun shouldRecompute(visibleBounds: GeoBounds): Boolean = !triggerBounds.strictlyContains(visibleBounds)
-}
-
-fun createFogViewportSnapshot(
+internal fun createFogViewportSnapshot(
     visibleBounds: GeoBounds,
     canonicalZoom: Int,
 ): FogViewportSnapshot {
@@ -44,7 +27,7 @@ fun createFogViewportSnapshot(
     )
 }
 
-fun createFogBufferRegion(
+internal fun createFogBufferRegion(
     visibleTileRange: ExplorationTileRange,
 ): FogBufferRegion {
     val visibleTileWidth = visibleTileRange.widthInTiles()
@@ -82,7 +65,7 @@ fun createFogBufferRegion(
     )
 }
 
-fun createFogBufferRegion(
+internal fun createFogBufferRegion(
     visibleBounds: GeoBounds,
     canonicalZoom: Int,
 ): FogBufferRegion = createFogBufferRegion(
@@ -92,21 +75,19 @@ fun createFogBufferRegion(
     ).visibleTileRange,
 )
 
-fun GeoBounds.containsInclusive(other: GeoBounds): Boolean {
-    return other.south >= south &&
-        other.west >= west &&
-        other.north <= north &&
-        other.east <= east
-}
+// Treat touching the trigger edge as a handoff point so the next buffer starts early.
+internal fun FogBufferRegion.shouldRecompute(visibleBounds: GeoBounds): Boolean =
+    !triggerBounds.strictlyContains(visibleBounds)
 
-fun GeoBounds.strictlyContains(other: GeoBounds): Boolean {
+
+internal fun GeoBounds.strictlyContains(other: GeoBounds): Boolean {
     return other.south > south &&
         other.west > west &&
         other.north < north &&
         other.east < east
 }
 
-fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
+internal fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
     return zoom == other.zoom &&
         other.minX >= minX &&
         other.maxX <= maxX &&
@@ -114,9 +95,9 @@ fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
         other.maxY <= maxY
 }
 
-fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
+internal fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
 
-fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
+internal fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
 
 private fun bufferedTilePaddingFor(
     visibleSpan: Int,

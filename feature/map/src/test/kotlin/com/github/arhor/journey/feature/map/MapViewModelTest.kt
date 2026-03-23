@@ -33,8 +33,7 @@ import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUse
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
-import com.github.arhor.journey.feature.map.fow.FogOfWarRenderDataFactory
-import com.github.arhor.journey.feature.map.fow.createFogBufferRegion
+import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -730,36 +729,6 @@ class MapViewModelTest {
             actual.fogOfWar.visibleTileCount shouldBe 4L
             actual.fogOfWar.exploredVisibleTileCount shouldBe 1
             actual.fogOfWar.renderData.shouldNotBeNull()
-            actual.fogOfWar.diagnostics.lastPreparation.visibleTileCount shouldBe 4L
-            actual.fogOfWar.diagnostics.lastPreparation.exploredTileCount shouldBe 1
-            actual.fogOfWar.diagnostics.lastPreparation.fogRangeCount shouldBe actual.fogOfWar.fogRanges.size
-            actual.fogOfWar.diagnostics.lastPreparation.featureCount shouldBe 1
-            actual.fogOfWar.diagnostics.cache.renderMisses shouldBe 1
-            actual.fogOfWar.diagnostics.sourceUpdate.updateCount shouldBe 0
-        } finally {
-            tearDownMainDispatcher()
-        }
-    }
-
-    @Test
-    fun `dispatch should track fog source update timing diagnostics`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture()
-
-        try {
-            fixture.viewModel.awaitContent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.FogOfWarSourceUpdated(elapsedMillis = 12))
-            advanceUntilIdle()
-
-            // Then
-            val actual = fixture.viewModel.awaitContent {
-                it.fogOfWar.diagnostics.sourceUpdate.updateCount == 1L
-            }
-            actual.fogOfWar.diagnostics.sourceUpdate.lastSetDataMillis shouldBe 12
         } finally {
             tearDownMainDispatcher()
         }
@@ -814,89 +783,6 @@ class MapViewModelTest {
             actual.fogOfWar.renderData.shouldNotBeNull()
             actual.fogOfWar.isRecomputing shouldBe false
             verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
-        } finally {
-            tearDownMainDispatcher()
-        }
-    }
-
-    @Test
-    fun `dispatch should keep the displayed fog buffer active until the replacement buffer is ready`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val initialVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-            minX = 10,
-            maxX = 11,
-            minY = 20,
-            maxY = 21,
-        )
-        val shiftedVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-            minX = 12,
-            maxX = 13,
-            minY = 20,
-            maxY = 21,
-        )
-        val initialVisibleBounds = visibleBoundsInside(initialVisibleRange)
-        val shiftedVisibleBounds = visibleBoundsInside(shiftedVisibleRange)
-        val initialBuffer = createFogBufferRegion(
-            visibleBounds = initialVisibleBounds,
-            canonicalZoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-        )
-        val shiftedBuffer = createFogBufferRegion(
-            visibleBounds = shiftedVisibleBounds,
-            canonicalZoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-        )
-        val fixture = createFixture(
-            observeExploredTilesFlowFactory = { range ->
-                when (range) {
-                    initialBuffer.bufferedTileRange -> MutableStateFlow(emptySet())
-                    shiftedBuffer.bufferedTileRange -> flow {
-                        delay(1_000L)
-                        emit(emptySet())
-                    }
-
-                    else -> MutableStateFlow(emptySet())
-                }
-            },
-        )
-
-        try {
-            fixture.viewModel.awaitContent()
-            fixture.viewModel.dispatch(
-                MapIntent.CameraViewportChanged(
-                    visibleBounds = initialVisibleBounds,
-                ),
-            )
-            advanceUntilIdle()
-
-            val initial = fixture.viewModel.awaitContent {
-                it.fogOfWar.bufferedBounds == initialBuffer.bufferedBounds
-            }
-
-            // When
-            fixture.viewModel.dispatch(
-                MapIntent.CameraViewportChanged(
-                    visibleBounds = shiftedVisibleBounds,
-                ),
-            )
-            runCurrent()
-
-            // Then
-            val pending = fixture.viewModel.awaitContent {
-                it.fogOfWar.visibleTileRange == shiftedVisibleRange && it.fogOfWar.isRecomputing
-            }
-            pending.fogOfWar.bufferedBounds shouldBe initial.fogOfWar.bufferedBounds
-            pending.fogOfWar.triggerBounds shouldBe initial.fogOfWar.triggerBounds
-
-            advanceTimeBy(1_000L)
-            advanceUntilIdle()
-
-            val actual = fixture.viewModel.awaitContent {
-                it.fogOfWar.bufferedBounds == shiftedBuffer.bufferedBounds && !it.fogOfWar.isRecomputing
-            }
-            actual.fogOfWar.triggerBounds shouldBe shiftedBuffer.triggerBounds
         } finally {
             tearDownMainDispatcher()
         }
@@ -1343,7 +1229,7 @@ class MapViewModelTest {
                 setExplorationTileRevealRadius = setExplorationTileRevealRadius,
                 fogOfWarController = FogOfWarController(
                     observeExploredTiles = observeExploredTiles,
-                    renderDataFactory = FogOfWarRenderDataFactory(),
+                    renderDataFactory = FowRenderDataFactory(),
                 ),
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
