@@ -14,9 +14,7 @@ import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Polygon
 import org.maplibre.spatialk.geojson.Position
-import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
-import kotlin.time.TimeSource
 
 /**
  * Prepares and memoizes render-ready fog overlay geometry.
@@ -25,11 +23,7 @@ import kotlin.time.TimeSource
  * polygon conversion out of the composable render path.
  */
 class FowRenderDataFactory @Inject constructor() {
-    private val renderCache = object : LruCache<FogOfWarRenderKey, FogOfWarRenderCacheEntry>(CACHE_CAPACITY) {
-        override fun create(key: FogOfWarRenderKey): FogOfWarRenderCacheEntry? {
-            return super.create(key)
-        }
-    }
+    private val renderCache = LruCache<FogOfWarRenderKey, FogOfWarRenderCacheEntry>(CACHE_CAPACITY)
     private val fullRangeCache = LruCache<ExplorationTileRange, FogOfWarRenderData>(CACHE_CAPACITY)
 
     fun create(

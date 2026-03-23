@@ -8,6 +8,8 @@ import org.junit.Test
 
 class FogOfWarCalculatorTest {
 
+    private val fogOfWarCalculator = FogOfWarCalculator()
+
     @Test
     fun `calculateUnexploredFogRanges should extend fog one tile past the left viewport edge when the border remains unexplored`() {
         // Given
@@ -24,7 +26,7 @@ class FogOfWarCalculatorTest {
             .toSet()
 
         // When
-        val actual = calculateUnexploredFogRanges(
+        val actual = fogOfWarCalculator.calculateUnexploredFogRanges(
             tileRange = fogTileRange,
             exploredTiles = exploredTiles,
         )
@@ -57,7 +59,7 @@ class FogOfWarCalculatorTest {
             .toSet()
 
         // When
-        val actual = calculateUnexploredFogRanges(
+        val actual = fogOfWarCalculator.calculateUnexploredFogRanges(
             tileRange = fogTileRange,
             exploredTiles = exploredTiles,
         )
@@ -89,7 +91,7 @@ class FogOfWarCalculatorTest {
         )
 
         // When
-        val actual = calculateUnexploredFogRanges(
+        val actual = fogOfWarCalculator.calculateUnexploredFogRanges(
             tileRange = tileRange,
             exploredTiles = exploredTiles,
         )
@@ -115,7 +117,7 @@ class FogOfWarCalculatorTest {
         val exploredTiles = tileRange.asSequence().toSet()
 
         // When
-        val actual = calculateUnexploredFogRanges(
+        val actual = fogOfWarCalculator.calculateUnexploredFogRanges(
             tileRange = tileRange,
             exploredTiles = exploredTiles,
         )

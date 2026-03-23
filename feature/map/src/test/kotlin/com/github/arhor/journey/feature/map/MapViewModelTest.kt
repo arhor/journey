@@ -32,6 +32,7 @@ import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUs
 import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
+import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
 import com.github.arhor.journey.feature.map.model.CameraPositionState
@@ -1230,6 +1231,7 @@ class MapViewModelTest {
                 fogOfWarController = FogOfWarController(
                     observeExploredTiles = observeExploredTiles,
                     renderDataFactory = FowRenderDataFactory(),
+                    fogOfWarCalculator = FogOfWarCalculator(),
                 ),
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,

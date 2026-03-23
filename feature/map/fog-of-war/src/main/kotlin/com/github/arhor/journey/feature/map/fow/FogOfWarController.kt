@@ -34,6 +34,7 @@ private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
 class FogOfWarController @Inject constructor(
     private val observeExploredTiles: ObserveExploredTilesUseCase,
     private val renderDataFactory: FowRenderDataFactory,
+    private val fogOfWarCalculator: FogOfWarCalculator,
 ) {
     private val state = MutableStateFlow(State())
     private var scope: CoroutineScope? = null
@@ -92,14 +93,13 @@ class FogOfWarController @Inject constructor(
     private suspend fun prepareFogBufferData(
         buffer: FogBufferRegion,
         exploredTiles: Set<ExplorationTile>,
-        visibleTileCount: Long,
     ): PreparedFogBuffer {
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
             val checkCancelled = { coroutineContext.ensureActive() }
             val diagnosticsEnabled = BuildConfig.DEBUG
-            val fogRanges = calculateUnexploredFogRanges(
+            val fogRanges = fogOfWarCalculator.calculateUnexploredFogRanges(
                 tileRange = buffer.bufferedTileRange,
                 exploredTiles = exploredTiles,
                 checkCancelled = checkCancelled,
@@ -259,7 +259,6 @@ class FogOfWarController @Inject constructor(
                 prepareFogBufferData(
                     buffer = buffer,
                     exploredTiles = exploredTiles,
-                    visibleTileCount = state.value.visibleTileCount,
                 )
             } catch (exception: CancellationException) {
                 recordFogPreparationCancellation()
@@ -322,7 +321,6 @@ class FogOfWarController @Inject constructor(
                         prepareFogBufferData(
                             buffer = buffer,
                             exploredTiles = exploredTiles,
-                            visibleTileCount = state.value.visibleTileCount,
                         )
                     } catch (exception: CancellationException) {
                         recordFogPreparationCancellation()

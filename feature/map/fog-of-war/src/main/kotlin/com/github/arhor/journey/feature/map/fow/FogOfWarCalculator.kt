@@ -2,103 +2,107 @@ package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
+import javax.inject.Inject
 
-fun calculateUnexploredFogRanges(
-    tileRange: ExplorationTileRange?,
-    exploredTiles: Set<ExplorationTile>,
-    checkCancelled: () -> Unit = {},
-): List<ExplorationTileRange> {
-    tileRange ?: return emptyList()
+class FogOfWarCalculator @Inject constructor() {
 
-    val completedRanges = mutableListOf<ExplorationTileRange>()
-    var activeRanges = mutableMapOf<RowSpan, MutableFogRange>()
+    fun calculateUnexploredFogRanges(
+        tileRange: ExplorationTileRange?,
+        exploredTiles: Set<ExplorationTile>,
+        checkCancelled: () -> Unit = {},
+    ): List<ExplorationTileRange> {
+        tileRange ?: return emptyList()
 
-    for (y in tileRange.minY..tileRange.maxY) {
-        checkCancelled()
-        val currentRanges = mutableMapOf<RowSpan, MutableFogRange>()
+        val completedRanges = mutableListOf<ExplorationTileRange>()
+        var activeRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
-        for (span in rowSpans(tileRange, exploredTiles, y, checkCancelled)) {
+        for (y in tileRange.minY..tileRange.maxY) {
             checkCancelled()
-            val continuedRange = activeRanges.remove(span)
+            val currentRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
-            if (continuedRange != null) {
-                continuedRange.maxY = y
-                currentRanges[span] = continuedRange
-            } else {
-                currentRanges[span] = MutableFogRange(
-                    minX = span.minX,
-                    maxX = span.maxX,
-                    minY = y,
-                    maxY = y,
-                )
+            for (span in rowSpans(tileRange, exploredTiles, y, checkCancelled)) {
+                checkCancelled()
+                val continuedRange = activeRanges.remove(span)
+
+                if (continuedRange != null) {
+                    continuedRange.maxY = y
+                    currentRanges[span] = continuedRange
+                } else {
+                    currentRanges[span] = MutableFogRange(
+                        minX = span.minX,
+                        maxX = span.maxX,
+                        minY = y,
+                        maxY = y,
+                    )
+                }
             }
+
+            completedRanges += activeRanges.values.map { it.toRange(tileRange.zoom) }
+            activeRanges = currentRanges
         }
 
         completedRanges += activeRanges.values.map { it.toRange(tileRange.zoom) }
-        activeRanges = currentRanges
+
+        return completedRanges
     }
 
-    completedRanges += activeRanges.values.map { it.toRange(tileRange.zoom) }
+    private fun rowSpans(
+        visibleRange: ExplorationTileRange,
+        exploredTiles: Set<ExplorationTile>,
+        y: Int,
+        checkCancelled: () -> Unit = {},
+    ): List<RowSpan> {
+        val spans = mutableListOf<RowSpan>()
+        var spanStartX: Int? = null
 
-    return completedRanges
-}
+        for (x in visibleRange.minX..visibleRange.maxX) {
+            checkCancelled()
+            val isExplored = exploredTiles.contains(
+                ExplorationTile(
+                    zoom = visibleRange.zoom,
+                    x = x,
+                    y = y,
+                ),
+            )
 
-private fun rowSpans(
-    visibleRange: ExplorationTileRange,
-    exploredTiles: Set<ExplorationTile>,
-    y: Int,
-    checkCancelled: () -> Unit = {},
-): List<RowSpan> {
-    val spans = mutableListOf<RowSpan>()
-    var spanStartX: Int? = null
+            if (!isExplored && spanStartX == null) {
+                spanStartX = x
+            } else if (isExplored && spanStartX != null) {
+                spans += RowSpan(
+                    minX = spanStartX,
+                    maxX = x - 1,
+                )
+                spanStartX = null
+            }
+        }
 
-    for (x in visibleRange.minX..visibleRange.maxX) {
-        checkCancelled()
-        val isExplored = exploredTiles.contains(
-            ExplorationTile(
-                zoom = visibleRange.zoom,
-                x = x,
-                y = y,
-            ),
-        )
-
-        if (!isExplored && spanStartX == null) {
-            spanStartX = x
-        } else if (isExplored && spanStartX != null) {
+        if (spanStartX != null) {
             spans += RowSpan(
                 minX = spanStartX,
-                maxX = x - 1,
+                maxX = visibleRange.maxX,
             )
-            spanStartX = null
         }
+
+        return spans
     }
 
-    if (spanStartX != null) {
-        spans += RowSpan(
-            minX = spanStartX,
-            maxX = visibleRange.maxX,
+    private data class RowSpan(
+        val minX: Int,
+        val maxX: Int,
+    )
+
+    private data class MutableFogRange(
+        val minX: Int,
+        val maxX: Int,
+        val minY: Int,
+        var maxY: Int,
+    ) {
+        fun toRange(zoom: Int): ExplorationTileRange = ExplorationTileRange(
+            zoom = zoom,
+            minX = minX,
+            maxX = maxX,
+            minY = minY,
+            maxY = maxY,
         )
     }
-
-    return spans
-}
-
-private data class RowSpan(
-    val minX: Int,
-    val maxX: Int,
-)
-
-private data class MutableFogRange(
-    val minX: Int,
-    val maxX: Int,
-    val minY: Int,
-    var maxY: Int,
-) {
-    fun toRange(zoom: Int): ExplorationTileRange = ExplorationTileRange(
-        zoom = zoom,
-        minX = minX,
-        maxX = maxX,
-        minY = minY,
-        maxY = maxY,
-    )
 }

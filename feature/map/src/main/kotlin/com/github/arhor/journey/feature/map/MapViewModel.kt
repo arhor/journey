@@ -210,17 +210,17 @@ class MapViewModel @Inject constructor(
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
-            MapIntent.MapOpened -> onMapOpened()
-            MapIntent.DebugControlsClicked -> onDebugControlsClicked()
-            MapIntent.DebugControlsDismissed -> onDebugControlsDismissed()
+            is MapIntent.MapOpened -> onMapOpened()
+            is MapIntent.DebugControlsClicked -> onDebugControlsClicked()
+            is MapIntent.DebugControlsDismissed -> onDebugControlsDismissed()
             is MapIntent.DebugInfoVisibilityChanged -> onDebugInfoVisibilityChanged(intent)
             is MapIntent.FogOfWarOverlayToggled -> onFogOfWarOverlayToggled(intent)
             is MapIntent.TilesGridOverlayToggled -> onTilesGridOverlayToggled(intent)
             is MapIntent.CanonicalZoomChanged -> onCanonicalZoomChanged(intent)
             is MapIntent.RevealRadiusMetersChanged -> onRevealRadiusMetersChanged(intent)
             is MapIntent.MapRenderModeSelected -> onMapRenderModeSelected(intent)
-            MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
-            MapIntent.StopTrackingClicked -> onStopTrackingClicked()
+            is MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
+            is MapIntent.StopTrackingClicked -> onStopTrackingClicked()
             is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
             is MapIntent.MapViewportSizeChanged -> onMapViewportSizeChanged(intent)
             is MapIntent.CameraGestureStarted -> onCameraGestureStarted(intent)
