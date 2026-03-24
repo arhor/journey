@@ -20,3 +20,17 @@ data class FogOfWarUiState(
     val isSuppressedByVisibleTileLimit: Boolean = false,
     val isRecomputing: Boolean = false,
 )
+
+@Immutable
+data class FogOfWarRenderState(
+    val isOverlayEnabled: Boolean = true,
+    val activeRenderData: FogOfWarRenderData? = null,
+    val handoffRenderData: FogOfWarRenderData? = null,
+)
+
+internal val FogOfWarUiState.renderState: FogOfWarRenderState
+    get() = FogOfWarRenderState(
+        isOverlayEnabled = isOverlayEnabled,
+        activeRenderData = activeRenderData,
+        handoffRenderData = handoffRenderData,
+    )

@@ -125,4 +125,28 @@ class FogOfWarCalculatorTest {
         // Then
         actual.isEmpty() shouldBe true
     }
+
+    @Test
+    fun `calculateUnexploredFogRanges should ignore explored tiles from different zoom levels`() {
+        // Given
+        val tileRange = ExplorationTileRange(
+            zoom = 16,
+            minX = 10,
+            maxX = 10,
+            minY = 20,
+            maxY = 20,
+        )
+        val exploredTiles = setOf(
+            ExplorationTile(zoom = 17, x = 10, y = 20),
+        )
+
+        // When
+        val actual = fogOfWarCalculator.calculateUnexploredFogRanges(
+            tileRange = tileRange,
+            exploredTiles = exploredTiles,
+        )
+
+        // Then
+        actual shouldContainExactly listOf(tileRange)
+    }
 }
