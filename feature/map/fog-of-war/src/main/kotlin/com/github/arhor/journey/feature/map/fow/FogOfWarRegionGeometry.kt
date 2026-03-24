@@ -18,10 +18,18 @@ import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sinh
+
+private const val DEFAULT_CORNER_RADIUS_TILES = 0.50
+private const val DEFAULT_ARC_SEGMENTS_PER_CORNER = 10
+private const val HALF_LONGITUDE_SPAN = 180.0
+private const val FULL_LONGITUDE_SPAN = 360.0
+private const val DEGREES_PER_RADIAN = 180.0 / PI
+private const val FULL_TURN_RADIANS = PI * 2.0
+
+internal const val GEOMETRY_EPSILON = 1e-9
 
 internal fun List<ExplorationTileRange>.toTileRegionGeometries(
     cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
@@ -96,41 +104,41 @@ internal fun List<GridPoint>.roundOrthogonalLoop(
 ): List<GridPoint> {
     require(cornerRadiusTiles >= 0.0) { "cornerRadiusTiles must be >= 0." }
     require(arcSegmentsPerCorner >= 1) { "arcSegmentsPerCorner must be >= 1." }
-    require(first().approximatelyEquals(last())) { "A rounded loop must be closed." }
+    require(first().closeTo(last(), GEOMETRY_EPSILON)) { "A rounded loop must be closed." }
 
     val openLoop = dropLast(1)
     val roundedLoop = mutableListOf<GridPoint>()
 
     for (index in openLoop.indices) {
         checkCancelled()
-        val previous = openLoop[(index - 1 + openLoop.size) % openLoop.size]
-        val current = openLoop[index]
+        val prev = openLoop[(index - 1 + openLoop.size) % openLoop.size]
+        val curr = openLoop[index]
         val next = openLoop[(index + 1) % openLoop.size]
 
-        if (areCollinear(previous, current, next)) {
-            roundedLoop.addIfDistinct(current)
+        if (areCollinear(prev, curr, next)) {
+            roundedLoop.addIfDistinct(curr)
             continue
         }
 
-        val incoming = previous - current
-        val outgoing = next - current
+        val incoming = prev - curr
+        val outgoing = next - curr
         val trimDistance = min(
             cornerRadiusTiles,
             min(incoming.length() / 2.0, outgoing.length() / 2.0),
         )
 
         if (trimDistance <= GEOMETRY_EPSILON) {
-            roundedLoop.addIfDistinct(current)
+            roundedLoop.addIfDistinct(curr)
             continue
         }
 
-        val entry = current + incoming.normalized() * trimDistance
-        val exit = current + outgoing.normalized() * trimDistance
+        val entry = curr + incoming.normalized(GEOMETRY_EPSILON) * trimDistance
+        val exit = curr + outgoing.normalized(GEOMETRY_EPSILON) * trimDistance
 
         roundedLoop.addIfDistinct(entry)
         quarterArcPoints(
             entry = entry,
-            corner = current,
+            corner = curr,
             exit = exit,
             radius = trimDistance,
             arcSegmentsPerCorner = arcSegmentsPerCorner,
@@ -189,25 +197,6 @@ private fun Set<TileCell>.connectedComponents(checkCancelled: () -> Unit = {}): 
 
     return components
 }
-
-private fun TileCell.neighbors(): List<TileCell> = listOf(
-    copy(y = y - 1),
-    copy(x = x + 1),
-    copy(y = y + 1),
-    copy(x = x - 1),
-)
-
-private fun Set<TileCell>.toTileRegionGeometry(
-    zoom: Int,
-    cornerRadiusTiles: Double,
-    arcSegmentsPerCorner: Int,
-    checkCancelled: () -> Unit = {},
-): TileRegionGeometry = toTileRegionGeometryBuildResult(
-    zoom = zoom,
-    cornerRadiusTiles = cornerRadiusTiles,
-    arcSegmentsPerCorner = arcSegmentsPerCorner,
-    checkCancelled = checkCancelled,
-).geometry
 
 private fun Set<TileCell>.toTileRegionGeometryBuildResult(
     zoom: Int,
@@ -406,7 +395,7 @@ private fun List<GridPoint>.ensureClockwiseGeo(): List<GridPoint> =
     if (signedAreaGeo() < 0.0) this else reversedClosedRing()
 
 private fun List<GridPoint>.canonicalizeClosedRing(): List<GridPoint> {
-    require(first().approximatelyEquals(last())) { "A canonicalized ring must be closed." }
+    require(first().closeTo(last(), GEOMETRY_EPSILON)) { "A canonicalized ring must be closed." }
 
     val openLoop = dropLast(1)
     val startIndex = openLoop.indices.minWith(
@@ -418,7 +407,7 @@ private fun List<GridPoint>.canonicalizeClosedRing(): List<GridPoint> {
 }
 
 private fun List<GridPoint>.reversedClosedRing(): List<GridPoint> {
-    require(first().approximatelyEquals(last())) { "A reversed ring must be closed." }
+    require(first().closeTo(last(), GEOMETRY_EPSILON)) { "A reversed ring must be closed." }
 
     val reversed = dropLast(1).asReversed()
 
@@ -464,64 +453,21 @@ private fun tileYToLatitude(
 private fun tilesPerAxis(zoom: Int): Double = (1 shl zoom).toDouble()
 
 private fun MutableList<GridPoint>.addIfDistinct(point: GridPoint) {
-    if (lastOrNull()?.approximatelyEquals(point) != true) {
+    if (lastOrNull()?.closeTo(point, GEOMETRY_EPSILON) != true) {
         add(point)
     }
 }
 
-private fun GridPoint.length(): Double = hypot(x, y)
-
-private fun GridPoint.normalized(): GridPoint {
-    val length = length()
-    check(length > GEOMETRY_EPSILON) { "Cannot normalize a zero-length vector." }
-
-    return this * (1.0 / length)
+private fun areCollinear(a: GridVertex, b: GridVertex, c: GridVertex): Boolean {
+    return (a.x == b.x && b.x == c.x)
+        || (a.y == b.y && b.y == c.y)
 }
 
-internal fun GridPoint.approximatelyEquals(
-    other: GridPoint,
-    epsilon: Double = GEOMETRY_EPSILON,
-): Boolean = abs(x - other.x) <= epsilon &&
-    abs(y - other.y) <= epsilon
+private fun areCollinear(a: GridPoint, b: GridPoint, c: GridPoint): Boolean {
+    return (a.x.closeTo(b.x) && b.x.closeTo(c.x))
+        || (a.y.closeTo(b.y) && b.y.closeTo(c.y))
+}
 
-private fun areCollinear(
-    previous: GridVertex,
-    current: GridVertex,
-    next: GridVertex,
-): Boolean = (previous.x == current.x && current.x == next.x) ||
-    (previous.y == current.y && current.y == next.y)
-
-private fun areCollinear(
-    previous: GridPoint,
-    current: GridPoint,
-    next: GridPoint,
-): Boolean = (previous.x.approximatelyEquals(current.x) && current.x.approximatelyEquals(next.x)) ||
-    (previous.y.approximatelyEquals(current.y) && current.y.approximatelyEquals(next.y))
-
-private fun Double.approximatelyEquals(
-    other: Double,
-    epsilon: Double = GEOMETRY_EPSILON,
-): Boolean = abs(this - other) <= epsilon
-
-private operator fun GridPoint.plus(other: GridPoint): GridPoint = GridPoint(
-    x = x + other.x,
-    y = y + other.y,
-)
-
-private operator fun GridPoint.minus(other: GridPoint): GridPoint = GridPoint(
-    x = x - other.x,
-    y = y - other.y,
-)
-
-private operator fun GridPoint.times(scale: Double): GridPoint = GridPoint(
-    x = x * scale,
-    y = y * scale,
-)
-
-private const val DEFAULT_CORNER_RADIUS_TILES = 0.50
-private const val DEFAULT_ARC_SEGMENTS_PER_CORNER = 10
-private const val GEOMETRY_EPSILON = 1e-9
-private const val HALF_LONGITUDE_SPAN = 180.0
-private const val FULL_LONGITUDE_SPAN = 360.0
-private const val DEGREES_PER_RADIAN = 180.0 / PI
-private const val FULL_TURN_RADIANS = PI * 2.0
+private fun Double.closeTo(that: Double, epsilon: Double = GEOMETRY_EPSILON): Boolean {
+    return abs(this - that) <= epsilon
+}

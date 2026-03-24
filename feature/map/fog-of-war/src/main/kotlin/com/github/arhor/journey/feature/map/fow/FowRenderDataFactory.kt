@@ -25,6 +25,7 @@ import javax.inject.Inject
 class FowRenderDataFactory @Inject constructor() {
     private val renderCache = LruCache<FogOfWarRenderKey, FogOfWarRenderCacheEntry>(CACHE_CAPACITY)
     private val fullRangeCache = LruCache<ExplorationTileRange, FogOfWarRenderData>(CACHE_CAPACITY)
+    private val fullRangesCache = LruCache<FogOfWarRenderKey, FogOfWarRenderData>(CACHE_CAPACITY)
 
     fun create(
         fogRanges: List<ExplorationTileRange>,
@@ -121,6 +122,59 @@ class FowRenderDataFactory @Inject constructor() {
                 return it
             }
             fullRangeCache.put(fogRange, renderData)
+
+            return renderData
+        }
+    }
+
+    fun createFullRanges(
+        fogRanges: List<ExplorationTileRange>,
+    ): FogOfWarRenderData? {
+        if (fogRanges.isEmpty()) {
+            return null
+        }
+        if (fogRanges.size == 1) {
+            return createFullRange(fogRanges.single())
+        }
+
+        val key = FogOfWarRenderKey.of(fogRanges)
+
+        synchronized(fullRangesCache) {
+            fullRangesCache[key]?.let {
+                return it
+            }
+        }
+
+        val renderData = FogOfWarRenderData(
+            geoJsonData = GeoJsonData.Features(
+                FeatureCollection(
+                    features = key.ranges.mapIndexed { index, fogRange ->
+                        val bounds = ExplorationTileGrid.bounds(fogRange)
+                        Feature(
+                            geometry = Polygon(
+                                coordinates = listOf(
+                                    listOf(
+                                        Position(longitude = bounds.west, latitude = bounds.north),
+                                        Position(longitude = bounds.east, latitude = bounds.north),
+                                        Position(longitude = bounds.east, latitude = bounds.south),
+                                        Position(longitude = bounds.west, latitude = bounds.south),
+                                        Position(longitude = bounds.west, latitude = bounds.north),
+                                    ),
+                                ),
+                            ),
+                            properties = buildJsonObject { },
+                            id = JsonPrimitive("${fogRange.zoom}:full#$index"),
+                        )
+                    },
+                ),
+            ),
+        )
+
+        synchronized(fullRangesCache) {
+            fullRangesCache[key]?.let {
+                return it
+            }
+            fullRangesCache.put(key, renderData)
 
             return renderData
         }

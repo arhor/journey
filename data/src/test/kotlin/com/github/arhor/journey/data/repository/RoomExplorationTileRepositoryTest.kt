@@ -50,6 +50,41 @@ class RoomExplorationTileRepositoryTest {
     }
 
     @Test
+    fun `getExploredTiles should map dao range entities to canonical tiles when queried`() = runTest {
+        // Given
+        val dao = FakeExplorationTileDao(
+            observedItems = listOf(
+                ExploredTileEntity(
+                    zoom = 16,
+                    x = 34567,
+                    y = 22345,
+                ),
+            ),
+        )
+        val subject = RoomExplorationTileRepository(dao = dao)
+
+        // When
+        val actual = subject.getExploredTiles(
+            range = ExplorationTileRange(
+                zoom = 16,
+                minX = 34567,
+                maxX = 34567,
+                minY = 22345,
+                maxY = 22345,
+            ),
+        )
+
+        // Then
+        actual shouldBe setOf(
+            ExplorationTile(
+                zoom = 16,
+                x = 34567,
+                y = 22345,
+            ),
+        )
+    }
+
+    @Test
     fun `markExplored should persist sorted canonical tile entities when new tiles are provided`() = runTest {
         // Given
         val dao = FakeExplorationTileDao(observedItems = emptyList())
@@ -98,6 +133,14 @@ class RoomExplorationTileRepositoryTest {
             minY: Int,
             maxY: Int,
         ): Flow<List<ExploredTileEntity>> = flowOf(observedItems)
+
+        override suspend fun getByRange(
+            zoom: Int,
+            minX: Int,
+            maxX: Int,
+            minY: Int,
+            maxY: Int,
+        ): List<ExploredTileEntity> = observedItems
 
         override suspend fun insert(entities: List<ExploredTileEntity>): List<Long> {
             insertedEntities += entities

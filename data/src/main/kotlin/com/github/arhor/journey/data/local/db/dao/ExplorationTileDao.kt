@@ -28,6 +28,24 @@ interface ExplorationTileDao {
         maxY: Int,
     ): Flow<List<ExploredTileEntity>>
 
+    @Query(
+        """
+        SELECT *
+        FROM explored_tiles
+        WHERE zoom = :zoom
+            AND x BETWEEN :minX AND :maxX
+            AND y BETWEEN :minY AND :maxY
+        ORDER BY y ASC, x ASC
+        """,
+    )
+    suspend fun getByRange(
+        zoom: Int,
+        minX: Int,
+        maxX: Int,
+        minY: Int,
+        maxY: Int,
+    ): List<ExploredTileEntity>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entities: List<ExploredTileEntity>): List<Long>
 

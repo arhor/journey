@@ -6,10 +6,13 @@ import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
 import com.github.arhor.journey.feature.map.fow.model.FogViewportSnapshot
 import kotlin.math.ceil
+import kotlin.math.sqrt
 
-private const val TRIGGER_TILE_PADDING_MULTIPLIER = 0.5
-private const val BUFFERED_TILE_PADDING_MULTIPLIER = 1.0
+private const val TARGET_TRIGGER_AREA_IN_SCREENS = 1.5
+private const val TARGET_BUFFERED_AREA_IN_SCREENS = 3.0
 private const val MIN_TILE_PADDING = 1
+private val TRIGGER_TILE_PADDING_MULTIPLIER = tilePaddingMultiplierForTargetArea(TARGET_TRIGGER_AREA_IN_SCREENS)
+private val BUFFERED_TILE_PADDING_MULTIPLIER = tilePaddingMultiplierForTargetArea(TARGET_BUFFERED_AREA_IN_SCREENS)
 
 internal fun createFogViewportSnapshot(
     visibleBounds: GeoBounds,
@@ -65,39 +68,21 @@ internal fun createFogBufferRegion(
     )
 }
 
-internal fun createFogBufferRegion(
-    visibleBounds: GeoBounds,
-    canonicalZoom: Int,
-): FogBufferRegion = createFogBufferRegion(
-    visibleTileRange = createFogViewportSnapshot(
-        visibleBounds = visibleBounds,
-        canonicalZoom = canonicalZoom,
-    ).visibleTileRange,
-)
-
 // Treat touching the trigger edge as a handoff point so the next buffer starts early.
 internal fun FogBufferRegion.shouldRecompute(visibleBounds: GeoBounds): Boolean =
     !triggerBounds.strictlyContains(visibleBounds)
 
 
 internal fun GeoBounds.strictlyContains(other: GeoBounds): Boolean {
-    return other.south > south &&
-        other.west > west &&
-        other.north < north &&
-        other.east < east
+    return other.south > south
+        && other.west > west
+        && other.north < north
+        && other.east < east
 }
 
-internal fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
-    return zoom == other.zoom &&
-        other.minX >= minX &&
-        other.maxX <= maxX &&
-        other.minY >= minY &&
-        other.maxY <= maxY
-}
+private fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
 
-internal fun ExplorationTileRange.widthInTiles(): Int = maxX - minX + 1
-
-internal fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
+private fun ExplorationTileRange.heightInTiles(): Int = maxY - minY + 1
 
 private fun bufferedTilePaddingFor(
     visibleSpan: Int,
@@ -115,3 +100,7 @@ private fun tilePaddingFor(
     multiplier: Double,
 ): Int = ceil(visibleSpan * multiplier).toInt()
     .coerceAtLeast(MIN_TILE_PADDING)
+
+private fun tilePaddingMultiplierForTargetArea(
+    targetAreaInScreens: Double,
+): Double = (sqrt(targetAreaInScreens) - 1.0) / 2.0

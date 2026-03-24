@@ -21,6 +21,7 @@ import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
@@ -70,6 +71,8 @@ import kotlinx.coroutines.test.setMain
 import org.junit.Ignore
 import org.junit.Test
 import java.time.Instant
+import kotlin.math.ceil
+import kotlin.math.sqrt
 
 class MapViewModelTest {
 
@@ -732,7 +735,7 @@ class MapViewModelTest {
             val actual = fixture.viewModel.awaitContent { it.fogOfWar.exploredVisibleTileCount == 1 }
             actual.fogOfWar.visibleTileCount shouldBe 4L
             actual.fogOfWar.exploredVisibleTileCount shouldBe 1
-            actual.fogOfWar.renderData.shouldNotBeNull()
+            actual.fogOfWar.activeRenderData.shouldNotBeNull()
         } finally {
             tearDownMainDispatcher()
         }
@@ -784,9 +787,229 @@ class MapViewModelTest {
             val actual = fixture.viewModel.awaitContent {
                 it.fogOfWar.visibleTileRange == shiftedVisibleRange
             }
-            actual.fogOfWar.renderData.shouldNotBeNull()
+            actual.fogOfWar.activeRenderData.shouldNotBeNull()
             actual.fogOfWar.isRecomputing shouldBe false
             verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should keep active fog and expose handoff fog while pending exact fog is still loading`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val outrunVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 14,
+            maxX = 15,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture(
+            observeExploredTilesFlowFactory = { range ->
+                when (range) {
+                    expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
+                    expectedFogBufferRange(outrunVisibleRange) -> flow {
+                        delay(1_000L)
+                        emit(emptySet())
+                    }
+
+                    else -> MutableStateFlow(emptySet())
+                }
+            },
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(initialVisibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(outrunVisibleRange),
+                ),
+            )
+            runCurrent()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleTileRange == outrunVisibleRange
+            }
+            actual.fogOfWar.activeRenderData.shouldNotBeNull()
+            actual.fogOfWar.handoffRenderData.shouldNotBeNull()
+            actual.fogOfWar.isRecomputing shouldBe true
+            actual.fogOfWar.bufferedBounds shouldBe expectedFogBufferBounds(initialVisibleRange)
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
+    fun `dispatch should keep the newest handoff fog and avoid swapping stale pending buffers during repeated fast pans`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val initialVisibleRange = ExplorationTileRange(
+                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                minX = 10,
+                maxX = 11,
+                minY = 20,
+                maxY = 21,
+            )
+            val secondVisibleRange = ExplorationTileRange(
+                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                minX = 14,
+                maxX = 15,
+                minY = 20,
+                maxY = 21,
+            )
+            val thirdVisibleRange = ExplorationTileRange(
+                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                minX = 18,
+                maxX = 19,
+                minY = 20,
+                maxY = 21,
+            )
+            val fixture = createFixture(
+                observeExploredTilesFlowFactory = { range ->
+                    when (range) {
+                        expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
+                        expectedFogBufferRange(secondVisibleRange),
+                        expectedFogBufferRange(thirdVisibleRange) -> flow {
+                            delay(1_000L)
+                            emit(emptySet())
+                        }
+
+                        else -> MutableStateFlow(emptySet())
+                    }
+                },
+            )
+
+            try {
+                fixture.viewModel.awaitContent()
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBoundsInside(initialVisibleRange),
+                    ),
+                )
+                advanceUntilIdle()
+
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBoundsInside(secondVisibleRange),
+                    ),
+                )
+                runCurrent()
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBoundsInside(thirdVisibleRange),
+                    ),
+                )
+                runCurrent()
+
+                // When
+                advanceTimeBy(1_000L)
+                runCurrent()
+
+                // Then
+                val pending = fixture.viewModel.awaitContent {
+                    it.fogOfWar.visibleTileRange == thirdVisibleRange
+                }
+                pending.fogOfWar.bufferedBounds shouldBe expectedFogBufferBounds(initialVisibleRange)
+                pending.fogOfWar.handoffRenderData.shouldNotBeNull()
+                pending.fogOfWar.isRecomputing shouldBe true
+
+                advanceTimeBy(1_000L)
+                advanceUntilIdle()
+
+                val actual = fixture.viewModel.awaitContent {
+                    it.fogOfWar.bufferedBounds == expectedFogBufferBounds(thirdVisibleRange)
+                }
+                actual.fogOfWar.activeRenderData.shouldNotBeNull()
+                actual.fogOfWar.handoffRenderData shouldBe null
+                actual.fogOfWar.isRecomputing shouldBe false
+            } finally {
+                tearDownMainDispatcher()
+            }
+        }
+
+    @Test
+    fun `dispatch should recompute exact fog after a pending buffer swap when explored tiles change`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val shiftedVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 14,
+            maxX = 15,
+            minY = 20,
+            maxY = 21,
+        )
+        val shiftedTile = ExplorationTile(
+            zoom = shiftedVisibleRange.zoom,
+            x = shiftedVisibleRange.minX,
+            y = shiftedVisibleRange.minY,
+        )
+        val shiftedFlow = MutableStateFlow(emptySet<ExplorationTile>())
+        val fixture = createFixture(
+            observeExploredTilesFlowFactory = { range ->
+                when (range) {
+                    expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
+                    expectedFogBufferRange(shiftedVisibleRange) -> shiftedFlow
+                    else -> MutableStateFlow(emptySet())
+                }
+            },
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(initialVisibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(shiftedVisibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            shiftedFlow.value = setOf(shiftedTile)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.bufferedBounds == expectedFogBufferBounds(shiftedVisibleRange) &&
+                    it.fogOfWar.exploredVisibleTileCount == 1
+            }
+            actual.fogOfWar.exploredVisibleTileCount shouldBe 1
+            actual.fogOfWar.handoffRenderData shouldBe null
         } finally {
             tearDownMainDispatcher()
         }
@@ -894,7 +1117,7 @@ class MapViewModelTest {
             pending.fogOfWar.canonicalZoom shouldBe 18
             pending.fogOfWar.visibleTileRange?.zoom shouldBe 18
             pending.fogOfWar.fogRanges.all { it.zoom == 18 } shouldBe true
-            pending.fogOfWar.renderData.shouldNotBeNull()
+            pending.fogOfWar.activeRenderData.shouldNotBeNull()
 
             advanceTimeBy(1L)
             advanceUntilIdle()
@@ -1158,6 +1381,7 @@ class MapViewModelTest {
         val observeExploredTiles: ObserveExploredTilesUseCase,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
         val clearExploredTiles: ClearExploredTilesUseCase,
+        val getExploredTiles: GetExploredTilesUseCase,
         val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
         val setExplorationTileRevealRadius: SetExplorationTileRevealRadiusUseCase,
         val startTrackingSession: StartExplorationTrackingSessionUseCase,
@@ -1185,6 +1409,7 @@ class MapViewModelTest {
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
         val clearExploredTiles = mockk<ClearExploredTilesUseCase>()
+        val getExploredTiles = mockk<GetExploredTilesUseCase>()
         val getExplorationTileRuntimeConfig = mockk<GetExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val setExplorationTileCanonicalZoom = mockk<SetExplorationTileCanonicalZoomUseCase>()
@@ -1217,6 +1442,10 @@ class MapViewModelTest {
         every { setExplorationTileCanonicalZoom.invoke(any()) } just runs
         every { setExplorationTileRevealRadius.invoke(any()) } just runs
         every { mapTilePrewarmer.prewarm(any()) } returns Job()
+        coEvery { getExploredTiles.invoke(any()) } coAnswers {
+            observeExploredTilesFlowFactory?.invoke(arg(0))?.first()
+                ?: exploredTiles
+        }
 
         coEvery { discoverPointOfInterest.invoke(any()) } just runs
         coEvery { clearExploredTiles.invoke() } just runs
@@ -1238,6 +1467,7 @@ class MapViewModelTest {
                     FogOfWarController(
                         observeExplorationTileRuntimeConfig = observeExplorationTileRuntimeConfig,
                         observeExploredTiles = observeExploredTiles,
+                        getExploredTiles = getExploredTiles,
                         renderDataFactory = FowRenderDataFactory(),
                         fogOfWarCalculator = FogOfWarCalculator(),
                         scope = scope,
@@ -1255,6 +1485,7 @@ class MapViewModelTest {
             observeExploredTiles = observeExploredTiles,
             discoverPointOfInterest = discoverPointOfInterest,
             clearExploredTiles = clearExploredTiles,
+            getExploredTiles = getExploredTiles,
             setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
             setExplorationTileRevealRadius = setExplorationTileRevealRadius,
             startTrackingSession = startTrackingSession,
@@ -1297,6 +1528,31 @@ class MapViewModelTest {
                 east = bounds.east - VIEWPORT_BOUNDS_EPSILON,
             )
         }
+
+    private fun expectedFogBufferRange(range: ExplorationTileRange): ExplorationTileRange {
+        val widthInTiles = range.maxX - range.minX + 1
+        val heightInTiles = range.maxY - range.minY + 1
+        val triggerMultiplier = (sqrt(5.0) - 1.0) / 2.0
+        val bufferedMultiplier = (sqrt(10.0) - 1.0) / 2.0
+        val triggerHorizontalPadding = ceil(widthInTiles * triggerMultiplier).toInt().coerceAtLeast(1)
+        val triggerVerticalPadding = ceil(heightInTiles * triggerMultiplier).toInt().coerceAtLeast(1)
+        val bufferedHorizontalPadding = maxOf(
+            triggerHorizontalPadding + 1,
+            ceil(widthInTiles * bufferedMultiplier).toInt().coerceAtLeast(1),
+        )
+        val bufferedVerticalPadding = maxOf(
+            triggerVerticalPadding + 1,
+            ceil(heightInTiles * bufferedMultiplier).toInt().coerceAtLeast(1),
+        )
+
+        return range.expandedBy(
+            horizontalTilePadding = bufferedHorizontalPadding,
+            verticalTilePadding = bufferedVerticalPadding,
+        )
+    }
+
+    private fun expectedFogBufferBounds(range: ExplorationTileRange): GeoBounds =
+        ExplorationTileGrid.bounds(expectedFogBufferRange(range))
 
     private data class TestDomainError(
         override val message: String? = null,
