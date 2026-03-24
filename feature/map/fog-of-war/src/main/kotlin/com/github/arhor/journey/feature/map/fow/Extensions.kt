@@ -8,16 +8,4 @@ import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Polygon
 
-internal fun List<TileRegionGeometry>.toPolygonFeatureCollection(
-    checkCancelled: () -> Unit = {},
-): FeatureCollection<Polygon, JsonObject?> =
-    FeatureCollection(
-        features = mapIndexed { index, region ->
-            checkCancelled()
-            Feature(
-                geometry = region.toPolygon(),
-                properties = buildJsonObject { },
-                id = JsonPrimitive("${region.zoom}#$index"),
-            )
-        },
-    )
+

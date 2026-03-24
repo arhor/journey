@@ -12,6 +12,12 @@ import com.github.arhor.journey.feature.map.fow.model.TileRegionGeometry
 import com.github.arhor.journey.feature.map.fow.model.TileRegionGeometryBuildResult
 import com.github.arhor.journey.feature.map.fow.model.TileRegionGeometryMetrics
 import com.github.arhor.journey.feature.map.fow.model.TileRegionRing
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import org.maplibre.spatialk.geojson.Feature
+import org.maplibre.spatialk.geojson.FeatureCollection
+import org.maplibre.spatialk.geojson.Polygon
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.PI
 import kotlin.math.abs
@@ -30,16 +36,6 @@ private const val DEGREES_PER_RADIAN = 180.0 / PI
 private const val FULL_TURN_RADIANS = PI * 2.0
 
 internal const val GEOMETRY_EPSILON = 1e-9
-
-internal fun List<ExplorationTileRange>.toTileRegionGeometries(
-    cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
-    arcSegmentsPerCorner: Int = DEFAULT_ARC_SEGMENTS_PER_CORNER,
-    checkCancelled: () -> Unit = {},
-): List<TileRegionGeometry> = toTileRegionGeometriesBuildResult(
-    cornerRadiusTiles = cornerRadiusTiles,
-    arcSegmentsPerCorner = arcSegmentsPerCorner,
-    checkCancelled = checkCancelled,
-).geometries
 
 internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
     cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
@@ -149,6 +145,41 @@ internal fun List<GridPoint>.roundOrthogonalLoop(
 
     return roundedLoop
 }
+
+internal fun List<TileRegionGeometry>.toPolygonFeatureCollection(
+    checkCancelled: () -> Unit = {},
+): FeatureCollection<Polygon, JsonObject?> =
+    FeatureCollection(
+        features = mapIndexed { index, region ->
+            checkCancelled()
+            Feature(
+                geometry = region.toPolygon(),
+                properties = buildJsonObject { },
+                id = JsonPrimitive("${region.zoom}#$index"),
+            )
+        },
+    )
+
+/* ------------------------------------------ Internal implementation ------------------------------------------- */
+
+private fun GridPoint.toPosition(zoom: Int): Position {
+    val tilesPerAxis = tilesPerAxis(zoom)
+    val longitude = x / tilesPerAxis * FULL_LONGITUDE_SPAN - HALF_LONGITUDE_SPAN
+    val latitude = tileYToLatitude(y, zoom)
+
+    return Position(
+        longitude = longitude,
+        latitude = latitude,
+    )
+}
+
+private fun TileRegionGeometry.toPolygon(): Polygon = Polygon(
+    coordinates = listOf(
+        outerRing.points.map { it.toPosition(zoom) },
+    ) + holeRings.map { ring ->
+        ring.points.map { it.toPosition(zoom) }
+    },
+)
 
 private fun List<ExplorationTileRange>.toTileCells(checkCancelled: () -> Unit = {}): Set<TileCell> {
     val cells = linkedSetOf<TileCell>()
@@ -427,17 +458,6 @@ private fun List<GridPoint>.signedAreaGeo(): Double {
     }
 
     return area / 2.0
-}
-
-internal fun GridPoint.toPosition(zoom: Int): Position {
-    val tilesPerAxis = tilesPerAxis(zoom)
-    val longitude = x / tilesPerAxis * FULL_LONGITUDE_SPAN - HALF_LONGITUDE_SPAN
-    val latitude = tileYToLatitude(y, zoom)
-
-    return Position(
-        longitude = longitude,
-        latitude = latitude,
-    )
 }
 
 private fun tileYToLatitude(
