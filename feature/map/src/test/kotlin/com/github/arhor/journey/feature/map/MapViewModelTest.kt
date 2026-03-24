@@ -991,6 +991,14 @@ class MapViewModelTest {
             val hasCoverage = recomputing.fogOfWar.activeRenderData != null ||
                 recomputing.fogOfWar.handoffRenderData != null
             hasCoverage shouldBe true
+
+            // Ensure pending recomputation finishes before test scope teardown.
+            advanceTimeBy(1_000L)
+            runCurrent()
+            fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleTileRange == outrunVisibleRange &&
+                    !it.fogOfWar.isRecomputing
+            }
         } finally {
             tearDownMainDispatcher()
         }
