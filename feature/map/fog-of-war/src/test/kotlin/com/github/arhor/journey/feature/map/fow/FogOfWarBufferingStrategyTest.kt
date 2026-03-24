@@ -95,6 +95,27 @@ class FogOfWarBufferingStrategyTest {
         actual shouldBe true
     }
 
+    @Test
+    fun `buffer region should keep at least two tile lead beyond trigger on each side`() {
+        // Given
+        val visibleTileRange = ExplorationTileRange(
+            zoom = 17,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+
+        // When
+        val actual = createFogBufferRegion(visibleTileRange)
+
+        // Then
+        (actual.triggerTileRange.minX - actual.bufferedTileRange.minX) shouldBe 2
+        (actual.bufferedTileRange.maxX - actual.triggerTileRange.maxX) shouldBe 2
+        (actual.triggerTileRange.minY - actual.bufferedTileRange.minY) shouldBe 2
+        (actual.bufferedTileRange.maxY - actual.triggerTileRange.maxY) shouldBe 2
+    }
+
     private fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
         return zoom == other.zoom &&
             other.minX >= minX &&

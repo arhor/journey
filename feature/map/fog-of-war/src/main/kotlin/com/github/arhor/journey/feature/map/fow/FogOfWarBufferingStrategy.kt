@@ -11,6 +11,7 @@ import kotlin.math.sqrt
 private const val TARGET_TRIGGER_AREA_IN_SCREENS = 1.5
 private const val TARGET_BUFFERED_AREA_IN_SCREENS = 3.0
 private const val MIN_TILE_PADDING = 1
+private const val MIN_BUFFERED_PADDING_DELTA = 2
 private val TRIGGER_TILE_PADDING_MULTIPLIER = tilePaddingMultiplierForTargetArea(TARGET_TRIGGER_AREA_IN_SCREENS)
 private val BUFFERED_TILE_PADDING_MULTIPLIER = tilePaddingMultiplierForTargetArea(TARGET_BUFFERED_AREA_IN_SCREENS)
 
@@ -88,7 +89,7 @@ private fun bufferedTilePaddingFor(
     visibleSpan: Int,
     triggerPadding: Int,
 ): Int = maxOf(
-    triggerPadding + 1,
+    triggerPadding + MIN_BUFFERED_PADDING_DELTA,
     tilePaddingFor(
         visibleSpan = visibleSpan,
         multiplier = BUFFERED_TILE_PADDING_MULTIPLIER,

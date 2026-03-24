@@ -1,7 +1,7 @@
 package com.github.arhor.journey.feature.map.fow.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderData
@@ -49,11 +49,16 @@ internal fun FogOfWarRendererAdapter(
     layerId: String,
     isVisible: Boolean,
 ) {
-    val geoJsonData = fogRenderData?.geoJsonData ?: EMPTY_FOG_GEO_JSON_DATA
-    val source = remember(sourceId) { GeoJsonSource(id = sourceId, data = geoJsonData, options = GeoJsonOptions()) }
+    val source = remember(sourceId) {
+        GeoJsonSource(
+            id = sourceId,
+            data = EMPTY_FOG_GEO_JSON_DATA,
+            options = GeoJsonOptions(),
+        )
+    }
 
-    LaunchedEffect(source, geoJsonData) {
-        source.setData(geoJsonData)
+    SideEffect {
+        fogRenderData?.geoJsonData?.let(source::setData)
     }
 
     FillLayer(
