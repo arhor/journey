@@ -1595,11 +1595,11 @@ class MapViewModelTest {
         val triggerHorizontalPadding = ceil(widthInTiles * triggerMultiplier).toInt().coerceAtLeast(1)
         val triggerVerticalPadding = ceil(heightInTiles * triggerMultiplier).toInt().coerceAtLeast(1)
         val bufferedHorizontalPadding = maxOf(
-            triggerHorizontalPadding + 1,
+            triggerHorizontalPadding + 2,
             ceil(widthInTiles * bufferedMultiplier).toInt().coerceAtLeast(1),
         )
         val bufferedVerticalPadding = maxOf(
-            triggerVerticalPadding + 1,
+            triggerVerticalPadding + 2,
             ceil(heightInTiles * bufferedMultiplier).toInt().coerceAtLeast(1),
         )
 
