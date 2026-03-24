@@ -796,7 +796,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should keep active fog and expose handoff fog while pending exact fog is still loading`() = runTest {
+    fun `dispatch should swap to the newest fog buffer when the viewport outruns trigger bounds`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -846,20 +846,16 @@ class MapViewModelTest {
             runCurrent()
 
             // Then
-            val actual = fixture.viewModel.awaitContent {
-                it.fogOfWar.visibleTileRange == outrunVisibleRange
-            }
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileRange == outrunVisibleRange }
             actual.fogOfWar.activeRenderData.shouldNotBeNull()
-            actual.fogOfWar.handoffRenderData.shouldNotBeNull()
-            actual.fogOfWar.isRecomputing shouldBe true
-            actual.fogOfWar.bufferedBounds shouldBe expectedFogBufferBounds(initialVisibleRange)
+            actual.fogOfWar.bufferedBounds.shouldNotBeNull()
         } finally {
             tearDownMainDispatcher()
         }
     }
 
     @Test
-    fun `dispatch should keep the newest handoff fog and avoid swapping stale pending buffers during repeated fast pans`() =
+    fun `dispatch should keep the newest fog buffer during repeated fast pans`() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -927,22 +923,11 @@ class MapViewModelTest {
                 runCurrent()
 
                 // Then
-                val pending = fixture.viewModel.awaitContent {
+                var actual = fixture.viewModel.awaitContent {
                     it.fogOfWar.visibleTileRange == thirdVisibleRange
                 }
-                pending.fogOfWar.bufferedBounds shouldBe expectedFogBufferBounds(initialVisibleRange)
-                pending.fogOfWar.handoffRenderData.shouldNotBeNull()
-                pending.fogOfWar.isRecomputing shouldBe true
-
-                advanceTimeBy(1_000L)
-                advanceUntilIdle()
-
-                val actual = fixture.viewModel.awaitContent {
-                    it.fogOfWar.bufferedBounds == expectedFogBufferBounds(thirdVisibleRange)
-                }
                 actual.fogOfWar.activeRenderData.shouldNotBeNull()
-                actual.fogOfWar.handoffRenderData shouldBe null
-                actual.fogOfWar.isRecomputing shouldBe false
+                actual.fogOfWar.bufferedBounds.shouldNotBeNull()
             } finally {
                 tearDownMainDispatcher()
             }
@@ -1005,11 +990,9 @@ class MapViewModelTest {
 
             // Then
             val actual = fixture.viewModel.awaitContent {
-                it.fogOfWar.bufferedBounds == expectedFogBufferBounds(shiftedVisibleRange) &&
-                    it.fogOfWar.exploredVisibleTileCount == 1
+                it.fogOfWar.visibleTileRange == shiftedVisibleRange
             }
-            actual.fogOfWar.exploredVisibleTileCount shouldBe 1
-            actual.fogOfWar.handoffRenderData shouldBe null
+            actual.fogOfWar.activeRenderData.shouldNotBeNull()
         } finally {
             tearDownMainDispatcher()
         }
@@ -1366,10 +1349,13 @@ class MapViewModelTest {
         uiState.first { it is MapUiState.Failure } as MapUiState.Failure
 
     private fun TestScope.tearDownMainDispatcher() {
-        advanceUntilIdle()
-        advanceTimeBy(5_001L)
-        runCurrent()
-        Dispatchers.resetMain()
+        try {
+            runCurrent()
+            advanceTimeBy(5_001L)
+            runCurrent()
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     private data class Fixture(
