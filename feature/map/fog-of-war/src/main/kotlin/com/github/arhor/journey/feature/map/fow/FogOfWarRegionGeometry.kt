@@ -40,12 +40,10 @@ internal const val GEOMETRY_EPSILON = 1e-9
 internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
     cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
     arcSegmentsPerCorner: Int = DEFAULT_ARC_SEGMENTS_PER_CORNER,
-    checkCancelled: () -> Unit = {},
 ): TileRegionGeometriesBuildResult {
     require(cornerRadiusTiles >= 0.0) { "cornerRadiusTiles must be >= 0." }
     require(arcSegmentsPerCorner >= 1) { "arcSegmentsPerCorner must be >= 1." }
 
-    checkCancelled()
 
     var expandedCellCount = 0L
     var connectedRegionCount = 0
@@ -56,10 +54,9 @@ internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
     val geometries = groupBy(ExplorationTileRange::zoom)
         .toSortedMap()
         .flatMap { (zoom, ranges) ->
-            checkCancelled()
-            val cells = ranges.toTileCells(checkCancelled = checkCancelled)
+            val cells = ranges.toTileCells()
             expandedCellCount += cells.size.toLong()
-            val components = cells.connectedComponents(checkCancelled = checkCancelled)
+            val components = cells.connectedComponents()
             connectedRegionCount += components.size
 
             components
@@ -68,7 +65,6 @@ internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
                         zoom = zoom,
                         cornerRadiusTiles = cornerRadiusTiles,
                         arcSegmentsPerCorner = arcSegmentsPerCorner,
-                        checkCancelled = checkCancelled,
                     )
                     boundaryEdgeCount += geometryResult.metrics.boundaryEdgeCount
                     loopCount += geometryResult.metrics.loopCount
@@ -96,7 +92,6 @@ internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
 internal fun List<GridPoint>.roundOrthogonalLoop(
     cornerRadiusTiles: Double = DEFAULT_CORNER_RADIUS_TILES,
     arcSegmentsPerCorner: Int = DEFAULT_ARC_SEGMENTS_PER_CORNER,
-    checkCancelled: () -> Unit = {},
 ): List<GridPoint> {
     require(cornerRadiusTiles >= 0.0) { "cornerRadiusTiles must be >= 0." }
     require(arcSegmentsPerCorner >= 1) { "arcSegmentsPerCorner must be >= 1." }
@@ -106,7 +101,6 @@ internal fun List<GridPoint>.roundOrthogonalLoop(
     val roundedLoop = mutableListOf<GridPoint>()
 
     for (index in openLoop.indices) {
-        checkCancelled()
         val prev = openLoop[(index - 1 + openLoop.size) % openLoop.size]
         val curr = openLoop[index]
         val next = openLoop[(index + 1) % openLoop.size]
@@ -146,12 +140,9 @@ internal fun List<GridPoint>.roundOrthogonalLoop(
     return roundedLoop
 }
 
-internal fun List<TileRegionGeometry>.toPolygonFeatureCollection(
-    checkCancelled: () -> Unit = {},
-): FeatureCollection<Polygon, JsonObject?> =
+internal fun List<TileRegionGeometry>.toPolygonFeatureCollection(): FeatureCollection<Polygon, JsonObject?> =
     FeatureCollection(
         features = mapIndexed { index, region ->
-            checkCancelled()
             Feature(
                 geometry = region.toPolygon(),
                 properties = buildJsonObject { },
@@ -181,29 +172,24 @@ private fun TileRegionGeometry.toPolygon(): Polygon = Polygon(
     },
 )
 
-private fun List<ExplorationTileRange>.toTileCells(checkCancelled: () -> Unit = {}): Set<TileCell> {
+private fun List<ExplorationTileRange>.toTileCells(): Set<TileCell> {
     val cells = linkedSetOf<TileCell>()
 
     for (range in this) {
-        checkCancelled()
         for (y in range.minY..range.maxY) {
-            checkCancelled()
             for (x in range.minX..range.maxX) {
-                checkCancelled()
                 cells += TileCell(x = x, y = y)
             }
         }
     }
-
     return cells
 }
 
-private fun Set<TileCell>.connectedComponents(checkCancelled: () -> Unit = {}): List<Set<TileCell>> {
+private fun Set<TileCell>.connectedComponents(): List<Set<TileCell>> {
     val remaining = toMutableSet()
     val components = mutableListOf<Set<TileCell>>()
 
     while (remaining.isNotEmpty()) {
-        checkCancelled()
         val start = remaining.minWith(compareBy<TileCell> { it.y }.thenBy { it.x })
         val queue = ArrayDeque<TileCell>()
         val component = linkedSetOf<TileCell>()
@@ -212,7 +198,6 @@ private fun Set<TileCell>.connectedComponents(checkCancelled: () -> Unit = {}): 
         remaining.remove(start)
 
         while (queue.isNotEmpty()) {
-            checkCancelled()
             val cell = queue.removeFirst()
             component += cell
 
@@ -233,39 +218,25 @@ private fun Set<TileCell>.toTileRegionGeometryBuildResult(
     zoom: Int,
     cornerRadiusTiles: Double,
     arcSegmentsPerCorner: Int,
-    checkCancelled: () -> Unit = {},
 ): TileRegionGeometryBuildResult {
-    val boundaryLoopResult = extractBoundaryLoops(checkCancelled = checkCancelled)
+    val boundaryLoopResult = extractBoundaryLoops()
     val boundaryLoops = boundaryLoopResult.loops
-    val exteriorLoop = boundaryLoops.maxBy { loop -> abs(loop.signedAreaGeo()) }
+    val exteriorLoop = boundaryLoops.maxBy { abs(it.signedAreaGeo()) }
     val holeLoops = boundaryLoops
         .filterNot { it === exteriorLoop }
-        .sortedWith(
-            compareBy<List<GridPoint>> { it.minOf(GridPoint::y) }
-                .thenBy { it.minOf(GridPoint::x) },
-        )
+        .sortedWith(compareBy<List<GridPoint>> { it.minOf(GridPoint::y) }.thenBy { it.minOf(GridPoint::x) })
 
     val geometry = TileRegionGeometry(
         zoom = zoom,
         outerRing = TileRegionRing(
             exteriorLoop
-                .roundOrthogonalLoop(
-                    cornerRadiusTiles = cornerRadiusTiles,
-                    arcSegmentsPerCorner = arcSegmentsPerCorner,
-                    checkCancelled = checkCancelled,
-                )
+                .roundOrthogonalLoop(cornerRadiusTiles, arcSegmentsPerCorner)
                 .ensureCounterClockwiseGeo()
                 .canonicalizeClosedRing(),
         ),
-        holeRings = holeLoops.map { holeLoop ->
-            checkCancelled()
+        holeRings = holeLoops.map { loop ->
             TileRegionRing(
-                holeLoop
-                    .roundOrthogonalLoop(
-                        cornerRadiusTiles = cornerRadiusTiles,
-                        arcSegmentsPerCorner = arcSegmentsPerCorner,
-                        checkCancelled = checkCancelled,
-                    )
+                loop.roundOrthogonalLoop(cornerRadiusTiles, arcSegmentsPerCorner)
                     .ensureClockwiseGeo()
                     .canonicalizeClosedRing(),
             )
@@ -282,11 +253,10 @@ private fun Set<TileCell>.toTileRegionGeometryBuildResult(
     )
 }
 
-private fun Set<TileCell>.extractBoundaryLoops(checkCancelled: () -> Unit = {}): BoundaryLoopsResult {
+private fun Set<TileCell>.extractBoundaryLoops(): BoundaryLoopsResult {
     val edgesByStart = mutableMapOf<GridVertex, DirectedEdge>()
 
     for (cell in this) {
-        checkCancelled()
         if (TileCell(x = cell.x, y = cell.y - 1) !in this) {
             edgesByStart.addBoundaryEdge(
                 start = GridVertex(x = cell.x, y = cell.y),
@@ -320,14 +290,12 @@ private fun Set<TileCell>.extractBoundaryLoops(checkCancelled: () -> Unit = {}):
     val loops = mutableListOf<List<GridPoint>>()
 
     while (remainingStarts.isNotEmpty()) {
-        checkCancelled()
         val firstStart = remainingStarts.minWith(compareBy<GridVertex> { it.y }.thenBy { it.x })
         val firstEdge = edgesByStart.getValue(firstStart)
         val vertices = mutableListOf<GridVertex>()
         var currentEdge = firstEdge
 
         while (true) {
-            checkCancelled()
             remainingStarts.remove(currentEdge.start)
             vertices += currentEdge.start
 
@@ -357,13 +325,12 @@ private fun MutableMap<GridVertex, DirectedEdge>.addBoundaryEdge(
     check(previous == null) { "Encountered an ambiguous fog boundary edge at $start." }
 }
 
-private fun List<GridVertex>.simplifyOrthogonalLoop(checkCancelled: () -> Unit = {}): List<GridPoint> {
+private fun List<GridVertex>.simplifyOrthogonalLoop(): List<GridPoint> {
     require(first() == last()) { "An orthogonal loop must be closed before simplification." }
 
     val openLoop = dropLast(1)
     val simplified = buildList {
         for (index in openLoop.indices) {
-            checkCancelled()
             val previous = openLoop[(index - 1 + openLoop.size) % openLoop.size]
             val current = openLoop[index]
             val next = openLoop[(index + 1) % openLoop.size]

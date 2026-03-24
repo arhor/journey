@@ -23,42 +23,46 @@ import javax.inject.Inject
  * polygon conversion out of the composable render path.
  */
 class FowRenderDataFactory @Inject constructor() {
-    private val renderCache = LruCache<FogOfWarRenderKey, FogOfWarRenderCacheEntry>(CACHE_CAPACITY)
-    private val fullRangeCache = LruCache<ExplorationTileRange, FogOfWarRenderData>(CACHE_CAPACITY)
-    private val fullRangesCache = LruCache<FogOfWarRenderKey, FogOfWarRenderData>(CACHE_CAPACITY)
+    private val renderCache = LruCacheWithFactory(factory = ::createRenderCacheEntry)
+    private val fullRangeCache = LruCacheWithFactory(factory = ::createFowRenderDataFromRange)
+    private val fullRangesCache = LruCacheWithFactory(factory = ::createFowRenderDataFromRanges)
 
-    fun create(
-        fogRanges: List<ExplorationTileRange>,
-        checkCancelled: () -> Unit = {},
-    ): FogOfWarRenderData? = createDetailed(
-        fogRanges = fogRanges,
-        checkCancelled = checkCancelled,
-    )?.renderData
+    fun create(fogRanges: List<ExplorationTileRange>): FogOfWarRenderData? =
+        createDetailed(fogRanges = fogRanges)
+            ?.renderData
 
-    internal fun createDetailed(
-        fogRanges: List<ExplorationTileRange>,
-        checkCancelled: () -> Unit = {},
-    ): FogOfWarRenderBuildResult? {
+    internal fun createDetailed(fogRanges: List<ExplorationTileRange>): FogOfWarRenderBuildResult? {
         if (fogRanges.isEmpty()) {
             return null
         }
-        checkCancelled()
         val key = FogOfWarRenderKey.of(fogRanges)
+        return renderCache[key]?.let { FogOfWarRenderBuildResult(it.renderData) }
+    }
 
-        synchronized(renderCache) {
-            renderCache[key]?.let { entry ->
-                return FogOfWarRenderBuildResult(
-                    renderData = entry.renderData,
-                )
-            }
+    fun createFullRange(fogRange: ExplorationTileRange): FogOfWarRenderData {
+        return fullRangeCache[fogRange]!!
+    }
+
+    fun createFullRanges(fogRanges: List<ExplorationTileRange>): FogOfWarRenderData? {
+        if (fogRanges.isEmpty()) {
+            return null
         }
+        if (fogRanges.size == 1) {
+            return createFullRange(fogRanges.single())
+        }
+        val key = FogOfWarRenderKey.of(fogRanges)
+        return fullRangesCache[key]
+    }
 
-        val geometryResult = key.ranges.toTileRegionGeometriesBuildResult(checkCancelled = checkCancelled)
+    /* ------------------------------------------ Internal implementation ------------------------------------------- */
+
+    private fun createRenderCacheEntry(key: FogOfWarRenderKey): FogOfWarRenderCacheEntry? {
+        val geometryResult = key.ranges.toTileRegionGeometriesBuildResult()
         if (geometryResult.geometries.isEmpty()) {
             return null
         }
 
-        val featureCollection = geometryResult.geometries.toPolygonFeatureCollection(checkCancelled = checkCancelled)
+        val featureCollection = geometryResult.geometries.toPolygonFeatureCollection()
         val cacheEntry = FogOfWarRenderCacheEntry(
             renderData = FogOfWarRenderData(geoJsonData = GeoJsonData.Features(featureCollection)),
             expandedFogCellCount = geometryResult.metrics.expandedCellCount,
@@ -69,82 +73,10 @@ class FowRenderDataFactory @Inject constructor() {
             ringPointCount = geometryResult.metrics.ringPointCount,
         )
 
-        synchronized(renderCache) {
-            renderCache[key]?.let { entry ->
-                return FogOfWarRenderBuildResult(
-                    renderData = entry.renderData,
-                )
-            }
-            renderCache.put(key, cacheEntry)
-
-            return FogOfWarRenderBuildResult(
-                renderData = cacheEntry.renderData,
-            )
-        }
+        return cacheEntry
     }
 
-    fun createFullRange(
-        fogRange: ExplorationTileRange,
-    ): FogOfWarRenderData {
-        synchronized(fullRangeCache) {
-            fullRangeCache[fogRange]?.let {
-                return it
-            }
-        }
-
-        val bounds = ExplorationTileGrid.bounds(fogRange)
-        val renderData = FogOfWarRenderData(
-            geoJsonData = GeoJsonData.Features(
-                FeatureCollection(
-                    features = listOf(
-                        Feature(
-                            geometry = Polygon(
-                                coordinates = listOf(
-                                    listOf(
-                                        Position(longitude = bounds.west, latitude = bounds.north),
-                                        Position(longitude = bounds.east, latitude = bounds.north),
-                                        Position(longitude = bounds.east, latitude = bounds.south),
-                                        Position(longitude = bounds.west, latitude = bounds.south),
-                                        Position(longitude = bounds.west, latitude = bounds.north),
-                                    ),
-                                ),
-                            ),
-                            properties = buildJsonObject { },
-                            id = JsonPrimitive("${fogRange.zoom}:full"),
-                        ),
-                    ),
-                ),
-            ),
-        )
-
-        synchronized(fullRangeCache) {
-            fullRangeCache[fogRange]?.let {
-                return it
-            }
-            fullRangeCache.put(fogRange, renderData)
-
-            return renderData
-        }
-    }
-
-    fun createFullRanges(
-        fogRanges: List<ExplorationTileRange>,
-    ): FogOfWarRenderData? {
-        if (fogRanges.isEmpty()) {
-            return null
-        }
-        if (fogRanges.size == 1) {
-            return createFullRange(fogRanges.single())
-        }
-
-        val key = FogOfWarRenderKey.of(fogRanges)
-
-        synchronized(fullRangesCache) {
-            fullRangesCache[key]?.let {
-                return it
-            }
-        }
-
+    private fun createFowRenderDataFromRanges(key: FogOfWarRenderKey): FogOfWarRenderData {
         val renderData = FogOfWarRenderData(
             geoJsonData = GeoJsonData.Features(
                 FeatureCollection(
@@ -169,18 +101,45 @@ class FowRenderDataFactory @Inject constructor() {
                 ),
             ),
         )
-
-        synchronized(fullRangesCache) {
-            fullRangesCache[key]?.let {
-                return it
-            }
-            fullRangesCache.put(key, renderData)
-
-            return renderData
-        }
+        return renderData
     }
 
-    private companion object {
-        private const val CACHE_CAPACITY = 16
+    private fun createFowRenderDataFromRange(key: ExplorationTileRange): FogOfWarRenderData {
+        val bounds = ExplorationTileGrid.bounds(key)
+        val renderData = FogOfWarRenderData(
+            geoJsonData = GeoJsonData.Features(
+                FeatureCollection(
+                    features = listOf(
+                        Feature(
+                            geometry = Polygon(
+                                coordinates = listOf(
+                                    listOf(
+                                        Position(longitude = bounds.west, latitude = bounds.north),
+                                        Position(longitude = bounds.east, latitude = bounds.north),
+                                        Position(longitude = bounds.east, latitude = bounds.south),
+                                        Position(longitude = bounds.west, latitude = bounds.south),
+                                        Position(longitude = bounds.west, latitude = bounds.north),
+                                    ),
+                                ),
+                            ),
+                            properties = buildJsonObject { },
+                            id = JsonPrimitive("${key.zoom}:full"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        return renderData
+    }
+
+    private class LruCacheWithFactory<K : Any, V : Any>(
+        capacity: Int = DEFAULT_CACHE_CAPACITY,
+        private val factory: (K) -> V?,
+    ) : LruCache<K, V>(capacity) {
+        override fun create(key: K): V? = factory(key)
+
+        companion object {
+            const val DEFAULT_CACHE_CAPACITY = 16
+        }
     }
 }

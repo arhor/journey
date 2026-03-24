@@ -105,25 +105,26 @@ class FogOfWarController @AssistedInject constructor(
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
-            val checkCancelled = { coroutineContext.ensureActive() }
             val diagnosticsEnabled = BuildConfig.DEBUG
             val fogRanges = fogOfWarCalculator.calculateUnexploredFogRanges(
                 tileRange = buffer.bufferedTileRange,
                 exploredTiles = exploredTiles,
-                checkCancelled = checkCancelled,
             )
+
+            coroutineContext.ensureActive()
+
             val renderOutput = if (diagnosticsEnabled) {
-                renderDataFactory.createDetailed(
-                    fogRanges = fogRanges,
-                    checkCancelled = checkCancelled,
-                )
+                renderDataFactory.createDetailed(fogRanges = fogRanges)
             } else {
                 null
             }
-            val renderData = renderOutput?.renderData ?: renderDataFactory.create(
-                fogRanges = fogRanges,
-                checkCancelled = checkCancelled,
-            )
+
+            coroutineContext.ensureActive()
+
+            val renderData = renderOutput?.renderData
+                ?: renderDataFactory.create(fogRanges = fogRanges)
+
+            coroutineContext.ensureActive()
 
             PreparedFogBuffer(
                 data = DisplayedFogData(

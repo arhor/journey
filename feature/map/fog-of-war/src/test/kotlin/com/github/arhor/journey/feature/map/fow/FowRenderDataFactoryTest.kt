@@ -7,7 +7,6 @@ import kotlinx.serialization.json.JsonObject
 import org.junit.Test
 import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Polygon
-import java.util.concurrent.CancellationException
 
 class FowRenderDataFactoryTest {
 
@@ -55,36 +54,6 @@ class FowRenderDataFactoryTest {
     }
 
     @Test
-    fun `create should stop geometry preparation when cancellation is requested`() {
-        // Given
-        val factory = FowRenderDataFactory()
-        val fogRanges = listOf(
-            ExplorationTileRange(
-                zoom = 16,
-                minX = 34567,
-                maxX = 34570,
-                minY = 22345,
-                maxY = 22348,
-            ),
-        )
-        var cancellationChecks = 0
-
-        // When
-        val result = runCatching {
-            factory.create(fogRanges) {
-                cancellationChecks += 1
-                if (cancellationChecks >= 2) {
-                    throw CancellationException("cancelled")
-                }
-            }
-        }
-
-        // Then
-        (result.exceptionOrNull() is CancellationException) shouldBe true
-        (cancellationChecks >= 2) shouldBe true
-    }
-
-    @Test
     fun `toFeatureCollection should emit rounded merged polygons for connected fog tiles`() {
         // Given
         val fogRanges = listOf(
@@ -111,10 +80,8 @@ class FowRenderDataFactoryTest {
         (actual.features.single().geometry.coordinates.single().size > 5) shouldBe true
     }
 
-    internal fun List<ExplorationTileRange>.toFeatureCollection(
-        checkCancelled: () -> Unit = {},
-    ): FeatureCollection<Polygon, JsonObject?> =
-        this.toTileRegionGeometriesBuildResult(checkCancelled = checkCancelled)
+    internal fun List<ExplorationTileRange>.toFeatureCollection(): FeatureCollection<Polygon, JsonObject?> =
+        this.toTileRegionGeometriesBuildResult()
             .geometries
-            .toPolygonFeatureCollection(checkCancelled = checkCancelled)
+            .toPolygonFeatureCollection()
 }
