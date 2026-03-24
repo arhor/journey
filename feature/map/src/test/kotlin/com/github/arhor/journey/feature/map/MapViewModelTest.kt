@@ -934,6 +934,69 @@ class MapViewModelTest {
         }
 
     @Test
+    fun `dispatch should keep fog coverage while a newer fog buffer is still recomputing`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val outrunVisibleRange = ExplorationTileRange(
+            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            minX = 18,
+            maxX = 19,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture(
+            observeExploredTilesFlowFactory = { range ->
+                when (range) {
+                    expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
+                    expectedFogBufferRange(outrunVisibleRange) -> flow {
+                        delay(1_000L)
+                        emit(emptySet())
+                    }
+
+                    else -> MutableStateFlow(emptySet())
+                }
+            },
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(initialVisibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(outrunVisibleRange),
+                ),
+            )
+            runCurrent()
+
+            // Then
+            val recomputing = fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleTileRange == outrunVisibleRange &&
+                    it.fogOfWar.isRecomputing
+            }
+            val hasCoverage = recomputing.fogOfWar.activeRenderData != null ||
+                recomputing.fogOfWar.handoffRenderData != null
+            hasCoverage shouldBe true
+        } finally {
+            tearDownMainDispatcher()
+        }
+    }
+
+    @Test
     fun `dispatch should recompute exact fog after a pending buffer swap when explored tiles change`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
