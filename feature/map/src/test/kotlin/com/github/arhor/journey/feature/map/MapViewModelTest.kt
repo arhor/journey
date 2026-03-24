@@ -999,6 +999,9 @@ class MapViewModelTest {
                 it.fogOfWar.visibleTileRange == outrunVisibleRange &&
                     !it.fogOfWar.isRecomputing
             }
+            advanceTimeBy(1_000L)
+            runCurrent()
+            advanceUntilIdle()
         } finally {
             tearDownMainDispatcher()
         }
