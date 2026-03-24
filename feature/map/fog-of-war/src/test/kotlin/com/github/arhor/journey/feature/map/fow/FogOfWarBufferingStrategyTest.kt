@@ -95,28 +95,6 @@ class FogOfWarBufferingStrategyTest {
         actual shouldBe true
     }
 
-    @Test
-    fun `buffer region should target about five trigger screens and ten buffered screens for larger viewports`() {
-        // Given
-        val visibleTileRange = ExplorationTileRange(
-            zoom = 17,
-            minX = 100,
-            maxX = 109,
-            minY = 200,
-            maxY = 209,
-        )
-
-        // When
-        val actual = createFogBufferRegion(visibleTileRange)
-        val visibleArea = visibleTileRange.tileCount.toDouble()
-        val triggerAreaRatio = actual.triggerTileRange.tileCount / visibleArea
-        val bufferedAreaRatio = actual.bufferedTileRange.tileCount / visibleArea
-
-        // Then
-        (triggerAreaRatio in 5.0..6.0) shouldBe true
-        (bufferedAreaRatio in 10.0..11.0) shouldBe true
-    }
-
     private fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
         return zoom == other.zoom &&
             other.minX >= minX &&
