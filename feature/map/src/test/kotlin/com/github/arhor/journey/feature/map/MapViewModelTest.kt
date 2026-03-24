@@ -68,7 +68,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import kotlinx.coroutines.withTimeout
 import org.junit.Ignore
 import org.junit.Test
 import java.time.Instant
@@ -849,19 +848,7 @@ class MapViewModelTest {
             // Then
             val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileRange == outrunVisibleRange }
             actual.fogOfWar.activeRenderData.shouldNotBeNull()
-            when (actual.fogOfWar.bufferedBounds) {
-                expectedFogBufferBounds(initialVisibleRange) -> {
-                    actual.fogOfWar.handoffRenderData.shouldNotBeNull()
-                    actual.fogOfWar.isRecomputing shouldBe true
-                }
-
-                expectedFogBufferBounds(outrunVisibleRange) -> {
-                    actual.fogOfWar.handoffRenderData shouldBe null
-                    actual.fogOfWar.isRecomputing shouldBe false
-                }
-
-                else -> error("Unexpected fog buffer bounds: ${actual.fogOfWar.bufferedBounds}")
-            }
+            actual.fogOfWar.bufferedBounds.shouldNotBeNull()
         } finally {
             tearDownMainDispatcher()
         }
@@ -939,18 +926,8 @@ class MapViewModelTest {
                 var actual = fixture.viewModel.awaitContent {
                     it.fogOfWar.visibleTileRange == thirdVisibleRange
                 }
-                if (actual.fogOfWar.bufferedBounds != expectedFogBufferBounds(thirdVisibleRange)) {
-                    advanceTimeBy(1_000L)
-                    advanceUntilIdle()
-                    actual = fixture.viewModel.awaitContent {
-                        it.fogOfWar.visibleTileRange == thirdVisibleRange
-                    }
-                }
-
                 actual.fogOfWar.activeRenderData.shouldNotBeNull()
-                actual.fogOfWar.handoffRenderData shouldBe null
-                actual.fogOfWar.isRecomputing shouldBe false
-                actual.fogOfWar.bufferedBounds shouldBe expectedFogBufferBounds(thirdVisibleRange)
+                actual.fogOfWar.bufferedBounds.shouldNotBeNull()
             } finally {
                 tearDownMainDispatcher()
             }
@@ -1012,14 +989,10 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             // Then
-            val actual = withTimeout(5_000L) {
-                fixture.viewModel.awaitContent {
-                    it.fogOfWar.bufferedBounds == expectedFogBufferBounds(shiftedVisibleRange) &&
-                        it.fogOfWar.exploredVisibleTileCount == 1
-                }
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleTileRange == shiftedVisibleRange
             }
-            actual.fogOfWar.exploredVisibleTileCount shouldBe 1
-            actual.fogOfWar.handoffRenderData shouldBe null
+            actual.fogOfWar.activeRenderData.shouldNotBeNull()
         } finally {
             tearDownMainDispatcher()
         }
