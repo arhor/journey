@@ -13,6 +13,7 @@ import com.github.arhor.journey.feature.map.MapDestination
 import com.github.arhor.journey.feature.map.mapGraph
 import com.github.arhor.journey.feature.settings.SettingsDestination
 import com.github.arhor.journey.feature.settings.settingsGraph
+import com.github.arhor.journey.ui.GodotPoiViewer
 
 @Composable
 fun AppNavGraph(
@@ -31,6 +32,7 @@ fun AppNavGraph(
             snackbarHostState = snackbarHostState,
             onOpenHero = { controller.navigateToTopLevel(HeroDestination) },
             onOpenSettings = { controller.navigateToTopLevel(SettingsDestination) },
+            poiDetailsViewerContent = { GodotPoiViewer() },
         )
         settingsGraph(snackbarHostState = snackbarHostState)
     }

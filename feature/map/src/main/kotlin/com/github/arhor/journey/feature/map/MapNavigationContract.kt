@@ -3,6 +3,7 @@ package com.github.arhor.journey.feature.map
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
@@ -36,6 +37,7 @@ fun NavGraphBuilder.mapGraph(
     snackbarHostState: SnackbarHostState,
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
+    poiDetailsViewerContent: (@Composable () -> Unit)? = null,
 ) {
     composable<MapDestination> {
         MapRoute(
@@ -59,6 +61,7 @@ fun NavGraphBuilder.mapGraph(
     composable<PoiDetailsDestination> {
         PoiDetailsRoute(
             onBack = navController::navigateUp,
+            viewerContent = poiDetailsViewerContent,
         )
     }
 

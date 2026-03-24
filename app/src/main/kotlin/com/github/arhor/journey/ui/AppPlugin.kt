@@ -1,4 +1,4 @@
-package fhuyakou.godot.app.android.gltfviewer
+package com.github.arhor.journey.ui
 
 import org.godotengine.godot.Godot
 import org.godotengine.godot.plugin.GodotPlugin

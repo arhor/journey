@@ -1,4 +1,4 @@
-package fhuyakou.godot.app.android.gltfviewer
+package com.github.arhor.journey.ui
 
 import android.content.Context
 

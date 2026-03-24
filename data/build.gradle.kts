@@ -31,7 +31,6 @@ dependencies {
 
     implementation(project(":domain"))
     implementation(project(":core:common"))
-    implementation("org.godotengine:godot:4.6.1.stable")
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.ktx)

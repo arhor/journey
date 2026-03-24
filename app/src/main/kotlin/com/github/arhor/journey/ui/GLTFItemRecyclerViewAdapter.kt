@@ -1,14 +1,14 @@
-package fhuyakou.godot.app.android.gltfviewer
+package com.github.arhor.journey.ui
 
 import android.content.Context
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-
-import fhuyakou.godot.app.android.gltfviewer.GLTFContent.GLTFItem
-import fhuyakou.godot.app.android.gltfviewer.databinding.FragmentItemsSelectionBinding
+import com.github.arhor.journey.R
+import com.github.arhor.journey.ui.GLTFContent.GLTFItem
 
 /**
  * [RecyclerView.Adapter] that can display a [GLTFItem].
@@ -16,41 +16,38 @@ import fhuyakou.godot.app.android.gltfviewer.databinding.FragmentItemsSelectionB
 class GLTFItemRecyclerViewAdapter(
     private val context: Context,
     private val values: List<GLTFItem>,
-    private val listener: Listener
+    private val onItemSelected: (GLTFItem) -> Unit,
 ) : RecyclerView.Adapter<GLTFItemRecyclerViewAdapter.ViewHolder>() {
-
-    interface Listener {
-        /**
-         * Used to notify when a [GLTFItem] has been selected.
-         */
-        fun onItemSelected(item: GLTFItem)
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         return ViewHolder(
-            FragmentItemsSelectionBinding.inflate(
-                LayoutInflater.from(parent.context),
+            LayoutInflater.from(parent.context).inflate(
+                R.layout.item_gltf_selection,
                 parent,
-                false
-            )
+                false,
+            ),
         )
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = values[position]
-        holder.screenshotView.setImageResource(item.getScreenshotDrawableId(context))
+        val screenshotDrawableId = item.getScreenshotDrawableId(context)
+        if (screenshotDrawableId != 0) {
+            holder.screenshotView.setImageResource(screenshotDrawableId)
+        } else {
+            holder.screenshotView.setImageDrawable(null)
+        }
         holder.contentView.text = item.name
         holder.itemView.setOnClickListener {
-            listener.onItemSelected(item)
+            onItemSelected(item)
         }
     }
 
     override fun getItemCount(): Int = values.size
 
-    inner class ViewHolder(binding: FragmentItemsSelectionBinding) :
-        RecyclerView.ViewHolder(binding.root) {
-        val screenshotView: ImageView = binding.contentScreenshot
-        val contentView: TextView = binding.contentName
+    inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val screenshotView: ImageView = view.findViewById(R.id.contentScreenshot)
+        val contentView: TextView = view.findViewById(R.id.contentName)
 
         override fun toString(): String {
             return super.toString() + " '" + contentView.text + "'"

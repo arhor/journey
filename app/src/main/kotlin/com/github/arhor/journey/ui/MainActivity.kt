@@ -1,22 +1,22 @@
 package com.github.arhor.journey.ui
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import org.godotengine.godot.Godot
-import org.godotengine.godot.GodotFragment
-import org.godotengine.godot.GodotHost
-import org.godotengine.godot.plugin.GodotPlugin
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.usecase.SetExplorationTrackingCadenceUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import org.godotengine.godot.Godot
+import org.godotengine.godot.GodotFragment
+import org.godotengine.godot.GodotHost
+import org.godotengine.godot.plugin.GodotPlugin
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity(), GodotHost {
     private var godotFragment: GodotFragment? = null
     internal var appPlugin: AppPlugin? = null
 
@@ -25,25 +25,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        val currentGodotFragment = supportFragmentManager.findFragmentById(R.id.godot_fragment_container)
-        if (currentGodotFragment is GodotFragment) {
-            godotFragment = currentGodotFragment
-        } else {
-            godotFragment = GodotFragment()
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.godot_fragment_container, godotFragment!!)
-                .commitNowAllowingStateLoss()
-        }
-
-        var itemsSelectionFragment = supportFragmentManager.findFragmentById(R.id.item_selection_fragment_container)
-        if (itemsSelectionFragment !is ItemsSelectionFragment) {
-            itemsSelectionFragment = ItemsSelectionFragment.newInstance(1)
-            supportFragmentManager.beginTransaction()
-                .replace(R.id.item_selection_fragment_container, itemsSelectionFragment)
-                .commitAllowingStateLoss()
-        }
-
         enableEdgeToEdge()
         setContent { App() }
     }
@@ -62,7 +43,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-        private fun initAppPluginIfNeeded(godot: Godot) {
+    fun createGodotFragment(): GodotFragment =
+        GodotFragment().also { fragment ->
+            godotFragment = fragment
+        }
+
+    fun clearGodotFragment(fragment: GodotFragment) {
+        if (godotFragment === fragment) {
+            godotFragment = null
+        }
+    }
+
+    fun showGltf(glbFilepath: String) {
+        appPlugin?.showGLTF(glbFilepath)
+    }
+
+    private fun initAppPluginIfNeeded(godot: Godot) {
         if (appPlugin == null) {
             appPlugin = AppPlugin(godot)
         }

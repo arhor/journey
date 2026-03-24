@@ -16,18 +16,17 @@ android {
     }
 
     defaultConfig {
-        // The default ignore pattern for the 'assets' directory includes hidden files and
-        // directories which are used by Godot projects, so we override it with the following.
-        aaptOptions {
-            ignoreAssetsPattern "!.svn:!.git:!.gitignore:!.ds_store:!*.scc:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"
-        }
-
         applicationId = "com.github.arhor.journey"
         minSdk = 35
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Keep hidden Godot project files inside the packaged assets directory.
+    androidResources {
+        ignoreAssetsPattern = "!.svn:!.git:!.gitignore:!.ds_store:!*.scc:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 
     buildTypes {
@@ -75,10 +74,12 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.navigation.compose)
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation(libs.hilt.android)
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    implementation("org.godotengine:godot:4.6.1.stable")
 
     testImplementation(libs.junit)
     testImplementation(libs.kotest.assertions.core)
