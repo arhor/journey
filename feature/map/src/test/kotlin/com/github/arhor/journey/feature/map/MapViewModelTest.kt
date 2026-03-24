@@ -53,6 +53,7 @@ import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -952,17 +953,14 @@ class MapViewModelTest {
             minY = 20,
             maxY = 21,
         )
+        val allowPendingSwap = CompletableDeferred<Unit>()
         val fixture = createFixture(
-            observeExploredTilesFlowFactory = { range ->
-                when (range) {
-                    expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
-                    expectedFogBufferRange(outrunVisibleRange) -> flow {
-                        delay(1_000L)
-                        emit(emptySet())
-                    }
-
-                    else -> MutableStateFlow(emptySet())
+            observeExploredTilesFlowFactory = { MutableStateFlow(emptySet()) },
+            getExploredTilesOverride = { range ->
+                if (range == expectedFogBufferRange(outrunVisibleRange)) {
+                    allowPendingSwap.await()
                 }
+                emptySet()
             },
         )
 
@@ -992,16 +990,13 @@ class MapViewModelTest {
                 recomputing.fogOfWar.handoffRenderData != null
             hasCoverage shouldBe true
 
-            // Ensure pending recomputation finishes before test scope teardown.
-            advanceTimeBy(1_000L)
+            allowPendingSwap.complete(Unit)
             runCurrent()
+            advanceUntilIdle()
             fixture.viewModel.awaitContent {
                 it.fogOfWar.visibleTileRange == outrunVisibleRange &&
                     !it.fogOfWar.isRecomputing
             }
-            advanceTimeBy(1_000L)
-            runCurrent()
-            advanceUntilIdle()
         } finally {
             tearDownMainDispatcher()
         }
@@ -1457,6 +1452,7 @@ class MapViewModelTest {
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<ExplorationTile> = emptySet(),
         observeExploredTilesFlowFactory: ((ExplorationTileRange) -> Flow<Set<ExplorationTile>>)? = null,
+        getExploredTilesOverride: (suspend (ExplorationTileRange) -> Set<ExplorationTile>)? = null,
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: StartExplorationTrackingSessionResult =
@@ -1503,7 +1499,8 @@ class MapViewModelTest {
         every { setExplorationTileRevealRadius.invoke(any()) } just runs
         every { mapTilePrewarmer.prewarm(any()) } returns Job()
         coEvery { getExploredTiles.invoke(any()) } coAnswers {
-            observeExploredTilesFlowFactory?.invoke(arg(0))?.first()
+            getExploredTilesOverride?.invoke(arg(0))
+                ?: observeExploredTilesFlowFactory?.invoke(arg(0))?.first()
                 ?: exploredTiles
         }
 
