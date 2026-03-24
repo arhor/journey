@@ -16,6 +16,12 @@ android {
     }
 
     defaultConfig {
+        // The default ignore pattern for the 'assets' directory includes hidden files and
+        // directories which are used by Godot projects, so we override it with the following.
+        aaptOptions {
+            ignoreAssetsPattern "!.svn:!.git:!.gitignore:!.ds_store:!*.scc:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"
+        }
+
         applicationId = "com.github.arhor.journey"
         minSdk = 35
         targetSdk = 36
