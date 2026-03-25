@@ -7,7 +7,7 @@ import org.junit.Test
 class PackedExplorationTileCoordinatesTest {
 
     @Test
-    fun `pack should encode zoom x and y into the expected long value`() {
+    fun `pack should round trip normal values`() {
         // Given
         val zoom = 16
         val x = 34567
@@ -21,10 +21,61 @@ class PackedExplorationTileCoordinatesTest {
         )
 
         // Then
-        actual shouldBe ((16L shl 48) or (34567L shl 24) or 22345L)
         PackedExplorationTileCoordinates.unpackZoom(actual) shouldBe zoom
         PackedExplorationTileCoordinates.unpackX(actual) shouldBe x
         PackedExplorationTileCoordinates.unpackY(actual) shouldBe y
+    }
+
+    @Test
+    fun `pack should mask zoom to 8 bits`() {
+        // Given
+        val zoom = 0x1AB
+
+        // When
+        val actual = PackedExplorationTileCoordinates.pack(
+            zoom = zoom,
+            x = 1,
+            y = 2,
+        )
+
+        // Then
+        PackedExplorationTileCoordinates.unpackZoom(actual) shouldBe 0xAB
+    }
+
+    @Test
+    fun `pack should keep 24 bit axis boundary values reversible`() {
+        // Given
+        val x = PackedExplorationTileCoordinates.MAX_AXIS_COORDINATE
+        val y = PackedExplorationTileCoordinates.MAX_AXIS_COORDINATE
+
+        // When
+        val actual = PackedExplorationTileCoordinates.pack(
+            zoom = PackedExplorationTileCoordinates.MAX_ZOOM,
+            x = x,
+            y = y,
+        )
+
+        // Then
+        PackedExplorationTileCoordinates.unpackX(actual) shouldBe x
+        PackedExplorationTileCoordinates.unpackY(actual) shouldBe y
+    }
+
+    @Test
+    fun `pack should match expected exact long for representative values`() {
+        // Given
+        val zoom = 0xAB
+        val x = 0x123456
+        val y = 0x654321
+
+        // When
+        val actual = PackedExplorationTileCoordinates.pack(
+            zoom = zoom,
+            x = x,
+            y = y,
+        )
+
+        // Then
+        actual shouldBe 0x00AB123456654321L
     }
 
     @Test
@@ -44,25 +95,5 @@ class PackedExplorationTileCoordinatesTest {
 
         // Then
         packed.distinct().shouldHaveSize(tiles.size)
-    }
-
-    @Test
-    fun `pack should keep supported boundary values reversible`() {
-        // Given
-        val zoom = PackedExplorationTileCoordinates.MAX_ZOOM
-        val x = PackedExplorationTileCoordinates.MAX_AXIS_COORDINATE
-        val y = PackedExplorationTileCoordinates.MAX_AXIS_COORDINATE
-
-        // When
-        val actual = PackedExplorationTileCoordinates.pack(
-            zoom = zoom,
-            x = x,
-            y = y,
-        )
-
-        // Then
-        PackedExplorationTileCoordinates.unpackZoom(actual) shouldBe zoom
-        PackedExplorationTileCoordinates.unpackX(actual) shouldBe x
-        PackedExplorationTileCoordinates.unpackY(actual) shouldBe y
     }
 }

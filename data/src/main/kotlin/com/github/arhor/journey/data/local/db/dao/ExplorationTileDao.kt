@@ -48,7 +48,7 @@ interface ExplorationTileDao {
 
     @Query(
         """
-        SELECT ((zoom << 48) | ((x & 16777215) << 24) | (y & 16777215))
+        SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
         FROM explored_tiles
         WHERE zoom = :zoom
             AND x = :x
@@ -64,7 +64,7 @@ interface ExplorationTileDao {
 
     @Query(
         """
-        SELECT ((zoom << 48) | ((x & 16777215) << 24) | (y & 16777215))
+        SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
         FROM explored_tiles
         WHERE zoom = :zoom
             AND x BETWEEN :minX AND :maxX
@@ -82,7 +82,7 @@ interface ExplorationTileDao {
 
     @Query(
         """
-        SELECT ((zoom << 48) | ((x & 16777215) << 24) | (y & 16777215))
+        SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
         FROM explored_tiles
         WHERE zoom = :zoom
             AND x BETWEEN :minX AND :maxX

@@ -64,6 +64,31 @@ class ExplorationTileDaoTest {
     }
 
     @Test
+    fun `getPackedByCoordinates should mask zoom to 8 bits in SQL projection`() = runTest {
+        // Given
+        explorationTileDao.insert(
+            entities = listOf(
+                ExploredTileEntity(zoom = 0x1AB, x = 10, y = 20),
+            ),
+        )
+
+        // When
+        val actual = explorationTileDao.getPackedByCoordinates(
+            zoom = 0x1AB,
+            x = 10,
+            y = 20,
+        )
+
+        // Then
+        actual shouldBe PackedExplorationTileCoordinates.pack(
+            zoom = 0x1AB,
+            x = 10,
+            y = 20,
+        )
+        PackedExplorationTileCoordinates.unpackZoom(actual!!) shouldBe 0xAB
+    }
+
+    @Test
     fun `getPackedByRange should return deterministic packed ordering for range`() = runTest {
         // Given
         explorationTileDao.insert(
