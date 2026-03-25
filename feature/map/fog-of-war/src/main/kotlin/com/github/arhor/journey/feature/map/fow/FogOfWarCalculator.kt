@@ -1,6 +1,5 @@
 package com.github.arhor.journey.feature.map.fow
 
-import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.PackedExplorationTileCoordinates
 import javax.inject.Inject
@@ -9,17 +8,13 @@ class FogOfWarCalculator @Inject constructor() {
 
     fun calculateUnexploredFogRanges(
         tileRange: ExplorationTileRange?,
-        exploredTiles: Set<ExplorationTile>,
+        packedExploredTiles: LongArray,
     ): List<ExplorationTileRange> {
         if (tileRange == null) {
             return emptyList()
         }
 
-        val exploredTileKeys = exploredTiles
-            .asSequence()
-            .filter { it.zoom == tileRange.zoom }
-            .map(PackedExplorationTileCoordinates::pack)
-            .toHashSet()
+        val exploredTileKeys = packedExploredTiles.toHashSet()
 
         val completedRanges = mutableListOf<ExplorationTileRange>()
         var activeRanges = mutableMapOf<RowSpan, MutableFogRange>()
