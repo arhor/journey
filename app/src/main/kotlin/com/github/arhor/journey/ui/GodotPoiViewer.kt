@@ -22,6 +22,7 @@ import androidx.fragment.app.FragmentContainerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.github.arhor.journey.R
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun GodotPoiViewer(
@@ -40,7 +41,7 @@ fun GodotPoiViewer(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = context.getString(R.string.poi_details_godot_viewer_title),
+                text = stringResource(R.string.poi_details_godot_viewer_title),
                 style = MaterialTheme.typography.titleMedium,
             )
 
