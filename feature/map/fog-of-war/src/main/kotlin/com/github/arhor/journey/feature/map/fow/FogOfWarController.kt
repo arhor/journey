@@ -2,13 +2,13 @@ package com.github.arhor.journey.feature.map.fow
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTilePrototype
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
+import com.github.arhor.journey.domain.model.PackedExplorationTileCoordinates
+import com.github.arhor.journey.domain.usecase.GetPackedExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
-import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
 import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderData
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
@@ -37,8 +37,8 @@ private const val MAX_BUFFERED_FOG_TILE_COUNT = MAX_VISIBLE_FOG_TILE_COUNT * 9
 @Stable
 class FogOfWarController @AssistedInject constructor(
     private val observeExplorationTileRuntimeConfig: ObserveExplorationTileRuntimeConfigUseCase,
-    private val observeExploredTiles: ObserveExploredTilesUseCase,
-    private val getExploredTiles: GetExploredTilesUseCase,
+    private val observePackedExploredTiles: ObservePackedExploredTilesUseCase,
+    private val getPackedExploredTiles: GetPackedExploredTilesUseCase,
     private val renderDataFactory: FowRenderDataFactory,
     private val fogOfWarCalculator: FogOfWarCalculator,
     @Assisted private val scope: CoroutineScope,
@@ -94,13 +94,13 @@ class FogOfWarController @AssistedInject constructor(
 
     private fun observeFogExploredTiles(
         fogTileRange: ExplorationTileRange?,
-    ): Flow<Set<ExplorationTile>> = fogTileRange
-        ?.let(observeExploredTiles::invoke)
-        ?: flowOf(emptySet())
+    ): Flow<LongArray> = fogTileRange
+        ?.let(observePackedExploredTiles::invoke)
+        ?: flowOf(LongArray(0))
 
     private suspend fun prepareFogBufferData(
         buffer: FogBufferRegion,
-        exploredTiles: Set<ExplorationTile>,
+        packedExploredTiles: LongArray,
     ): PreparedFogBuffer {
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
@@ -108,7 +108,7 @@ class FogOfWarController @AssistedInject constructor(
             val diagnosticsEnabled = BuildConfig.DEBUG
             val fogRanges = fogOfWarCalculator.calculateUnexploredFogRanges(
                 tileRange = buffer.bufferedTileRange,
-                exploredTiles = exploredTiles,
+                packedExploredTiles = packedExploredTiles,
             )
 
             coroutineContext.ensureActive()
@@ -128,7 +128,7 @@ class FogOfWarController @AssistedInject constructor(
 
             PreparedFogBuffer(
                 data = DisplayedFogData(
-                    exploredTiles = exploredTiles,
+                    packedExploredTiles = packedExploredTiles,
                     fogRanges = fogRanges,
                     renderData = renderData,
                 ),
@@ -139,7 +139,7 @@ class FogOfWarController @AssistedInject constructor(
     private fun buildUiState(state: State): FogOfWarUiState {
         val displayedFogData = state.displayedFogData
         val exploredVisibleTileCount = state.visibleTileRange?.let { visibleRange ->
-            displayedFogData?.exploredTiles?.count(visibleRange::contains)
+            displayedFogData?.packedExploredTiles?.countVisibleExploredTiles(visibleRange)
         } ?: 0
         val fallbackFogTileRange = state.displayedFogBuffer
             ?.bufferedTileRange
@@ -321,13 +321,13 @@ class FogOfWarController @AssistedInject constructor(
                 while (true) {
                     val buffer = latestPendingFogBuffer ?: break
                     latestPendingFogBuffer = null
-                    val exploredTiles = getExploredTiles(buffer.bufferedTileRange)
-                    val preparedFogBuffer = preparePendingFogBuffer(buffer, exploredTiles) ?: continue
+                    val packedExploredTiles = getPackedExploredTiles(buffer.bufferedTileRange)
+                    val preparedFogBuffer = preparePendingFogBuffer(buffer, packedExploredTiles) ?: continue
 
                     if (swapPreparedPendingFogBuffer(buffer, preparedFogBuffer)) {
                         startObservingDisplayedFogBuffer(
                             buffer = buffer,
-                            seedExploredTiles = preparedFogBuffer.data.exploredTiles,
+                            seedPackedExploredTiles = preparedFogBuffer.data.packedExploredTiles,
                         )
 
                         _state.value.visibleBounds?.takeIf(buffer::shouldRecompute)?.let(::updateFogViewport)
@@ -345,11 +345,11 @@ class FogOfWarController @AssistedInject constructor(
 
     private suspend fun preparePendingFogBuffer(
         buffer: FogBufferRegion,
-        exploredTiles: Set<ExplorationTile>,
+        packedExploredTiles: LongArray,
     ): PreparedFogBuffer? = try {
         prepareFogBufferData(
             buffer = buffer,
-            exploredTiles = exploredTiles,
+            packedExploredTiles = packedExploredTiles,
         )
     } catch (exception: CancellationException) {
         throw exception
@@ -381,16 +381,18 @@ class FogOfWarController @AssistedInject constructor(
 
     private fun startObservingDisplayedFogBuffer(
         buffer: FogBufferRegion,
-        seedExploredTiles: Set<ExplorationTile>? = null,
+        seedPackedExploredTiles: LongArray? = null,
     ) {
         displayedFogObservationJob?.cancel()
         displayedFogObservationJob = scope.launch {
-            var shouldSkipSeed = seedExploredTiles != null
+            var shouldSkipSeed = seedPackedExploredTiles != null
 
             observeFogExploredTiles(buffer.bufferedTileRange)
-                .distinctUntilChanged()
-                .collectLatest { exploredTiles ->
-                    if (shouldSkipSeed && exploredTiles == seedExploredTiles) {
+                .distinctUntilChanged(LongArray::contentEquals)
+                .collectLatest { packedExploredTiles ->
+                    if (shouldSkipSeed && seedPackedExploredTiles != null &&
+                        packedExploredTiles.contentEquals(seedPackedExploredTiles)
+                    ) {
                         shouldSkipSeed = false
                         return@collectLatest
                     }
@@ -399,7 +401,7 @@ class FogOfWarController @AssistedInject constructor(
                     val preparedFogBuffer = try {
                         prepareFogBufferData(
                             buffer = buffer,
-                            exploredTiles = exploredTiles,
+                            packedExploredTiles = packedExploredTiles,
                         )
                     } catch (exception: CancellationException) {
                         throw exception
@@ -433,7 +435,7 @@ class FogOfWarController @AssistedInject constructor(
 
     @Immutable
     private data class DisplayedFogData(
-        val exploredTiles: Set<ExplorationTile>,
+        val packedExploredTiles: LongArray,
         val fogRanges: List<ExplorationTileRange>,
         val renderData: FogOfWarRenderData?,
     )
@@ -442,4 +444,13 @@ class FogOfWarController @AssistedInject constructor(
     private data class PreparedFogBuffer(
         val data: DisplayedFogData,
     )
+
+    private fun LongArray.countVisibleExploredTiles(range: ExplorationTileRange): Int =
+        count { packedTile ->
+            val zoom = PackedExplorationTileCoordinates.unpackZoom(packedTile)
+            val x = PackedExplorationTileCoordinates.unpackX(packedTile)
+            val y = PackedExplorationTileCoordinates.unpackY(packedTile)
+
+            zoom == range.zoom && x in range.minX..range.maxX && y in range.minY..range.maxY
+        }
 }
