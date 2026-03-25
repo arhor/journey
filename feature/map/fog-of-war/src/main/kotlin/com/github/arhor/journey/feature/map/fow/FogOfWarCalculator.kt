@@ -13,13 +13,20 @@ class FogOfWarCalculator @Inject constructor() {
         if (tileRange == null) {
             return emptyList()
         }
+
+        val exploredTileKeys = exploredTiles
+            .asSequence()
+            .filter { it.zoom == tileRange.zoom }
+            .map(::packTileCoordinates)
+            .toHashSet()
+
         val completedRanges = mutableListOf<ExplorationTileRange>()
         var activeRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
         for (y in tileRange.minY..tileRange.maxY) {
             val currentRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
-            for (span in rowSpans(tileRange, exploredTiles, y)) {
+            for (span in rowSpans(tileRange, exploredTileKeys, y)) {
                 val continuedRange = activeRanges.remove(span)
 
                 if (continuedRange != null) {
@@ -46,20 +53,18 @@ class FogOfWarCalculator @Inject constructor() {
 
     private fun rowSpans(
         visibleRange: ExplorationTileRange,
-        exploredTiles: Set<ExplorationTile>,
+        exploredTileKeys: Set<Long>,
         y: Int,
     ): List<RowSpan> {
         val spans = mutableListOf<RowSpan>()
         var spanStartX: Int? = null
 
         for (x in visibleRange.minX..visibleRange.maxX) {
-            val isExplored = exploredTiles.contains(
-                ExplorationTile(
-                    zoom = visibleRange.zoom,
-                    x = x,
-                    y = y,
-                ),
-            )
+            val isExplored = packTileCoordinates(
+                zoom = visibleRange.zoom,
+                x = x,
+                y = y,
+            ) in exploredTileKeys
 
             if (!isExplored && spanStartX == null) {
                 spanStartX = x
@@ -100,5 +105,23 @@ class FogOfWarCalculator @Inject constructor() {
             minY = minY,
             maxY = maxY,
         )
+    }
+
+    private fun packTileCoordinates(tile: ExplorationTile): Long = packTileCoordinates(
+        zoom = tile.zoom,
+        x = tile.x,
+        y = tile.y,
+    )
+
+    private fun packTileCoordinates(
+        zoom: Int,
+        x: Int,
+        y: Int,
+    ): Long = (zoom.toLong() shl 48) or
+        ((x.toLong() and AXIS_COORDINATE_MASK) shl 24) or
+        (y.toLong() and AXIS_COORDINATE_MASK)
+
+    private companion object {
+        const val AXIS_COORDINATE_MASK = 0xFFFFFFL
     }
 }

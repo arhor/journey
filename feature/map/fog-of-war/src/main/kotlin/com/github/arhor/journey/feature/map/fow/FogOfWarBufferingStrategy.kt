@@ -8,8 +8,12 @@ import com.github.arhor.journey.feature.map.fow.model.FogViewportSnapshot
 import kotlin.math.ceil
 import kotlin.math.sqrt
 
-private const val TARGET_TRIGGER_AREA_IN_SCREENS = 1.5
-private const val TARGET_BUFFERED_AREA_IN_SCREENS = 3.0
+// "Screens" here means total area coverage relative to the current viewport area,
+// not padding on a single edge. 5.0 and 10.0 intentionally bias toward earlier
+// recompute and larger prepared fog coverage so fast dragging is less likely to
+// expose leading-edge seams.
+private const val TARGET_TRIGGER_AREA_IN_SCREENS = 5.0
+private const val TARGET_BUFFERED_AREA_IN_SCREENS = 10.0
 private const val MIN_TILE_PADDING = 1
 private const val MIN_BUFFERED_PADDING_DELTA = 2
 private val TRIGGER_TILE_PADDING_MULTIPLIER = tilePaddingMultiplierForTargetArea(TARGET_TRIGGER_AREA_IN_SCREENS)

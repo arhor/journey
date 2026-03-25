@@ -4,6 +4,7 @@ import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
 import com.github.arhor.journey.feature.map.fow.shouldRecompute
+import io.kotest.matchers.ints.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 
@@ -110,10 +111,31 @@ class FogOfWarBufferingStrategyTest {
         val actual = createFogBufferRegion(visibleTileRange)
 
         // Then
-        (actual.triggerTileRange.minX - actual.bufferedTileRange.minX) shouldBe 2
-        (actual.bufferedTileRange.maxX - actual.triggerTileRange.maxX) shouldBe 2
-        (actual.triggerTileRange.minY - actual.bufferedTileRange.minY) shouldBe 2
-        (actual.bufferedTileRange.maxY - actual.triggerTileRange.maxY) shouldBe 2
+        (actual.triggerTileRange.minX - actual.bufferedTileRange.minX).shouldBeGreaterThanOrEqual(2)
+        (actual.bufferedTileRange.maxX - actual.triggerTileRange.maxX).shouldBeGreaterThanOrEqual(2)
+        (actual.triggerTileRange.minY - actual.bufferedTileRange.minY).shouldBeGreaterThanOrEqual(2)
+        (actual.bufferedTileRange.maxY - actual.triggerTileRange.maxY).shouldBeGreaterThanOrEqual(2)
+    }
+
+    @Test
+    fun `buffer region should target around five screens for trigger and ten for buffered area`() {
+        // Given
+        val visibleTileRange = ExplorationTileRange(
+            zoom = 17,
+            minX = 100,
+            maxX = 119,
+            minY = 200,
+            maxY = 219,
+        )
+
+        // When
+        val actual = createFogBufferRegion(visibleTileRange)
+        val triggerAreaRatio = actual.triggerTileRange.areaRatioTo(visibleTileRange)
+        val bufferedAreaRatio = actual.bufferedTileRange.areaRatioTo(visibleTileRange)
+
+        // Then
+        (triggerAreaRatio in 4.5..5.8) shouldBe true
+        (bufferedAreaRatio in 9.0..11.2) shouldBe true
     }
 
     private fun ExplorationTileRange.contains(other: ExplorationTileRange): Boolean {
@@ -122,6 +144,12 @@ class FogOfWarBufferingStrategyTest {
             other.maxX <= maxX &&
             other.minY >= minY &&
             other.maxY <= maxY
+    }
+
+    private fun ExplorationTileRange.areaRatioTo(other: ExplorationTileRange): Double {
+        val thisArea = (maxX - minX + 1).toLong() * (maxY - minY + 1).toLong()
+        val otherArea = (other.maxX - other.minX + 1).toLong() * (other.maxY - other.minY + 1).toLong()
+        return thisArea.toDouble() / otherArea.toDouble()
     }
 
     internal fun createFogBufferRegion(

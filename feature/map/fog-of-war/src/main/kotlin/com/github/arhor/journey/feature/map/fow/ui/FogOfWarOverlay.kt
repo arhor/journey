@@ -1,11 +1,14 @@
 package com.github.arhor.journey.feature.map.fow.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderData
-import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.layers.FillLayer
 import org.maplibre.compose.sources.GeoJsonData
@@ -25,7 +28,7 @@ internal val EMPTY_FOG_GEO_JSON_DATA = GeoJsonData.JsonString(
 @Composable
 @MaplibreComposable
 fun FogOfWarOverlay(
-    state: FogOfWarUiState,
+    state: FogOfWarRenderState,
 ) {
     if (!state.isOverlayEnabled) {
         return
@@ -56,9 +59,16 @@ internal fun FogOfWarRendererAdapter(
             options = GeoJsonOptions(),
         )
     }
+    var lastAppliedGeoJsonData by remember(sourceId) {
+        mutableStateOf<GeoJsonData.Features?>(null)
+    }
 
     SideEffect {
-        fogRenderData?.geoJsonData?.let(source::setData)
+        val nextGeoJsonData = fogRenderData?.geoJsonData
+        if (nextGeoJsonData != null && nextGeoJsonData !== lastAppliedGeoJsonData) {
+            source.setData(nextGeoJsonData)
+            lastAppliedGeoJsonData = nextGeoJsonData
+        }
     }
 
     FillLayer(
@@ -70,7 +80,7 @@ internal fun FogOfWarRendererAdapter(
     )
 }
 
-internal fun FogOfWarUiState.fogOfWarLayerSpecs(): List<FogOfWarLayerSpec> = listOf(
+internal fun FogOfWarRenderState.fogOfWarLayerSpecs(): List<FogOfWarLayerSpec> = listOf(
     FogOfWarLayerSpec(
         renderData = handoffRenderData,
         sourceId = HANDOFF_FOG_OF_WAR_SOURCE_ID,

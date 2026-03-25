@@ -71,6 +71,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Ignore
 import org.junit.Test
+import org.junit.AfterClass
 import java.time.Instant
 import kotlin.math.ceil
 import kotlin.math.sqrt
@@ -810,8 +811,8 @@ class MapViewModelTest {
         )
         val outrunVisibleRange = ExplorationTileRange(
             zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-            minX = 14,
-            maxX = 15,
+            minX = 16,
+            maxX = 17,
             minY = 20,
             maxY = 21,
         )
@@ -819,10 +820,7 @@ class MapViewModelTest {
             observeExploredTilesFlowFactory = { range ->
                 when (range) {
                     expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
-                    expectedFogBufferRange(outrunVisibleRange) -> flow {
-                        delay(1_000L)
-                        emit(emptySet())
-                    }
+                    expectedFogBufferRange(outrunVisibleRange) -> MutableStateFlow(emptySet())
 
                     else -> MutableStateFlow(emptySet())
                 }
@@ -844,7 +842,7 @@ class MapViewModelTest {
                     visibleBounds = visibleBoundsInside(outrunVisibleRange),
                 ),
             )
-            runCurrent()
+            advanceUntilIdle()
 
             // Then
             val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileRange == outrunVisibleRange }
@@ -870,15 +868,15 @@ class MapViewModelTest {
             )
             val secondVisibleRange = ExplorationTileRange(
                 zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-                minX = 14,
-                maxX = 15,
+                minX = 16,
+                maxX = 17,
                 minY = 20,
                 maxY = 21,
             )
             val thirdVisibleRange = ExplorationTileRange(
                 zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-                minX = 18,
-                maxX = 19,
+                minX = 22,
+                maxX = 23,
                 minY = 20,
                 maxY = 21,
             )
@@ -887,10 +885,7 @@ class MapViewModelTest {
                     when (range) {
                         expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
                         expectedFogBufferRange(secondVisibleRange),
-                        expectedFogBufferRange(thirdVisibleRange) -> flow {
-                            delay(1_000L)
-                            emit(emptySet())
-                        }
+                        expectedFogBufferRange(thirdVisibleRange) -> MutableStateFlow(emptySet())
 
                         else -> MutableStateFlow(emptySet())
                     }
@@ -920,8 +915,7 @@ class MapViewModelTest {
                 runCurrent()
 
                 // When
-                advanceTimeBy(1_000L)
-                runCurrent()
+                advanceUntilIdle()
 
                 // Then
                 var actual = fixture.viewModel.awaitContent {
@@ -1419,13 +1413,8 @@ class MapViewModelTest {
         uiState.first { it is MapUiState.Failure } as MapUiState.Failure
 
     private fun TestScope.tearDownMainDispatcher() {
-        try {
-            runCurrent()
-            advanceTimeBy(5_001L)
-            runCurrent()
-        } finally {
-            Dispatchers.resetMain()
-        }
+        runCurrent()
+        advanceUntilIdle()
     }
 
     private data class Fixture(
@@ -1618,6 +1607,12 @@ class MapViewModelTest {
     ) : DomainError
 
     private companion object {
+        @JvmStatic
+        @AfterClass
+        fun resetMainDispatcherAfterClass() {
+            Dispatchers.resetMain()
+        }
+
         const val VIEWPORT_BOUNDS_EPSILON = 1e-6
         const val FIRST_POI_ID = 1L
         const val SECOND_POI_ID = 2L
