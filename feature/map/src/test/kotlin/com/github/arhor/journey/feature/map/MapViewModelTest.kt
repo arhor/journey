@@ -810,8 +810,8 @@ class MapViewModelTest {
         )
         val outrunVisibleRange = ExplorationTileRange(
             zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-            minX = 14,
-            maxX = 15,
+            minX = 16,
+            maxX = 17,
             minY = 20,
             maxY = 21,
         )
@@ -845,6 +845,8 @@ class MapViewModelTest {
                 ),
             )
             runCurrent()
+            advanceTimeBy(1_000L)
+            advanceUntilIdle()
 
             // Then
             val actual = fixture.viewModel.awaitContent { it.fogOfWar.visibleTileRange == outrunVisibleRange }
@@ -870,15 +872,15 @@ class MapViewModelTest {
             )
             val secondVisibleRange = ExplorationTileRange(
                 zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-                minX = 14,
-                maxX = 15,
+                minX = 16,
+                maxX = 17,
                 minY = 20,
                 maxY = 21,
             )
             val thirdVisibleRange = ExplorationTileRange(
                 zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
-                minX = 18,
-                maxX = 19,
+                minX = 22,
+                maxX = 23,
                 minY = 20,
                 maxY = 21,
             )
@@ -921,7 +923,7 @@ class MapViewModelTest {
 
                 // When
                 advanceTimeBy(1_000L)
-                runCurrent()
+                advanceUntilIdle()
 
                 // Then
                 var actual = fixture.viewModel.awaitContent {
