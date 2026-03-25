@@ -28,7 +28,7 @@ data class FogOfWarRenderState(
     val handoffRenderData: FogOfWarRenderData? = null,
 )
 
-internal val FogOfWarUiState.renderState: FogOfWarRenderState
+val FogOfWarUiState.renderState: FogOfWarRenderState
     get() = FogOfWarRenderState(
         isOverlayEnabled = isOverlayEnabled,
         activeRenderData = activeRenderData,
