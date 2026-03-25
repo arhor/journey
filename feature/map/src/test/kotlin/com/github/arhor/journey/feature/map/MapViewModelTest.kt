@@ -71,6 +71,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Ignore
 import org.junit.Test
+import org.junit.AfterClass
 import java.time.Instant
 import kotlin.math.ceil
 import kotlin.math.sqrt
@@ -1412,13 +1413,8 @@ class MapViewModelTest {
         uiState.first { it is MapUiState.Failure } as MapUiState.Failure
 
     private fun TestScope.tearDownMainDispatcher() {
-        try {
-            runCurrent()
-            advanceTimeBy(5_001L)
-            runCurrent()
-        } finally {
-            Dispatchers.resetMain()
-        }
+        runCurrent()
+        advanceUntilIdle()
     }
 
     private data class Fixture(
@@ -1611,6 +1607,12 @@ class MapViewModelTest {
     ) : DomainError
 
     private companion object {
+        @JvmStatic
+        @AfterClass
+        fun resetMainDispatcherAfterClass() {
+            Dispatchers.resetMain()
+        }
+
         const val VIEWPORT_BOUNDS_EPSILON = 1e-6
         const val FIRST_POI_ID = 1L
         const val SECOND_POI_ID = 2L
