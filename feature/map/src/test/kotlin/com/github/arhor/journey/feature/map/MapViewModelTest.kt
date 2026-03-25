@@ -889,10 +889,7 @@ class MapViewModelTest {
                     when (range) {
                         expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
                         expectedFogBufferRange(secondVisibleRange),
-                        expectedFogBufferRange(thirdVisibleRange) -> flow {
-                            delay(1_000L)
-                            emit(emptySet())
-                        }
+                        expectedFogBufferRange(thirdVisibleRange) -> MutableStateFlow(emptySet())
 
                         else -> MutableStateFlow(emptySet())
                     }
@@ -922,7 +919,6 @@ class MapViewModelTest {
                 runCurrent()
 
                 // When
-                advanceTimeBy(1_000L)
                 advanceUntilIdle()
 
                 // Then
