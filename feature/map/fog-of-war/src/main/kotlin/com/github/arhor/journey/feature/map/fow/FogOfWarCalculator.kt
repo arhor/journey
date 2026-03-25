@@ -2,6 +2,7 @@ package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
+import com.github.arhor.journey.domain.model.PackedExplorationTileCoordinates
 import javax.inject.Inject
 
 class FogOfWarCalculator @Inject constructor() {
@@ -17,7 +18,7 @@ class FogOfWarCalculator @Inject constructor() {
         val exploredTileKeys = exploredTiles
             .asSequence()
             .filter { it.zoom == tileRange.zoom }
-            .map(::packTileCoordinates)
+            .map(PackedExplorationTileCoordinates::pack)
             .toHashSet()
 
         val completedRanges = mutableListOf<ExplorationTileRange>()
@@ -60,7 +61,7 @@ class FogOfWarCalculator @Inject constructor() {
         var spanStartX: Int? = null
 
         for (x in visibleRange.minX..visibleRange.maxX) {
-            val isExplored = packTileCoordinates(
+            val isExplored = PackedExplorationTileCoordinates.pack(
                 zoom = visibleRange.zoom,
                 x = x,
                 y = y,
@@ -105,23 +106,5 @@ class FogOfWarCalculator @Inject constructor() {
             minY = minY,
             maxY = maxY,
         )
-    }
-
-    private fun packTileCoordinates(tile: ExplorationTile): Long = packTileCoordinates(
-        zoom = tile.zoom,
-        x = tile.x,
-        y = tile.y,
-    )
-
-    private fun packTileCoordinates(
-        zoom: Int,
-        x: Int,
-        y: Int,
-    ): Long = (zoom.toLong() shl 48) or
-        ((x.toLong() and AXIS_COORDINATE_MASK) shl 24) or
-        (y.toLong() and AXIS_COORDINATE_MASK)
-
-    private companion object {
-        const val AXIS_COORDINATE_MASK = 0xFFFFFFL
     }
 }
