@@ -819,10 +819,7 @@ class MapViewModelTest {
             observeExploredTilesFlowFactory = { range ->
                 when (range) {
                     expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
-                    expectedFogBufferRange(outrunVisibleRange) -> flow {
-                        delay(1_000L)
-                        emit(emptySet())
-                    }
+                    expectedFogBufferRange(outrunVisibleRange) -> MutableStateFlow(emptySet())
 
                     else -> MutableStateFlow(emptySet())
                 }
@@ -844,8 +841,6 @@ class MapViewModelTest {
                     visibleBounds = visibleBoundsInside(outrunVisibleRange),
                 ),
             )
-            runCurrent()
-            advanceTimeBy(1_000L)
             advanceUntilIdle()
 
             // Then
