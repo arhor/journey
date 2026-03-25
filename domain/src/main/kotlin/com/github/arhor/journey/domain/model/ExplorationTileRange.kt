@@ -22,6 +22,76 @@ data class ExplorationTileRange(
             tile.y in minY..maxY
     }
 
+    fun intersectionOrNull(other: ExplorationTileRange): ExplorationTileRange? {
+        if (zoom != other.zoom) {
+            return null
+        }
+
+        val intersectionMinX = maxOf(minX, other.minX)
+        val intersectionMaxX = minOf(maxX, other.maxX)
+        val intersectionMinY = maxOf(minY, other.minY)
+        val intersectionMaxY = minOf(maxY, other.maxY)
+
+        if (intersectionMinX > intersectionMaxX || intersectionMinY > intersectionMaxY) {
+            return null
+        }
+
+        return ExplorationTileRange(
+            zoom = zoom,
+            minX = intersectionMinX,
+            maxX = intersectionMaxX,
+            minY = intersectionMinY,
+            maxY = intersectionMaxY,
+        )
+    }
+
+    fun subtract(other: ExplorationTileRange): List<ExplorationTileRange> {
+        val intersection = intersectionOrNull(other) ?: return listOf(this)
+        val remainder = mutableListOf<ExplorationTileRange>()
+
+        if (minY < intersection.minY) {
+            remainder += ExplorationTileRange(
+                zoom = zoom,
+                minX = minX,
+                maxX = maxX,
+                minY = minY,
+                maxY = intersection.minY - 1,
+            )
+        }
+
+        if (intersection.maxY < maxY) {
+            remainder += ExplorationTileRange(
+                zoom = zoom,
+                minX = minX,
+                maxX = maxX,
+                minY = intersection.maxY + 1,
+                maxY = maxY,
+            )
+        }
+
+        if (minX < intersection.minX) {
+            remainder += ExplorationTileRange(
+                zoom = zoom,
+                minX = minX,
+                maxX = intersection.minX - 1,
+                minY = intersection.minY,
+                maxY = intersection.maxY,
+            )
+        }
+
+        if (intersection.maxX < maxX) {
+            remainder += ExplorationTileRange(
+                zoom = zoom,
+                minX = intersection.maxX + 1,
+                maxX = maxX,
+                minY = intersection.minY,
+                maxY = intersection.maxY,
+            )
+        }
+
+        return remainder
+    }
+
     fun asSequence(): Sequence<ExplorationTile> = sequence {
         for (y in minY..maxY) {
             for (x in minX..maxX) {

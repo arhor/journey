@@ -1,61 +1,87 @@
 package com.github.arhor.journey.domain.model
 
-import io.kotest.matchers.shouldBe
+import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.nulls.shouldBeNull
 import org.junit.Test
 
 class ExplorationTileRangeTest {
 
     @Test
-    fun `expandedBy should grow the range independently on each axis`() {
+    fun `intersectionOrNull should return null when ranges do not overlap`() {
         // Given
-        val range = ExplorationTileRange(
-            zoom = 4,
-            minX = 8,
-            maxX = 9,
-            minY = 5,
-            maxY = 6,
+        val subject = ExplorationTileRange(
+            zoom = 16,
+            minX = 10,
+            maxX = 12,
+            minY = 20,
+            maxY = 22,
+        )
+        val other = ExplorationTileRange(
+            zoom = 16,
+            minX = 13,
+            maxX = 15,
+            minY = 20,
+            maxY = 22,
         )
 
         // When
-        val actual = range.expandedBy(
-            horizontalTilePadding = 2,
-            verticalTilePadding = 3,
-        )
+        val actual = subject.intersectionOrNull(other)
 
         // Then
-        actual shouldBe ExplorationTileRange(
-            zoom = 4,
-            minX = 6,
-            maxX = 11,
-            minY = 2,
-            maxY = 9,
-        )
+        actual.shouldBeNull()
     }
 
     @Test
-    fun `expandedBy should clamp the range to world bounds when padding crosses tile limits`() {
+    fun `subtract should split outer range into non overlapping rectangles when inner range overlaps the center`() {
         // Given
-        val range = ExplorationTileRange(
-            zoom = 2,
-            minX = 0,
-            maxX = 1,
-            minY = 0,
-            maxY = 1,
+        val subject = ExplorationTileRange(
+            zoom = 16,
+            minX = 10,
+            maxX = 14,
+            minY = 20,
+            maxY = 24,
+        )
+        val other = ExplorationTileRange(
+            zoom = 16,
+            minX = 11,
+            maxX = 13,
+            minY = 21,
+            maxY = 23,
         )
 
         // When
-        val actual = range.expandedBy(
-            horizontalTilePadding = 5,
-            verticalTilePadding = 3,
-        )
+        val actual = subject.subtract(other)
 
         // Then
-        actual shouldBe ExplorationTileRange(
-            zoom = 2,
-            minX = 0,
-            maxX = 3,
-            minY = 0,
-            maxY = 3,
+        actual shouldContainExactly listOf(
+            ExplorationTileRange(
+                zoom = 16,
+                minX = 10,
+                maxX = 14,
+                minY = 20,
+                maxY = 20,
+            ),
+            ExplorationTileRange(
+                zoom = 16,
+                minX = 10,
+                maxX = 14,
+                minY = 24,
+                maxY = 24,
+            ),
+            ExplorationTileRange(
+                zoom = 16,
+                minX = 10,
+                maxX = 10,
+                minY = 21,
+                maxY = 23,
+            ),
+            ExplorationTileRange(
+                zoom = 16,
+                minX = 14,
+                maxX = 14,
+                minY = 21,
+                maxY = 23,
+            ),
         )
     }
 }

@@ -28,6 +28,16 @@ class RoomExplorationTileRepository @Inject constructor(
                 .toSet()
         }
 
+    override suspend fun getExploredTiles(range: ExplorationTileRange): Set<ExplorationTile> =
+        dao.getByRange(
+            zoom = range.zoom,
+            minX = range.minX,
+            maxX = range.maxX,
+            minY = range.minY,
+            maxY = range.maxY,
+        ).map { it.toDomain() }
+            .toSet()
+
     override suspend fun markExplored(tiles: Set<ExplorationTile>) {
         if (tiles.isEmpty()) {
             return

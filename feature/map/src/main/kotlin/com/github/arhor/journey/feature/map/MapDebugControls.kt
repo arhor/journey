@@ -27,8 +27,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.feature.map.fow.toBufferingDebugString
-import com.github.arhor.journey.feature.map.fow.toSummaryDebugString
 
 @Immutable
 data class MapDebugUiState(
@@ -44,8 +42,6 @@ enum class MapDebugInfoItem {
     FogZoom,
     VisibleTiles,
     ExploredHere,
-    FogSummary,
-    FogBuffering,
     TrackingStatus,
 }
 
@@ -282,18 +278,6 @@ internal fun MapDebugInfoOverlay(
                             )
                         }
 
-                        MapDebugInfoItem.FogSummary -> {
-                            if (state.fogOfWar.isSuppressedByVisibleTileLimit) {
-                                stringResource(R.string.map_debug_info_fog_hidden)
-                            } else {
-                                state.fogOfWar.toSummaryDebugString()
-                            }
-                        }
-
-                        MapDebugInfoItem.FogBuffering -> {
-                            state.fogOfWar.toBufferingDebugString()
-                        }
-
                         MapDebugInfoItem.TrackingStatus -> {
                             stringResource(
                                 R.string.map_debug_info_tracking_status_value,
@@ -434,8 +418,6 @@ private fun MapDebugInfoItem.labelRes(): Int =
         MapDebugInfoItem.FogZoom -> R.string.map_debug_info_item_fog_zoom
         MapDebugInfoItem.VisibleTiles -> R.string.map_debug_info_item_visible_tiles
         MapDebugInfoItem.ExploredHere -> R.string.map_debug_info_item_explored_here
-        MapDebugInfoItem.FogSummary -> R.string.map_debug_info_item_fog_summary
-        MapDebugInfoItem.FogBuffering -> R.string.map_debug_info_item_fog_buffering
         MapDebugInfoItem.TrackingStatus -> R.string.map_debug_info_item_tracking_status
     }
 

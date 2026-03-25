@@ -8,6 +8,8 @@ interface ExplorationTileRepository {
 
     fun observeExploredTiles(range: ExplorationTileRange): Flow<Set<ExplorationTile>>
 
+    suspend fun getExploredTiles(range: ExplorationTileRange): Set<ExplorationTile>
+
     /**
      * Marks the provided tiles as explored.
      *

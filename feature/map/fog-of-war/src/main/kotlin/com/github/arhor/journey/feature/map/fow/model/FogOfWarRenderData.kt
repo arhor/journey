@@ -1,4 +1,4 @@
-package com.github.arhor.journey.feature.map.fow
+package com.github.arhor.journey.feature.map.fow.model
 
 import androidx.compose.runtime.Immutable
 import org.maplibre.compose.sources.GeoJsonData
