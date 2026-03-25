@@ -46,6 +46,58 @@ interface ExplorationTileDao {
         maxY: Int,
     ): List<ExploredTileEntity>
 
+    @Query(
+        """
+        SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
+        FROM explored_tiles
+        WHERE zoom = :zoom
+            AND x = :x
+            AND y = :y
+        LIMIT 1
+        """,
+    )
+    suspend fun getPackedByCoordinates(
+        zoom: Int,
+        x: Int,
+        y: Int,
+    ): Long?
+
+    @Query(
+        """
+        SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
+        FROM explored_tiles
+        WHERE zoom = :zoom
+            AND x BETWEEN :minX AND :maxX
+            AND y BETWEEN :minY AND :maxY
+        ORDER BY zoom ASC, y ASC, x ASC
+        """,
+    )
+    suspend fun getPackedByRange(
+        zoom: Int,
+        minX: Int,
+        maxX: Int,
+        minY: Int,
+        maxY: Int,
+    ): List<Long>
+
+    @Query(
+        """
+        SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
+        FROM explored_tiles
+        WHERE zoom = :zoom
+            AND x BETWEEN :minX AND :maxX
+            AND y BETWEEN :minY AND :maxY
+        ORDER BY zoom ASC, y ASC, x ASC
+        """,
+    )
+    fun observePackedByRange(
+        zoom: Int,
+        minX: Int,
+        maxX: Int,
+        minY: Int,
+        maxY: Int,
+    ): Flow<List<Long>>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(entities: List<ExploredTileEntity>): List<Long>
 

@@ -10,6 +10,12 @@ interface ExplorationTileRepository {
 
     suspend fun getExploredTiles(range: ExplorationTileRange): Set<ExplorationTile>
 
+    suspend fun getPackedExploredTile(tile: ExplorationTile): Long?
+
+    suspend fun getPackedExploredTiles(range: ExplorationTileRange): LongArray
+
+    fun observePackedExploredTiles(range: ExplorationTileRange): Flow<LongArray>
+
     /**
      * Marks the provided tiles as explored.
      *

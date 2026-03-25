@@ -38,6 +38,31 @@ class RoomExplorationTileRepository @Inject constructor(
         ).map { it.toDomain() }
             .toSet()
 
+    override suspend fun getPackedExploredTile(tile: ExplorationTile): Long? =
+        dao.getPackedByCoordinates(
+            zoom = tile.zoom,
+            x = tile.x,
+            y = tile.y,
+        )
+
+    override suspend fun getPackedExploredTiles(range: ExplorationTileRange): LongArray =
+        dao.getPackedByRange(
+            zoom = range.zoom,
+            minX = range.minX,
+            maxX = range.maxX,
+            minY = range.minY,
+            maxY = range.maxY,
+        ).toLongArray()
+
+    override fun observePackedExploredTiles(range: ExplorationTileRange): Flow<LongArray> =
+        dao.observePackedByRange(
+            zoom = range.zoom,
+            minX = range.minX,
+            maxX = range.maxX,
+            minY = range.minY,
+            maxY = range.maxY,
+        ).map { it.toLongArray() }
+
     override suspend fun markExplored(tiles: Set<ExplorationTile>) {
         if (tiles.isEmpty()) {
             return
