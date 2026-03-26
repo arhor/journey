@@ -74,7 +74,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.navigation.compose)
-    implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation(libs.hilt.android)
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.coroutines.android)

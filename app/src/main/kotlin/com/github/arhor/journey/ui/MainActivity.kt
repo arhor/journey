@@ -3,10 +3,12 @@ package com.github.arhor.journey.ui
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.usecase.SetExplorationTrackingCadenceUseCase
+import com.github.arhor.journey.feature.map.GodotPoiViewerHost
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.godotengine.godot.Godot
@@ -16,7 +18,7 @@ import org.godotengine.godot.plugin.GodotPlugin
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : FragmentActivity(), GodotHost {
+class MainActivity : FragmentActivity(), GodotHost, GodotPoiViewerHost {
     private var godotFragment: GodotFragment? = null
     internal var appPlugin: AppPlugin? = null
 
@@ -43,18 +45,20 @@ class MainActivity : FragmentActivity(), GodotHost {
         }
     }
 
-    fun createGodotFragment(): GodotFragment =
+    override val godotFragmentManager = supportFragmentManager
+
+    override fun createGodotFragment(): Fragment =
         GodotFragment().also { fragment ->
             godotFragment = fragment
         }
 
-    fun clearGodotFragment(fragment: GodotFragment) {
+    override fun clearGodotFragment(fragment: Fragment) {
         if (godotFragment === fragment) {
             godotFragment = null
         }
     }
 
-    fun showGltf(glbFilepath: String) {
+    override fun showGltf(glbFilepath: String) {
         appPlugin?.showGLTF(glbFilepath)
     }
 

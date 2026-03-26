@@ -1,4 +1,4 @@
-package com.github.arhor.journey.ui
+package com.github.arhor.journey.feature.map
 
 import android.content.Context
 import android.view.LayoutInflater
@@ -7,17 +7,13 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.github.arhor.journey.R
-import com.github.arhor.journey.ui.GLTFContent.GLTFItem
+import com.github.arhor.journey.feature.map.GltfContent.GltfItem
 
-/**
- * [RecyclerView.Adapter] that can display a [GLTFItem].
- */
-class GLTFItemRecyclerViewAdapter(
+class GltfItemRecyclerViewAdapter(
     private val context: Context,
-    private val values: List<GLTFItem>,
-    private val onItemSelected: (GLTFItem) -> Unit,
-) : RecyclerView.Adapter<GLTFItemRecyclerViewAdapter.ViewHolder>() {
+    private val values: List<GltfItem>,
+    private val onItemSelected: (GltfItem) -> Unit,
+) : RecyclerView.Adapter<GltfItemRecyclerViewAdapter.ViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         return ViewHolder(
@@ -53,5 +49,4 @@ class GLTFItemRecyclerViewAdapter(
             return super.toString() + " '" + contentView.text + "'"
         }
     }
-
 }

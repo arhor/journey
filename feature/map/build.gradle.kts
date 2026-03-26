@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)

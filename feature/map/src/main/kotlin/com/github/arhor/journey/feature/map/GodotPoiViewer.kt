@@ -1,4 +1,4 @@
-package com.github.arhor.journey.ui
+package com.github.arhor.journey.feature.map
 
 import android.content.Context
 import android.content.ContextWrapper
@@ -18,10 +18,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.github.arhor.journey.R
 import androidx.compose.ui.res.stringResource
 
 @Composable
@@ -29,9 +29,9 @@ fun GodotPoiViewer(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val activity = remember(context) { context.findMainActivity() }
+    val host = remember(context) { context.findGodotPoiViewerHost() }
     val godotContainerId = remember { View.generateViewId() }
-    val fragment = remember(activity) { activity.createGodotFragment() }
+    val fragment = remember(host) { host.createGodotFragment() }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -52,21 +52,21 @@ fun GodotPoiViewer(
                     }
                 },
                 update = {
-                    it.scheduleGodotFragmentAttach(activity = activity, fragment = fragment)
+                    it.scheduleGodotFragmentAttach(host = host, fragment = fragment)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(280.dp),
             )
 
-            DisposableEffect(activity, fragment) {
+            DisposableEffect(host, fragment) {
                 onDispose {
                     if (fragment.isAdded) {
-                        activity.supportFragmentManager.beginTransaction()
+                        host.godotFragmentManager.beginTransaction()
                             .remove(fragment)
                             .commitNowAllowingStateLoss()
                     }
-                    activity.clearGodotFragment(fragment)
+                    host.clearGodotFragment(fragment)
                 }
             }
 
@@ -78,11 +78,11 @@ fun GodotPoiViewer(
                             LinearLayoutManager.HORIZONTAL,
                             false,
                         )
-                        adapter = GLTFItemRecyclerViewAdapter(
+                        adapter = GltfItemRecyclerViewAdapter(
                             context = viewContext,
-                            values = GLTFContent.ITEMS,
+                            values = GltfContent.items,
                         ) { item ->
-                            activity.showGltf(item.glbFilepath)
+                            host.showGltf(item.glbFilepath)
                         }
                     }
                 },
@@ -94,32 +94,32 @@ fun GodotPoiViewer(
     }
 }
 
-private fun Context.findMainActivity(): MainActivity {
+private fun Context.findGodotPoiViewerHost(): GodotPoiViewerHost {
     var currentContext = this
     while (currentContext is ContextWrapper) {
-        if (currentContext is MainActivity) {
+        if (currentContext is GodotPoiViewerHost) {
             return currentContext
         }
         currentContext = currentContext.baseContext
     }
-    error("GodotPoiViewer must be hosted in MainActivity")
+    error("GodotPoiViewer must be hosted in a GodotPoiViewerHost")
 }
 
 private fun FragmentContainerView.scheduleGodotFragmentAttach(
-    activity: MainActivity,
-    fragment: androidx.fragment.app.Fragment,
+    host: GodotPoiViewerHost,
+    fragment: Fragment,
 ) {
     post {
         if (!isAttachedToWindow) {
             return@post
         }
 
-        val existingFragment = activity.supportFragmentManager.findFragmentByTag(GODOT_FRAGMENT_TAG)
+        val existingFragment = host.godotFragmentManager.findFragmentByTag(GODOT_FRAGMENT_TAG)
         if (existingFragment === fragment && fragment.isAdded && fragment.id == id) {
             return@post
         }
 
-        activity.supportFragmentManager.beginTransaction()
+        host.godotFragmentManager.beginTransaction()
             .replace(id, fragment, GODOT_FRAGMENT_TAG)
             .commitNowAllowingStateLoss()
     }

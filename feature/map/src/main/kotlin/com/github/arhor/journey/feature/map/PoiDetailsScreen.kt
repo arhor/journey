@@ -29,7 +29,6 @@ import com.github.arhor.journey.core.ui.components.LoadingIndicator
 fun PoiDetailsScreen(
     state: PoiDetailsUiState,
     onBack: () -> Unit,
-    viewerContent: (@Composable () -> Unit)? = null,
 ) {
     when (state) {
         PoiDetailsUiState.Loading -> LoadingIndicator()
@@ -37,7 +36,6 @@ fun PoiDetailsScreen(
         is PoiDetailsUiState.Content -> PoiDetailsContent(
             state = state,
             onBack = onBack,
-            viewerContent = viewerContent,
         )
     }
 }
@@ -47,7 +45,6 @@ fun PoiDetailsScreen(
 private fun PoiDetailsContent(
     state: PoiDetailsUiState.Content,
     onBack: () -> Unit,
-    viewerContent: (@Composable () -> Unit)?,
 ) {
     Scaffold(
         topBar = {
@@ -80,7 +77,7 @@ private fun PoiDetailsContent(
                 fontWeight = FontWeight.Bold,
             )
 
-            viewerContent?.invoke()
+            GodotPoiViewer()
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(

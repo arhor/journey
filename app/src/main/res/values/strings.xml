@@ -10,5 +10,4 @@
     <string name="tracking_notification_stop_action">Stop</string>
 
     <string name="common_retry">Retry</string>
-    <string name="poi_details_godot_viewer_title">3D Preview</string>
 </resources>

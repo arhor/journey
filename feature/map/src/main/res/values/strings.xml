@@ -51,6 +51,7 @@
     <string name="add_poi_save_button">Save point of interest</string>
     <string name="poi_details_title">Point of interest</string>
     <string name="poi_details_back_content_description">Navigate back</string>
+    <string name="poi_details_godot_viewer_title">3D Preview</string>
     <string name="poi_details_category_label">Category</string>
     <string name="poi_details_id_label">Identifier</string>
     <string name="poi_details_radius_label">Discovery radius</string>
