@@ -1,5 +1,12 @@
 package com.github.arhor.journey.domain.model
 
+private const val ZOOM_SHIFT = 48
+private const val X_SHIFT = 24
+private const val Y_SHIFT = 0
+
+private const val ZOOM_COORDINATE_MASK = 0xFFL
+private const val AXIS_COORDINATE_MASK = 0xFFFFFFL
+
 /**
  * Packed representation of a map tile coordinate.
  *
@@ -30,13 +37,6 @@ value class MapTile private constructor(
     val y: Int get() = unpackY(packedValue)
 
     companion object {
-        private const val ZOOM_SHIFT = 48
-        private const val X_SHIFT = 24
-        private const val Y_SHIFT = 0
-
-        private const val ZOOM_COORDINATE_MASK = 0xFFL
-        private const val AXIS_COORDINATE_MASK = 0xFFFFFFL
-
         /**
          * Creates a [MapTile] from zoom, x, and y coordinates.
          */
@@ -76,4 +76,24 @@ value class MapTile private constructor(
         fun unpackY(value: Long): Int =
             ((value ushr Y_SHIFT) and AXIS_COORDINATE_MASK).toInt()
     }
+}
+
+/**
+ * Creates a copy of this map tile, optionally updating its coordinates.
+ *
+ * @param zoom the zoom level for the new tile, defaults to the current [zoom]
+ * @param x the X coordinate for the new tile, defaults to the current [x]
+ * @param y the Y coordinate for the new tile, defaults to the current [y]
+ * @return a new [MapTile] instance with the specified coordinates
+ */
+fun MapTile.copy(
+    zoom: Int = this.zoom,
+    x: Int = this.x,
+    y: Int = this.y,
+): MapTile {
+    return MapTile(
+        zoom = zoom,
+        x = x,
+        y = y,
+    )
 }

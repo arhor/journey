@@ -13,11 +13,11 @@ interface ExplorationTileDao {
     @Query(
         """
         SELECT *
-        FROM explored_tiles
-        WHERE zoom = :zoom
-            AND x BETWEEN :minX AND :maxX
-            AND y BETWEEN :minY AND :maxY
-        ORDER BY y ASC, x ASC
+          FROM explored_tiles
+         WHERE zoom = :zoom
+           AND x BETWEEN :minX AND :maxX
+           AND y BETWEEN :minY AND :maxY
+         ORDER BY zoom ASC, x ASC, y ASC
         """,
     )
     fun observeByRange(
@@ -31,11 +31,11 @@ interface ExplorationTileDao {
     @Query(
         """
         SELECT *
-        FROM explored_tiles
-        WHERE zoom = :zoom
-            AND x BETWEEN :minX AND :maxX
-            AND y BETWEEN :minY AND :maxY
-        ORDER BY y ASC, x ASC
+          FROM explored_tiles
+         WHERE zoom = :zoom
+           AND x BETWEEN :minX AND :maxX
+           AND y BETWEEN :minY AND :maxY
+         ORDER BY zoom ASC, x ASC, y ASC
         """,
     )
     suspend fun getByRange(
@@ -49,11 +49,11 @@ interface ExplorationTileDao {
     @Query(
         """
         SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
-        FROM explored_tiles
-        WHERE zoom = :zoom
-            AND x = :x
-            AND y = :y
-        LIMIT 1
+          FROM explored_tiles
+         WHERE zoom = :zoom
+           AND x = :x
+           AND y = :y
+         LIMIT 1
         """,
     )
     suspend fun getPackedByCoordinates(
@@ -65,11 +65,11 @@ interface ExplorationTileDao {
     @Query(
         """
         SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
-        FROM explored_tiles
-        WHERE zoom = :zoom
-            AND x BETWEEN :minX AND :maxX
-            AND y BETWEEN :minY AND :maxY
-        ORDER BY zoom ASC, y ASC, x ASC
+          FROM explored_tiles
+         WHERE zoom = :zoom
+           AND x BETWEEN :minX AND :maxX
+           AND y BETWEEN :minY AND :maxY
+         ORDER BY zoom ASC, x ASC, y ASC
         """,
     )
     suspend fun getPackedByRange(
@@ -83,11 +83,11 @@ interface ExplorationTileDao {
     @Query(
         """
         SELECT (((zoom & 255) << 48) | ((x & 16777215) << 24) | (y & 16777215))
-        FROM explored_tiles
-        WHERE zoom = :zoom
-            AND x BETWEEN :minX AND :maxX
-            AND y BETWEEN :minY AND :maxY
-        ORDER BY zoom ASC, y ASC, x ASC
+          FROM explored_tiles
+         WHERE zoom = :zoom
+           AND x BETWEEN :minX AND :maxX
+           AND y BETWEEN :minY AND :maxY
+         ORDER BY zoom ASC, x ASC, y ASC
         """,
     )
     fun observePackedByRange(

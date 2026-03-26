@@ -5,9 +5,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.github.arhor.journey.data.local.db.JourneyDatabase
 import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
-import com.github.arhor.journey.domain.model.PackedExplorationTileCoordinates
+import com.github.arhor.journey.domain.model.MapTile
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -56,7 +58,7 @@ class ExplorationTileDaoTest {
         )
 
         // Then
-        actual shouldBe PackedExplorationTileCoordinates.pack(
+        actual shouldBe MapTile.pack(
             zoom = 16,
             x = 34567,
             y = 22345,
@@ -80,12 +82,12 @@ class ExplorationTileDaoTest {
         )
 
         // Then
-        actual shouldBe PackedExplorationTileCoordinates.pack(
-            zoom = 0x1AB,
+        actual shouldBe MapTile.pack(
+            zoom = 0xAB,
             x = 10,
             y = 20,
         )
-        PackedExplorationTileCoordinates.unpackZoom(actual!!) shouldBe 0xAB
+        MapTile.unpackZoom(actual!!) shouldBe 0xAB
     }
 
     @Test
@@ -110,9 +112,9 @@ class ExplorationTileDaoTest {
 
         // Then
         actual shouldContainExactly listOf(
-            PackedExplorationTileCoordinates.pack(zoom = 16, x = 1, y = 2),
-            PackedExplorationTileCoordinates.pack(zoom = 16, x = 3, y = 2),
-            PackedExplorationTileCoordinates.pack(zoom = 16, x = 2, y = 3),
+            MapTile.pack(zoom = 16, x = 1, y = 2),
+            MapTile.pack(zoom = 16, x = 2, y = 3),
+            MapTile.pack(zoom = 16, x = 3, y = 2),
         )
     }
 
@@ -120,6 +122,8 @@ class ExplorationTileDaoTest {
     fun `observePackedByRange should emit updated packed values when rows change`() = runTest {
         // Given
         val emissions = mutableListOf<List<Long>>()
+        val firstEmissionReceived = kotlinx.coroutines.CompletableDeferred<Unit>()
+
         val collectJob = launch {
             explorationTileDao.observePackedByRange(
                 zoom = 16,
@@ -127,8 +131,18 @@ class ExplorationTileDaoTest {
                 maxX = 10,
                 minY = 0,
                 maxY = 10,
-            ).take(2).toList(emissions)
+            )
+                .onEach { emission ->
+                    emissions += emission
+                    if (emissions.size == 1) {
+                        firstEmissionReceived.complete(Unit)
+                    }
+                }
+                .take(2)
+                .collect()
         }
+
+        firstEmissionReceived.await()
 
         // When
         explorationTileDao.insert(
@@ -141,7 +155,7 @@ class ExplorationTileDaoTest {
         // Then
         emissions shouldContainExactly listOf(
             emptyList(),
-            listOf(PackedExplorationTileCoordinates.pack(zoom = 16, x = 5, y = 6)),
+            listOf(MapTile.pack(zoom = 16, x = 5, y = 6)),
         )
     }
 }
