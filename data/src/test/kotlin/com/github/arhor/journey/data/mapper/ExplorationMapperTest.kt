@@ -3,7 +3,7 @@ package com.github.arhor.journey.data.mapper
 import com.github.arhor.journey.data.local.db.entity.DiscoveredPoiEntity
 import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
 import com.github.arhor.journey.domain.model.DiscoveredPoi
-import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.MapTile
 import io.kotest.matchers.shouldBe
 import org.junit.Test
 import java.time.Instant
@@ -62,7 +62,7 @@ class ExplorationMapperTest {
         val actual = entity.toDomain()
 
         // Then
-        actual shouldBe ExplorationTile(
+        actual shouldBe MapTile(
             zoom = 16,
             x = 34567,
             y = 22345,
@@ -72,7 +72,7 @@ class ExplorationMapperTest {
     @Test
     fun `toEntity should map exploration tile coordinates when prototype tile is provided`() {
         // Given
-        val tile = ExplorationTile(
+        val tile = MapTile(
             zoom = 16,
             x = 34567,
             y = 22345,

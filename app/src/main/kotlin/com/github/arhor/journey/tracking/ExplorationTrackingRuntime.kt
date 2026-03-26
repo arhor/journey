@@ -1,12 +1,12 @@
 package com.github.arhor.journey.tracking
 
 import com.github.arhor.journey.di.AppCoroutineScope
-import com.github.arhor.journey.domain.model.ExplorationTile
-import com.github.arhor.journey.domain.model.ExplorationTileGrid
+import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
+import com.github.arhor.journey.domain.internal.revealTilesAround
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
@@ -20,9 +20,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.roundToInt
 
 private const val NEARBY_COLLECTION_BUCKET_SCALE = 10_000.0
 
@@ -42,7 +42,7 @@ class ExplorationTrackingRuntime @Inject constructor(
     )
 
     private var trackingJob: Job? = null
-    private var lastRevealedTiles: Set<ExplorationTile> = emptySet()
+    private var lastRevealedTiles: Set<MapTile> = emptySet()
     private var lastNearbyCollectionBucket: NearbyCollectionBucket? = null
 
     fun observeSession(): Flow<ExplorationTrackingSession> = session.asStateFlow()
@@ -160,7 +160,7 @@ class ExplorationTrackingRuntime @Inject constructor(
         maybeCollectNearbyResources(location = update.location)
 
         val config = configHolder.snapshot()
-        val revealTiles = ExplorationTileGrid.revealTilesAround(
+        val revealTiles = revealTilesAround(
             point = update.location,
             radiusMeters = config.revealRadiusMeters,
             zoom = config.canonicalZoom,

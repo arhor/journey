@@ -1,8 +1,11 @@
 package com.github.arhor.journey.domain.model
 
+import com.github.arhor.journey.domain.CANONICAL_ZOOM
+import com.github.arhor.journey.domain.REVEAL_RADIUS_METERS
+
 data class ExplorationTileRuntimeConfig(
-    val canonicalZoom: Int = ExplorationTilePrototype.CANONICAL_ZOOM,
-    val revealRadiusMeters: Double = ExplorationTilePrototype.REVEAL_RADIUS_METERS,
+    val canonicalZoom: Int = CANONICAL_ZOOM,
+    val revealRadiusMeters: Double = REVEAL_RADIUS_METERS,
 ) {
     companion object {
         const val MIN_CANONICAL_ZOOM = 0

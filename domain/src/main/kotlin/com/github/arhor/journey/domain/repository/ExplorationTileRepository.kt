@@ -1,27 +1,20 @@
 package com.github.arhor.journey.domain.repository
 
-import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import kotlinx.coroutines.flow.Flow
 
 interface ExplorationTileRepository {
 
-    fun observeExploredTiles(range: ExplorationTileRange): Flow<Set<ExplorationTile>>
+    fun observeExploredTiles(range: ExplorationTileRange): Flow<Set<MapTile>>
 
-    suspend fun getExploredTiles(range: ExplorationTileRange): Set<ExplorationTile>
-
-    suspend fun getPackedExploredTile(tile: ExplorationTile): Long?
-
-    suspend fun getPackedExploredTiles(range: ExplorationTileRange): LongArray
+    suspend fun getExploredTiles(range: ExplorationTileRange): Set<MapTile>
 
     fun observePackedExploredTiles(range: ExplorationTileRange): Flow<LongArray>
 
-    /**
-     * Marks the provided tiles as explored.
-     *
-     * This operation is expected to be idempotent.
-     */
-    suspend fun markExplored(tiles: Set<ExplorationTile>)
+    suspend fun getPackedExploredTiles(range: ExplorationTileRange): LongArray
+
+    suspend fun markExplored(tiles: Collection<MapTile>)
 
     suspend fun clear()
 }

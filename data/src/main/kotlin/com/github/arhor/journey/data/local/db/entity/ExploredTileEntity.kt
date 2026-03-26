@@ -10,9 +10,7 @@ data class ExploredTileEntity(
     val zoom: Int,
     val x: Int,
     val y: Int,
-) : Comparable<ExploredTileEntity> {
-
-    override fun compareTo(other: ExploredTileEntity): Int = COMPARATOR.compare(this, other)
+)  {
 
     companion object {
         val COMPARATOR = compareBy(

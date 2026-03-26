@@ -1,6 +1,6 @@
 package com.github.arhor.journey.feature.map.fow
 
-import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -87,7 +87,7 @@ class FogOfWarCalculatorTest {
             maxY = 2,
         )
         val exploredTiles = setOf(
-            ExplorationTile(zoom = 16, x = 1, y = 2),
+            MapTile(zoom = 16, x = 1, y = 2),
         )
 
         // When
@@ -137,7 +137,7 @@ class FogOfWarCalculatorTest {
             maxY = 20,
         )
         val exploredTiles = setOf(
-            ExplorationTile(zoom = 17, x = 10, y = 20),
+            MapTile(zoom = 17, x = 10, y = 20),
         )
 
         // When

@@ -2,7 +2,7 @@ package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
-import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -41,7 +41,7 @@ class RoomExplorationTileRepositoryTest {
 
         // Then
         actual shouldBe setOf(
-            ExplorationTile(
+            MapTile(
                 zoom = 16,
                 x = 34567,
                 y = 22345,
@@ -76,67 +76,12 @@ class RoomExplorationTileRepositoryTest {
 
         // Then
         actual shouldBe setOf(
-            ExplorationTile(
+            MapTile(
                 zoom = 16,
                 x = 34567,
                 y = 22345,
             ),
         )
-    }
-
-    @Test
-    fun `getPackedExploredTile should delegate coordinates and return packed result`() = runTest {
-        // Given
-        val expectedPacked = 123L
-        val dao = FakeExplorationTileDao(
-            observedItems = emptyList(),
-            packedByCoordinates = expectedPacked,
-        )
-        val subject = RoomExplorationTileRepository(dao = dao)
-        val tile = ExplorationTile(zoom = 16, x = 100, y = 200)
-
-        // When
-        val actual = subject.getPackedExploredTile(tile = tile)
-
-        // Then
-        actual shouldBe expectedPacked
-        dao.lastGetPackedCoordinates shouldBe Triple(16, 100, 200)
-    }
-
-    @Test
-    fun `getPackedExploredTiles should return long array for queried range`() = runTest {
-        // Given
-        val expectedPacked = listOf(12L, 34L, 56L)
-        val dao = FakeExplorationTileDao(
-            observedItems = emptyList(),
-            packedByRange = expectedPacked,
-        )
-        val subject = RoomExplorationTileRepository(dao = dao)
-        val range = ExplorationTileRange(zoom = 16, minX = 1, maxX = 2, minY = 3, maxY = 4)
-
-        // When
-        val actual = subject.getPackedExploredTiles(range = range)
-
-        // Then
-        actual.toList() shouldBe expectedPacked
-    }
-
-    @Test
-    fun `getPackedExploredTiles should return empty long array when range has no explored rows`() = runTest {
-        // Given
-        val dao = FakeExplorationTileDao(
-            observedItems = emptyList(),
-            packedByRange = emptyList(),
-        )
-        val subject = RoomExplorationTileRepository(dao = dao)
-
-        // When
-        val actual = subject.getPackedExploredTiles(
-            range = ExplorationTileRange(zoom = 16, minX = 0, maxX = 1, minY = 0, maxY = 1),
-        )
-
-        // Then
-        actual.isEmpty() shouldBe true
     }
 
     @Test
@@ -166,9 +111,9 @@ class RoomExplorationTileRepositoryTest {
         // When
         subject.markExplored(
             tiles = setOf(
-                ExplorationTile(zoom = 16, x = 3, y = 2),
-                ExplorationTile(zoom = 16, x = 1, y = 2),
-                ExplorationTile(zoom = 16, x = 2, y = 1),
+                MapTile(zoom = 16, x = 3, y = 2),
+                MapTile(zoom = 16, x = 1, y = 2),
+                MapTile(zoom = 16, x = 2, y = 1),
             ),
         )
 

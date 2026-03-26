@@ -2,11 +2,12 @@ package com.github.arhor.journey.feature.map
 
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.domain.CANONICAL_ZOOM
+import com.github.arhor.journey.domain.REVEAL_RADIUS_METERS
+import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationProgress
-import com.github.arhor.journey.domain.model.ExplorationTile
-import com.github.arhor.journey.domain.model.ExplorationTileGrid
-import com.github.arhor.journey.domain.model.ExplorationTilePrototype
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
@@ -21,8 +22,8 @@ import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
-import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
+import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
@@ -51,9 +52,9 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -69,9 +70,9 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import org.junit.AfterClass
 import org.junit.Ignore
 import org.junit.Test
-import org.junit.AfterClass
 import java.time.Instant
 import kotlin.math.ceil
 import kotlin.math.sqrt
@@ -135,7 +136,7 @@ class MapViewModelTest {
             ),
         )
         val visibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
@@ -186,7 +187,7 @@ class MapViewModelTest {
             ),
         )
         val visibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
@@ -258,8 +259,8 @@ class MapViewModelTest {
             actual.debug.enabledInfoItems shouldBe emptySet()
             actual.fogOfWar.isOverlayEnabled shouldBe true
             actual.debug.isTilesGridOverlayEnabled shouldBe false
-            actual.debug.canonicalZoom shouldBe ExplorationTilePrototype.CANONICAL_ZOOM
-            actual.debug.revealRadiusMeters shouldBe ExplorationTilePrototype.REVEAL_RADIUS_METERS.toInt()
+            actual.debug.canonicalZoom shouldBe CANONICAL_ZOOM
+            actual.debug.revealRadiusMeters shouldBe REVEAL_RADIUS_METERS.toInt()
             actual.debug.renderMode shouldBe MapRenderMode.Standard
         } finally {
             tearDownMainDispatcher()
@@ -385,7 +386,7 @@ class MapViewModelTest {
 
         // Given
         val initialVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
@@ -706,7 +707,7 @@ class MapViewModelTest {
 
         // Given
         val visibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
@@ -714,7 +715,7 @@ class MapViewModelTest {
         )
         val fixture = createFixture(
             exploredTiles = setOf(
-                ExplorationTile(
+                MapTile(
                     zoom = visibleRange.zoom,
                     x = 10,
                     y = 20,
@@ -749,14 +750,14 @@ class MapViewModelTest {
 
         // Given
         val initialVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
             maxY = 21,
         )
         val shiftedVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 11,
             maxX = 12,
             minY = 20,
@@ -803,14 +804,14 @@ class MapViewModelTest {
 
         // Given
         val initialVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
             maxY = 21,
         )
         val outrunVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 16,
             maxX = 17,
             minY = 20,
@@ -860,21 +861,21 @@ class MapViewModelTest {
 
             // Given
             val initialVisibleRange = ExplorationTileRange(
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                zoom = CANONICAL_ZOOM,
                 minX = 10,
                 maxX = 11,
                 minY = 20,
                 maxY = 21,
             )
             val secondVisibleRange = ExplorationTileRange(
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                zoom = CANONICAL_ZOOM,
                 minX = 16,
                 maxX = 17,
                 minY = 20,
                 maxY = 21,
             )
             val thirdVisibleRange = ExplorationTileRange(
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                zoom = CANONICAL_ZOOM,
                 minX = 22,
                 maxX = 23,
                 minY = 20,
@@ -918,7 +919,7 @@ class MapViewModelTest {
                 advanceUntilIdle()
 
                 // Then
-                var actual = fixture.viewModel.awaitContent {
+                val actual = fixture.viewModel.awaitContent {
                     it.fogOfWar.visibleTileRange == thirdVisibleRange
                 }
                 actual.fogOfWar.activeRenderData.shouldNotBeNull()
@@ -935,14 +936,14 @@ class MapViewModelTest {
 
         // Given
         val initialVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
             maxY = 21,
         )
         val outrunVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 18,
             maxX = 19,
             minY = 20,
@@ -1003,25 +1004,25 @@ class MapViewModelTest {
 
         // Given
         val initialVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
             maxY = 21,
         )
         val shiftedVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 14,
             maxX = 15,
             minY = 20,
             maxY = 21,
         )
-        val shiftedTile = ExplorationTile(
+        val shiftedTile = MapTile(
             zoom = shiftedVisibleRange.zoom,
             x = shiftedVisibleRange.minX,
             y = shiftedVisibleRange.minY,
         )
-        val shiftedFlow = MutableStateFlow(emptySet<ExplorationTile>())
+        val shiftedFlow = MutableStateFlow(emptySet<MapTile>())
         val fixture = createFixture(
             observeExploredTilesFlowFactory = { range ->
                 when (range) {
@@ -1069,14 +1070,14 @@ class MapViewModelTest {
 
             // Given
             val initialVisibleRange = ExplorationTileRange(
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                zoom = CANONICAL_ZOOM,
                 minX = 10,
                 maxX = 11,
                 minY = 20,
                 maxY = 21,
             )
             val shiftedVisibleRange = ExplorationTileRange(
-                zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+                zoom = CANONICAL_ZOOM,
                 minX = 11,
                 maxX = 12,
                 minY = 20,
@@ -1123,7 +1124,7 @@ class MapViewModelTest {
 
         // Given
         val initialVisibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
@@ -1132,7 +1133,7 @@ class MapViewModelTest {
         val fixture = createFixture(
             observeExploredTilesFlowFactory = { range ->
                 when (range.zoom) {
-                    ExplorationTilePrototype.CANONICAL_ZOOM -> MutableStateFlow(emptySet())
+                    CANONICAL_ZOOM -> MutableStateFlow(emptySet())
                     18 -> flow {
                         delay(1_000L)
                         emit(emptySet())
@@ -1341,7 +1342,7 @@ class MapViewModelTest {
             ),
         )
         val visibleRange = ExplorationTileRange(
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
             minX = 10,
             maxX = 11,
             minY = 20,
@@ -1440,9 +1441,9 @@ class MapViewModelTest {
         ),
         resourceSpawns: List<ResourceSpawn> = emptyList(),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
-        exploredTiles: Set<ExplorationTile> = emptySet(),
-        observeExploredTilesFlowFactory: ((ExplorationTileRange) -> Flow<Set<ExplorationTile>>)? = null,
-        getExploredTilesOverride: (suspend (ExplorationTileRange) -> Set<ExplorationTile>)? = null,
+        exploredTiles: Set<MapTile> = emptySet(),
+        observeExploredTilesFlowFactory: ((ExplorationTileRange) -> Flow<Set<MapTile>>)? = null,
+        getExploredTilesOverride: (suspend (ExplorationTileRange) -> Set<MapTile>)? = null,
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: StartExplorationTrackingSessionResult =
@@ -1567,7 +1568,7 @@ class MapViewModelTest {
     )
 
     private fun visibleBoundsInside(range: ExplorationTileRange): GeoBounds =
-        ExplorationTileGrid.bounds(range).let { bounds ->
+        bounds(range).let { bounds ->
             GeoBounds(
                 south = bounds.south + VIEWPORT_BOUNDS_EPSILON,
                 west = bounds.west + VIEWPORT_BOUNDS_EPSILON,
@@ -1597,9 +1598,6 @@ class MapViewModelTest {
             verticalTilePadding = bufferedVerticalPadding,
         )
     }
-
-    private fun expectedFogBufferBounds(range: ExplorationTileRange): GeoBounds =
-        ExplorationTileGrid.bounds(expectedFogBufferRange(range))
 
     private data class TestDomainError(
         override val message: String? = null,
