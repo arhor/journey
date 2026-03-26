@@ -13,21 +13,21 @@ package com.github.arhor.journey.domain.model
  *
  * `[zoom | x | y]`
  *
- * Natural ordering by [value] follows the packed layout, meaning values are
+ * Natural ordering by [packedValue] follows the packed layout, meaning values are
  * effectively ordered by `zoom`, then `x`, then `y`.
  */
 @JvmInline
 value class MapTile private constructor(
-    val value: Long,
+    val packedValue: Long,
 ) {
-    /** Zoom level extracted from the packed [value]. */
-    val zoom: Int get() = unpackZoom(value)
+    /** Zoom level extracted from the packed [packedValue]. */
+    val zoom: Int get() = unpackZoom(packedValue)
 
-    /** X coordinate extracted from the packed [value]. */
-    val x: Int get() = unpackX(value)
+    /** X coordinate extracted from the packed [packedValue]. */
+    val x: Int get() = unpackX(packedValue)
 
-    /** Y coordinate extracted from the packed [value]. */
-    val y: Int get() = unpackY(value)
+    /** Y coordinate extracted from the packed [packedValue]. */
+    val y: Int get() = unpackY(packedValue)
 
     companion object {
         private const val ZOOM_SHIFT = 48
@@ -42,7 +42,7 @@ value class MapTile private constructor(
          */
         operator fun invoke(zoom: Int, x: Int, y: Int): MapTile {
             return MapTile(
-                value = pack(
+                packedValue = pack(
                     zoom = zoom,
                     x = x,
                     y = y,
