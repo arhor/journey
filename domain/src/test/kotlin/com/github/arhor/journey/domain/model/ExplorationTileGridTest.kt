@@ -1,9 +1,11 @@
 package com.github.arhor.journey.domain.model
 
+import com.github.arhor.journey.domain.internal.METERS_PER_LAT_DEGREE
+import com.github.arhor.journey.domain.model.ExplorationTileGrid.latDistanceMeters
+import com.github.arhor.journey.domain.model.ExplorationTileGrid.lonDistanceMeters
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.Test
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -112,11 +114,11 @@ class ExplorationTileGridTest {
             lat = (centerTileBounds.south + centerTileBounds.north) / 2.0,
             lon = (centerTileBounds.west + centerTileBounds.east) / 2.0,
         )
-        val halfTileWidthMeters = longitudeDistanceMeters(
+        val halfTileWidthMeters = lonDistanceMeters(
             point = point,
-            longitude = centerTileBounds.east,
+            lon = centerTileBounds.east,
         )
-        val halfTileHeightMeters = latitudeDistanceMeters(
+        val halfTileHeightMeters = latDistanceMeters(
             point = point,
             latitude = centerTileBounds.north,
         )
@@ -139,26 +141,5 @@ class ExplorationTileGridTest {
             centerTile.copy(y = centerTile.y - 1),
             centerTile.copy(y = centerTile.y + 1),
         )
-    }
-
-    private fun longitudeDistanceMeters(
-        point: GeoPoint,
-        longitude: Double,
-    ): Double {
-        val latitudeRadians = point.lat.toRadians()
-        val metersPerLongitudeDegree = EARTH_RADIUS_METERS * cos(latitudeRadians) / DEGREES_PER_RADIAN
-        return abs(longitude - point.lon) * metersPerLongitudeDegree
-    }
-
-    private fun latitudeDistanceMeters(
-        point: GeoPoint,
-        latitude: Double,
-    ): Double = abs(latitude - point.lat) * EARTH_RADIUS_METERS / DEGREES_PER_RADIAN
-
-    private fun Double.toRadians(): Double = this / DEGREES_PER_RADIAN
-
-    private companion object {
-        const val EARTH_RADIUS_METERS = 6_378_137.0
-        const val DEGREES_PER_RADIAN = 180.0 / PI
     }
 }

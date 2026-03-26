@@ -1,6 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
-import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
+import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import javax.inject.Inject
 import javax.inject.Singleton
 

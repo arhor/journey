@@ -6,7 +6,7 @@ import com.github.arhor.journey.domain.model.ExplorationTileGrid
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
+import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase

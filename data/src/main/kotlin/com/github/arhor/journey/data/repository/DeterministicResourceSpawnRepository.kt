@@ -1,12 +1,11 @@
 package com.github.arhor.journey.data.repository
 
+import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
-import com.github.arhor.journey.domain.model.distanceTo
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
-import com.github.arhor.journey.core.common.ResourceType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive

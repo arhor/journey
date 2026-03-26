@@ -1,6 +1,18 @@
 package com.github.arhor.journey.domain.model
 
+import com.github.arhor.journey.domain.internal.COS_EPSILON
+import com.github.arhor.journey.domain.internal.EARTH_RADIUS_METERS
+import com.github.arhor.journey.domain.internal.FULL_LONGITUDE_SPAN
+import com.github.arhor.journey.domain.internal.HALF_LONGITUDE_SPAN
+import com.github.arhor.journey.domain.internal.LAT_EPSILON
+import com.github.arhor.journey.domain.internal.LON_EPSILON
+import com.github.arhor.journey.domain.internal.MAX_LAT
+import com.github.arhor.journey.domain.internal.MAX_LON
+import com.github.arhor.journey.domain.internal.METERS_PER_LAT_DEGREE
+import com.github.arhor.journey.domain.internal.MIN_LAT
+import com.github.arhor.journey.domain.internal.MIN_LON
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.asinh
 import kotlin.math.atan
 import kotlin.math.cos
@@ -24,9 +36,9 @@ object ExplorationTileGrid {
     ): ExplorationTileRange = ExplorationTileRange(
         zoom = zoom,
         minX = longitudeToTileX(bounds.west, zoom),
-        maxX = longitudeToTileX(bounds.east - LONGITUDE_EPSILON, zoom),
+        maxX = longitudeToTileX(bounds.east - LON_EPSILON, zoom),
         minY = latitudeToTileY(bounds.north, zoom),
-        maxY = latitudeToTileY(bounds.south + LATITUDE_EPSILON, zoom),
+        maxY = latitudeToTileY(bounds.south + LAT_EPSILON, zoom),
     )
 
     fun bounds(tile: ExplorationTile): GeoBounds {
@@ -92,20 +104,34 @@ object ExplorationTileGrid {
         }
     }
 
+    fun lonDistanceMeters(
+        point: GeoPoint,
+        lon: Double,
+    ): Double {
+        val latRadians = Math.toRadians(point.lat)
+        val metersPerLongitudeDegree = cos(latRadians) * METERS_PER_LAT_DEGREE
+        return abs(lon - point.lon) * metersPerLongitudeDegree
+    }
+
+    fun latDistanceMeters(
+        point: GeoPoint,
+        latitude: Double,
+    ): Double = abs(latitude - point.lat) * METERS_PER_LAT_DEGREE
+
     private fun revealBounds(
         point: GeoPoint,
         radiusMeters: Double,
     ): GeoBounds {
-        val clampedLatitude = point.lat.coerceIn(MIN_LATITUDE, MAX_LATITUDE)
-        val latitudeRadians = clampedLatitude.toRadians()
+        val clampedLatitude = point.lat.coerceIn(MIN_LAT, MAX_LAT)
+        val latitudeRadians = Math.toRadians(clampedLatitude)
         val latitudeDelta = radiusMeters / EARTH_RADIUS_METERS
-        val longitudeDelta = radiusMeters / (EARTH_RADIUS_METERS * cos(latitudeRadians).coerceAtLeast(COSINE_EPSILON))
+        val longitudeDelta = radiusMeters / (EARTH_RADIUS_METERS * cos(latitudeRadians).coerceAtLeast(COS_EPSILON))
 
         return GeoBounds(
-            south = (clampedLatitude - latitudeDelta.toDegrees()).coerceIn(MIN_LATITUDE, MAX_LATITUDE),
-            west = (point.lon - longitudeDelta.toDegrees()).coerceIn(MIN_LONGITUDE, MAX_LONGITUDE),
-            north = (clampedLatitude + latitudeDelta.toDegrees()).coerceIn(MIN_LATITUDE, MAX_LATITUDE),
-            east = (point.lon + longitudeDelta.toDegrees()).coerceIn(MIN_LONGITUDE, MAX_LONGITUDE),
+            south = (clampedLatitude - Math.toDegrees(latitudeDelta)).coerceIn(MIN_LAT, MAX_LAT),
+            west = (point.lon - Math.toDegrees(longitudeDelta)).coerceIn(MIN_LON, MAX_LON),
+            north = (clampedLatitude + Math.toDegrees(latitudeDelta)).coerceIn(MIN_LAT, MAX_LAT),
+            east = (point.lon + Math.toDegrees(longitudeDelta)).coerceIn(MIN_LON, MAX_LON),
         )
     }
 
@@ -115,15 +141,13 @@ object ExplorationTileGrid {
         tile: ExplorationTile,
     ): Boolean {
         val tileBounds = bounds(tile)
-        val clampedLatitude = point.lat.coerceIn(MIN_LATITUDE, MAX_LATITUDE)
-        val metersPerLatitudeDegree = EARTH_RADIUS_METERS / DEGREES_PER_RADIAN
-        val metersPerLongitudeDegree =
-            EARTH_RADIUS_METERS * cos(clampedLatitude.toRadians()).coerceAtLeast(COSINE_EPSILON) / DEGREES_PER_RADIAN
+        val clampedLat = point.lat.coerceIn(MIN_LAT, MAX_LAT)
+        val metersPerLonDegree = cos(Math.toRadians(clampedLat)).coerceAtLeast(COS_EPSILON) * METERS_PER_LAT_DEGREE
 
-        val westMeters = (tileBounds.west - point.lon) * metersPerLongitudeDegree
-        val eastMeters = (tileBounds.east - point.lon) * metersPerLongitudeDegree
-        val southMeters = (tileBounds.south - clampedLatitude) * metersPerLatitudeDegree
-        val northMeters = (tileBounds.north - clampedLatitude) * metersPerLatitudeDegree
+        val westMeters = (tileBounds.west - point.lon) * metersPerLonDegree
+        val eastMeters = (tileBounds.east - point.lon) * metersPerLonDegree
+        val southMeters = (tileBounds.south - clampedLat) * METERS_PER_LAT_DEGREE
+        val northMeters = (tileBounds.north - clampedLat) * METERS_PER_LAT_DEGREE
 
         val closestXMeters = 0.0.coerceIn(westMeters, eastMeters)
         val closestYMeters = 0.0.coerceIn(southMeters, northMeters)
@@ -138,7 +162,7 @@ object ExplorationTileGrid {
         zoom: Int,
     ): Int {
         val tilesPerAxis = tilesPerAxis(zoom)
-        val normalizedLongitude = longitude.coerceIn(MIN_LONGITUDE, MAX_LONGITUDE)
+        val normalizedLongitude = longitude.coerceIn(MIN_LON, MAX_LON)
         val normalizedX = (normalizedLongitude + HALF_LONGITUDE_SPAN) / FULL_LONGITUDE_SPAN * tilesPerAxis
         return floor(normalizedX)
             .toInt()
@@ -150,8 +174,8 @@ object ExplorationTileGrid {
         zoom: Int,
     ): Int {
         val tilesPerAxis = tilesPerAxis(zoom)
-        val clampedLatitude = latitude.coerceIn(MIN_LATITUDE, MAX_LATITUDE)
-        val latitudeRadians = clampedLatitude.toRadians()
+        val clampedLatitude = latitude.coerceIn(MIN_LAT, MAX_LAT)
+        val latitudeRadians = Math.toRadians(clampedLatitude)
         val mercatorY = (1.0 - asinh(tan(latitudeRadians)) / PI) / 2.0 * tilesPerAxis
         return floor(mercatorY)
             .toInt()
@@ -164,24 +188,8 @@ object ExplorationTileGrid {
     ): Double {
         val tilesPerAxis = tilesPerAxis(zoom).toDouble()
         val mercator = PI * (1.0 - 2.0 * y / tilesPerAxis)
-        return atan(sinh(mercator)).toDegrees()
+        return Math.toDegrees(atan(sinh(mercator)))
     }
 
     private fun tilesPerAxis(zoom: Int): Int = 1 shl zoom
-
-    private fun Double.toRadians(): Double = this / DEGREES_PER_RADIAN
-
-    private fun Double.toDegrees(): Double = this * DEGREES_PER_RADIAN
-
-    private const val EARTH_RADIUS_METERS = 6_378_137.0
-    private const val HALF_LONGITUDE_SPAN = 180.0
-    private const val FULL_LONGITUDE_SPAN = 360.0
-    private const val MIN_LONGITUDE = -180.0
-    private const val MAX_LONGITUDE = 180.0 - 1e-9
-    private const val MIN_LATITUDE = -85.05112878
-    private const val MAX_LATITUDE = 85.05112878
-    private const val DEGREES_PER_RADIAN = 180.0 / PI
-    private const val COSINE_EPSILON = 1e-6
-    private const val LATITUDE_EPSILON = 1e-9
-    private const val LONGITUDE_EPSILON = 1e-9
 }

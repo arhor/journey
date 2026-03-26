@@ -2,7 +2,7 @@ package com.github.arhor.journey.domain.usecase
 
 import com.github.arhor.journey.domain.model.ExplorationTile
 import com.github.arhor.journey.domain.model.ExplorationTileGrid
-import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfigHolder
+import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import javax.inject.Inject
