@@ -26,7 +26,7 @@ private const val AXIS_COORDINATE_MASK = 0xFFFFFFL
 @JvmInline
 value class MapTile private constructor(
     val packedValue: Long,
-) {
+): Comparable<MapTile> {
     /** Zoom level extracted from the packed [packedValue]. */
     val zoom: Int get() = unpackZoom(packedValue)
 
@@ -35,6 +35,8 @@ value class MapTile private constructor(
 
     /** Y coordinate extracted from the packed [packedValue]. */
     val y: Int get() = unpackY(packedValue)
+
+    override fun compareTo(other: MapTile): Int = packedValue.compareTo(other.packedValue)
 
     companion object {
         /**

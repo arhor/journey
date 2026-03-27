@@ -59,7 +59,9 @@ class RoomExplorationTileRepository @Inject constructor(
             return
         }
         dao.insert(
-            entities = tiles.map { it.toEntity() }
+            entities = tiles
+                .sorted()
+                .map { it.toEntity() }
         )
     }
 

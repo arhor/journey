@@ -119,8 +119,8 @@ class RoomExplorationTileRepositoryTest {
 
         // Then
         dao.insertedEntities shouldContainExactly listOf(
-            ExploredTileEntity(zoom = 16, x = 2, y = 1),
             ExploredTileEntity(zoom = 16, x = 1, y = 2),
+            ExploredTileEntity(zoom = 16, x = 2, y = 1),
             ExploredTileEntity(zoom = 16, x = 3, y = 2),
         )
     }
