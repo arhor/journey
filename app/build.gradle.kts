@@ -75,6 +75,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
 
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -89,7 +92,4 @@ dependencies {
     androidTestImplementation(libs.hilt.android.testing)
     androidTestImplementation(libs.kotest.assertions.core)
     androidTestImplementation(libs.mockk.android)
-
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 }

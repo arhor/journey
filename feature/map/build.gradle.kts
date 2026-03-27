@@ -53,8 +53,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.maplibre.compose)
 
-    debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotest.assertions.core)
