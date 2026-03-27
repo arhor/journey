@@ -47,8 +47,8 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
 
     implementation(project(":data"))
-    implementation(project(":domain"))
     implementation(project(":core:common"))
+    implementation(project(":core:domain"))
     implementation(project(":core:navigation"))
     implementation(project(":feature:exploration"))
     implementation(project(":feature:hero"))

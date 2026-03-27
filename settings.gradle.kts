@@ -27,9 +27,10 @@ rootProject.name = "journey"
 include(
     ":app",
     ":data",
-    ":domain",
     ":core:common",
+    ":core:domain",
     ":core:navigation",
+    ":core:testing",
     ":core:ui",
     ":feature:exploration",
     ":feature:hero",

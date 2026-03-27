@@ -29,8 +29,8 @@ dependencies {
     ksp(libs.hilt.android.compiler)
     ksp(libs.androidx.room.compiler)
 
-    implementation(project(":domain"))
     implementation(project(":core:common"))
+    implementation(project(":core:domain"))
 
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.ktx)

@@ -1,12 +1,12 @@
 package com.github.arhor.journey.feature.exploration
 
+import com.github.arhor.journey.core.testing.MainDispatcherRule
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
-import com.github.arhor.journey.feature.exploration.testing.MainDispatcherRule
 import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
 import io.kotest.matchers.shouldBe
