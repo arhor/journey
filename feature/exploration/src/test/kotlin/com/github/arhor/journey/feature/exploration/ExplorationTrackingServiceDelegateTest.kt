@@ -1,4 +1,4 @@
-package com.github.arhor.journey.tracking
+package com.github.arhor.journey.feature.exploration
 
 import io.kotest.matchers.shouldBe
 import io.mockk.every

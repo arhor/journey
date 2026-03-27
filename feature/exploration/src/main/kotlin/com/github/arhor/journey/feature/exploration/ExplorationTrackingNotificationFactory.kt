@@ -1,14 +1,12 @@
-package com.github.arhor.journey.tracking
+package com.github.arhor.journey.feature.exploration
 
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
-import com.github.arhor.journey.R
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

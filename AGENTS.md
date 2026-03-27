@@ -11,12 +11,13 @@ This repository is a multi-module Android app built with Kotlin, Jetpack Compose
 
 Gradle modules:
 
-- `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, app-level Hilt modules, and foreground exploration tracking runtime.
+- `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, and app-level Hilt modules.
 - `:domain` - pure Kotlin/JVM domain layer with models, repository contracts, use cases, and progression logic.
 - `:data` - Android data layer with Room database/DAOs/entities, DataStore-backed repositories, mappers, and seeds.
 - `:core:common` - shared non-UI primitives such as `Output`, `DomainError`, and qualifiers.
 - `:core:navigation` - shared navigation types such as `BottomNavDestination`.
 - `:core:ui` - shared UI architecture support; currently mainly `MviViewModel`.
+- `:feature:exploration` - foreground exploration tracking runtime, services, and location orchestration.
 - `:feature:hero` - hero screen, route, navigation contract, and view model.
 - `:feature:map` - map flow, POI flows, map rendering integration, tracking session UI, and related view models.
 - `:feature:map:fog-of-war` - fog-of-war state, buffering, render-data preparation, diagnostics, and map overlay application.
@@ -61,7 +62,6 @@ Practical rules:
 - Keep `:domain` Android-free.
 - Treat `:app` as the composition root, not as the default place for new business logic.
 - Put app-wide wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
-- Keep long-running exploration tracking, foreground services, notifications, and platform location session orchestration in `app/src/main/kotlin/com/github/arhor/journey/tracking`.
 - Keep feature-specific platform bindings inside the owning feature module when they are not truly app-wide.
 - Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`; features own typed destinations and `*Graph(...)` builders.
 - Use typed navigation contracts with `@Serializable` destinations and `composable<T>` routes, matching existing feature modules.

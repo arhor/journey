@@ -1,4 +1,4 @@
-package com.github.arhor.journey.tracking.location
+package com.github.arhor.journey.feature.exploration.location
 
 import android.annotation.SuppressLint
 import android.content.BroadcastReceiver

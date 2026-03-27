@@ -31,6 +31,7 @@ include(
     ":core:common",
     ":core:navigation",
     ":core:ui",
+    ":feature:exploration",
     ":feature:hero",
     ":feature:map",
     ":feature:map:fog-of-war",

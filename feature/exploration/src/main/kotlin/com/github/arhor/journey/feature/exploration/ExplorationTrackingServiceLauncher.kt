@@ -1,4 +1,4 @@
-package com.github.arhor.journey.tracking
+package com.github.arhor.journey.feature.exploration
 
 import android.content.Context
 import androidx.core.content.ContextCompat

@@ -1,11 +1,11 @@
-package com.github.arhor.journey.di
+package com.github.arhor.journey.feature.exploration.di
 
 import com.github.arhor.journey.domain.tracking.ExplorationTrackingSessionController
-import com.github.arhor.journey.tracking.ExplorationTrackingSessionControllerImpl
-import com.github.arhor.journey.tracking.location.AndroidLocationPermissionChecker
-import com.github.arhor.journey.tracking.location.AndroidUserLocationSource
-import com.github.arhor.journey.tracking.location.LocationPermissionChecker
-import com.github.arhor.journey.tracking.location.UserLocationSource
+import com.github.arhor.journey.feature.exploration.ExplorationTrackingSessionControllerImpl
+import com.github.arhor.journey.feature.exploration.location.AndroidLocationPermissionChecker
+import com.github.arhor.journey.feature.exploration.location.AndroidUserLocationSource
+import com.github.arhor.journey.feature.exploration.location.LocationPermissionChecker
+import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

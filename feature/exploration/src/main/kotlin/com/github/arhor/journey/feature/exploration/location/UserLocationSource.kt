@@ -1,4 +1,4 @@
-package com.github.arhor.journey.tracking.location
+package com.github.arhor.journey.feature.exploration.location
 
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.GeoPoint

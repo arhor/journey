@@ -1,9 +1,9 @@
-package com.github.arhor.journey.tracking
+package com.github.arhor.journey.feature.exploration
 
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
-import com.github.arhor.journey.tracking.location.LocationPermissionChecker
+import com.github.arhor.journey.feature.exploration.location.LocationPermissionChecker
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.just

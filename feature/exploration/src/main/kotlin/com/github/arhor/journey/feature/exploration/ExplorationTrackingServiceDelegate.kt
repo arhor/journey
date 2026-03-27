@@ -1,4 +1,4 @@
-package com.github.arhor.journey.tracking
+package com.github.arhor.journey.feature.exploration
 
 import javax.inject.Inject
 
@@ -10,21 +10,18 @@ class ExplorationTrackingServiceDelegate @Inject constructor(
         startForeground: () -> Unit,
         stopService: () -> Unit,
     ): Int {
-        return when (action) {
+        when (action) {
             null,
             ExplorationTrackingForegroundService.ACTION_START -> {
                 startForeground()
                 runtime.startIfNeeded()
-                android.app.Service.START_NOT_STICKY
             }
 
             ExplorationTrackingForegroundService.ACTION_STOP -> {
                 runtime.stop()
                 stopService()
-                android.app.Service.START_NOT_STICKY
             }
-
-            else -> android.app.Service.START_NOT_STICKY
         }
+        return android.app.Service.START_NOT_STICKY
     }
 }

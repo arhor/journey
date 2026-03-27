@@ -3,11 +3,5 @@
     <string name="nav_hero">Hero</string>
     <string name="nav_map">Map</string>
     <string name="nav_settings">Settings</string>
-    <string name="tracking_notification_channel_name">Exploration tracking</string>
-    <string name="tracking_notification_channel_description">Shows when exploration tracking is running in the foreground.</string>
-    <string name="tracking_notification_title">Exploration tracking is active</string>
-    <string name="tracking_notification_text">Journey is continuing to reveal exploration progress in the background.</string>
-    <string name="tracking_notification_stop_action">Stop</string>
-
     <string name="common_retry">Retry</string>
 </resources>

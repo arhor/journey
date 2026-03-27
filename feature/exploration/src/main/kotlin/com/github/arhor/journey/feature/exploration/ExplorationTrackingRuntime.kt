@@ -1,4 +1,4 @@
-package com.github.arhor.journey.tracking
+package com.github.arhor.journey.feature.exploration
 
 import com.github.arhor.journey.di.AppCoroutineScope
 import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
@@ -10,8 +10,8 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
-import com.github.arhor.journey.tracking.location.UserLocationSource
-import com.github.arhor.journey.tracking.location.UserLocationUpdate
+import com.github.arhor.journey.feature.exploration.location.UserLocationSource
+import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
