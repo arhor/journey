@@ -27,4 +27,8 @@ subprojects {
             )
         }
     }
+
+    tasks.withType<Test>().configureEach {
+        failOnNoDiscoveredTests = false
+    }
 }
