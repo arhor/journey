@@ -2,7 +2,7 @@ package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
-import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -41,7 +41,7 @@ class RoomExplorationTileRepositoryTest {
 
         // Then
         actual shouldBe setOf(
-            ExplorationTile(
+            MapTile(
                 zoom = 16,
                 x = 34567,
                 y = 22345,
@@ -76,12 +76,30 @@ class RoomExplorationTileRepositoryTest {
 
         // Then
         actual shouldBe setOf(
-            ExplorationTile(
+            MapTile(
                 zoom = 16,
                 x = 34567,
                 y = 22345,
             ),
         )
+    }
+
+    @Test
+    fun `observePackedExploredTiles should emit long arrays from dao flow`() = runTest {
+        // Given
+        val dao = FakeExplorationTileDao(
+            observedItems = emptyList(),
+            observedPackedItems = listOf(77L, 88L),
+        )
+        val subject = RoomExplorationTileRepository(dao = dao)
+
+        // When
+        val actual = subject.observePackedExploredTiles(
+            range = ExplorationTileRange(zoom = 16, minX = 0, maxX = 5, minY = 0, maxY = 5),
+        ).first()
+
+        // Then
+        actual.toList() shouldBe listOf(77L, 88L)
     }
 
     @Test
@@ -93,9 +111,9 @@ class RoomExplorationTileRepositoryTest {
         // When
         subject.markExplored(
             tiles = setOf(
-                ExplorationTile(zoom = 16, x = 3, y = 2),
-                ExplorationTile(zoom = 16, x = 1, y = 2),
-                ExplorationTile(zoom = 16, x = 2, y = 1),
+                MapTile(zoom = 16, x = 3, y = 2),
+                MapTile(zoom = 16, x = 1, y = 2),
+                MapTile(zoom = 16, x = 2, y = 1),
             ),
         )
 
@@ -122,9 +140,13 @@ class RoomExplorationTileRepositoryTest {
 
     private class FakeExplorationTileDao(
         private val observedItems: List<ExploredTileEntity>,
+        private val packedByCoordinates: Long? = null,
+        private val packedByRange: List<Long> = emptyList(),
+        private val observedPackedItems: List<Long> = emptyList(),
     ) : ExplorationTileDao {
         val insertedEntities = mutableListOf<ExploredTileEntity>()
         var clearCalls: Int = 0
+        var lastGetPackedCoordinates: Triple<Int, Int, Int>? = null
 
         override fun observeByRange(
             zoom: Int,
@@ -141,6 +163,31 @@ class RoomExplorationTileRepositoryTest {
             minY: Int,
             maxY: Int,
         ): List<ExploredTileEntity> = observedItems
+
+        override suspend fun getPackedByCoordinates(
+            zoom: Int,
+            x: Int,
+            y: Int,
+        ): Long? {
+            lastGetPackedCoordinates = Triple(zoom, x, y)
+            return packedByCoordinates
+        }
+
+        override suspend fun getPackedByRange(
+            zoom: Int,
+            minX: Int,
+            maxX: Int,
+            minY: Int,
+            maxY: Int,
+        ): List<Long> = packedByRange
+
+        override fun observePackedByRange(
+            zoom: Int,
+            minX: Int,
+            maxX: Int,
+            minY: Int,
+            maxY: Int,
+        ): Flow<List<Long>> = flowOf(observedPackedItems)
 
         override suspend fun insert(entities: List<ExploredTileEntity>): List<Long> {
             insertedEntities += entities

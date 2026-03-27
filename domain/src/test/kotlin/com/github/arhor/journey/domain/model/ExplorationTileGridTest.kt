@@ -1,11 +1,16 @@
 package com.github.arhor.journey.domain.model
 
+import com.github.arhor.journey.domain.CANONICAL_ZOOM
+import com.github.arhor.journey.domain.internal.bounds
+import com.github.arhor.journey.domain.internal.latDistanceMeters
+import com.github.arhor.journey.domain.internal.lonDistanceMeters
+import com.github.arhor.journey.domain.internal.revealTilesAround
+import com.github.arhor.journey.domain.internal.tileAt
+import com.github.arhor.journey.domain.internal.tileRange
+import com.github.arhor.journey.domain.model.copy
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.Test
-import kotlin.math.PI
-import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.hypot
 
 class ExplorationTileGridTest {
@@ -19,13 +24,13 @@ class ExplorationTileGridTest {
         )
 
         // When
-        val actual = ExplorationTileGrid.tileAt(
+        val actual = tileAt(
             point = point,
             zoom = 2,
         )
 
         // Then
-        actual shouldBe ExplorationTile(
+        actual shouldBe MapTile(
             zoom = 2,
             x = 2,
             y = 2,
@@ -44,8 +49,8 @@ class ExplorationTileGridTest {
         )
 
         // When
-        val actual = ExplorationTileGrid.tileRange(
-            bounds = ExplorationTileGrid.bounds(expectedRange),
+        val actual = tileRange(
+            bounds = bounds(expectedRange),
             zoom = expectedRange.zoom,
         )
 
@@ -62,11 +67,11 @@ class ExplorationTileGridTest {
         )
 
         // When
-        val tile = ExplorationTileGrid.tileAt(
+        val tile = tileAt(
             point = point,
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
         )
-        val actual = ExplorationTileGrid.bounds(tile)
+        val actual = bounds(tile)
 
         // Then
         (point.lat in actual.south..actual.north) shouldBe true
@@ -82,7 +87,7 @@ class ExplorationTileGridTest {
         )
 
         // When
-        val actual = ExplorationTileGrid.revealTilesAround(
+        val actual = revealTilesAround(
             point = point,
             radiusMeters = 1_000.0,
             zoom = 2,
@@ -90,33 +95,33 @@ class ExplorationTileGridTest {
 
         // Then
         actual shouldContainExactlyInAnyOrder setOf(
-            ExplorationTile(zoom = 2, x = 1, y = 1),
-            ExplorationTile(zoom = 2, x = 2, y = 1),
-            ExplorationTile(zoom = 2, x = 1, y = 2),
-            ExplorationTile(zoom = 2, x = 2, y = 2),
+            MapTile(zoom = 2, x = 1, y = 1),
+            MapTile(zoom = 2, x = 2, y = 1),
+            MapTile(zoom = 2, x = 1, y = 2),
+            MapTile(zoom = 2, x = 2, y = 2),
         )
     }
 
     @Test
     fun `revealTilesAround should exclude diagonal tiles outside the circular radius`() {
         // Given
-        val centerTile = ExplorationTileGrid.tileAt(
+        val centerTile = tileAt(
             point = GeoPoint(
                 lat = 0.001,
                 lon = 0.001,
             ),
-            zoom = ExplorationTilePrototype.CANONICAL_ZOOM,
+            zoom = CANONICAL_ZOOM,
         )
-        val centerTileBounds = ExplorationTileGrid.bounds(centerTile)
+        val centerTileBounds = bounds(centerTile)
         val point = GeoPoint(
             lat = (centerTileBounds.south + centerTileBounds.north) / 2.0,
             lon = (centerTileBounds.west + centerTileBounds.east) / 2.0,
         )
-        val halfTileWidthMeters = longitudeDistanceMeters(
+        val halfTileWidthMeters = lonDistanceMeters(
             point = point,
-            longitude = centerTileBounds.east,
+            lon = centerTileBounds.east,
         )
-        val halfTileHeightMeters = latitudeDistanceMeters(
+        val halfTileHeightMeters = latDistanceMeters(
             point = point,
             latitude = centerTileBounds.north,
         )
@@ -125,7 +130,7 @@ class ExplorationTileGridTest {
         (radiusMeters < hypot(halfTileWidthMeters, halfTileHeightMeters)) shouldBe true
 
         // When
-        val actual = ExplorationTileGrid.revealTilesAround(
+        val actual = revealTilesAround(
             point = point,
             radiusMeters = radiusMeters,
             zoom = centerTile.zoom,
@@ -139,26 +144,5 @@ class ExplorationTileGridTest {
             centerTile.copy(y = centerTile.y - 1),
             centerTile.copy(y = centerTile.y + 1),
         )
-    }
-
-    private fun longitudeDistanceMeters(
-        point: GeoPoint,
-        longitude: Double,
-    ): Double {
-        val latitudeRadians = point.lat.toRadians()
-        val metersPerLongitudeDegree = EARTH_RADIUS_METERS * cos(latitudeRadians) / DEGREES_PER_RADIAN
-        return abs(longitude - point.lon) * metersPerLongitudeDegree
-    }
-
-    private fun latitudeDistanceMeters(
-        point: GeoPoint,
-        latitude: Double,
-    ): Double = abs(latitude - point.lat) * EARTH_RADIUS_METERS / DEGREES_PER_RADIAN
-
-    private fun Double.toRadians(): Double = this / DEGREES_PER_RADIAN
-
-    private companion object {
-        const val EARTH_RADIUS_METERS = 6_378_137.0
-        const val DEGREES_PER_RADIAN = 180.0 / PI
     }
 }

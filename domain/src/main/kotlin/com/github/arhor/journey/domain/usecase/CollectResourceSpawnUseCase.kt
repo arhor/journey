@@ -4,7 +4,6 @@ import com.github.arhor.journey.domain.TransactionRunner
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.ResourceSpawnCollectionResult
-import com.github.arhor.journey.domain.model.distanceTo
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository

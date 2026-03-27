@@ -16,7 +16,7 @@ data class ExplorationTileRange(
     val tileCount: Long
         get() = (maxX - minX + 1L) * (maxY - minY + 1L)
 
-    fun contains(tile: ExplorationTile): Boolean {
+    fun contains(tile: MapTile): Boolean {
         return tile.zoom == zoom &&
             tile.x in minX..maxX &&
             tile.y in minY..maxY
@@ -92,11 +92,11 @@ data class ExplorationTileRange(
         return remainder
     }
 
-    fun asSequence(): Sequence<ExplorationTile> = sequence {
+    fun asSequence(): Sequence<MapTile> = sequence {
         for (y in minY..maxY) {
             for (x in minX..maxX) {
                 yield(
-                    ExplorationTile(
+                    MapTile(
                         zoom = zoom,
                         x = x,
                         y = y,

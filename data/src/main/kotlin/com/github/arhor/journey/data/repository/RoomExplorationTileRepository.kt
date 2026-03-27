@@ -1,9 +1,10 @@
 package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
+import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
 import com.github.arhor.journey.data.mapper.toDomain
 import com.github.arhor.journey.data.mapper.toEntity
-import com.github.arhor.journey.domain.model.ExplorationTile
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import kotlinx.coroutines.flow.Flow
@@ -16,37 +17,49 @@ class RoomExplorationTileRepository @Inject constructor(
     private val dao: ExplorationTileDao,
 ) : ExplorationTileRepository {
 
-    override fun observeExploredTiles(range: ExplorationTileRange): Flow<Set<ExplorationTile>> =
+    override fun observeExploredTiles(range: ExplorationTileRange): Flow<Set<MapTile>> =
         dao.observeByRange(
             zoom = range.zoom,
             minX = range.minX,
             maxX = range.maxX,
             minY = range.minY,
             maxY = range.maxY,
-        ).map { data ->
-            data.map { it.toDomain() }
-                .toSet()
-        }
+        ).map { it.mapTo(HashSet(), ExploredTileEntity::toDomain) }
 
-    override suspend fun getExploredTiles(range: ExplorationTileRange): Set<ExplorationTile> =
+    override suspend fun getExploredTiles(range: ExplorationTileRange): Set<MapTile> =
         dao.getByRange(
             zoom = range.zoom,
             minX = range.minX,
             maxX = range.maxX,
             minY = range.minY,
             maxY = range.maxY,
-        ).map { it.toDomain() }
-            .toSet()
+        ).mapTo(HashSet(), ExploredTileEntity::toDomain)
 
-    override suspend fun markExplored(tiles: Set<ExplorationTile>) {
+
+    override fun observePackedExploredTiles(range: ExplorationTileRange): Flow<LongArray> =
+        dao.observePackedByRange(
+            zoom = range.zoom,
+            minX = range.minX,
+            maxX = range.maxX,
+            minY = range.minY,
+            maxY = range.maxY,
+        ).map { it.toLongArray() }
+
+    override suspend fun getPackedExploredTiles(range: ExplorationTileRange): LongArray =
+        dao.getPackedByRange(
+            zoom = range.zoom,
+            minX = range.minX,
+            maxX = range.maxX,
+            minY = range.minY,
+            maxY = range.maxY,
+        ).toLongArray()
+
+    override suspend fun markExplored(tiles: Collection<MapTile>) {
         if (tiles.isEmpty()) {
             return
         }
-
         dao.insert(
-            entities = tiles
-                .map { it.toEntity() }
-                .sorted(),
+            entities = tiles.map { it.toEntity() }
         )
     }
 

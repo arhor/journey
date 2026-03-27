@@ -1,6 +1,7 @@
 package com.github.arhor.journey.feature.map.fow
 
-import com.github.arhor.journey.domain.model.ExplorationTileGrid
+import com.github.arhor.journey.domain.internal.bounds
+import com.github.arhor.journey.domain.internal.tileRange
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
@@ -23,7 +24,7 @@ internal fun createFogViewportSnapshot(
     visibleBounds: GeoBounds,
     canonicalZoom: Int,
 ): FogViewportSnapshot {
-    val visibleTileRange = ExplorationTileGrid.tileRange(
+    val visibleTileRange = tileRange(
         bounds = visibleBounds,
         zoom = canonicalZoom,
     )
@@ -66,8 +67,8 @@ internal fun createFogBufferRegion(
     )
 
     return FogBufferRegion(
-        triggerBounds = ExplorationTileGrid.bounds(triggerTileRange),
-        bufferedBounds = ExplorationTileGrid.bounds(bufferedTileRange),
+        triggerBounds = bounds(triggerTileRange),
+        bufferedBounds = bounds(bufferedTileRange),
         triggerTileRange = triggerTileRange,
         bufferedTileRange = bufferedTileRange,
     )

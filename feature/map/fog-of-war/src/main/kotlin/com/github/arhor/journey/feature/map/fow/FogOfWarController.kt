@@ -2,8 +2,8 @@ package com.github.arhor.journey.feature.map.fow
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
-import com.github.arhor.journey.domain.model.ExplorationTile
-import com.github.arhor.journey.domain.model.ExplorationTilePrototype
+import com.github.arhor.journey.domain.CANONICAL_ZOOM
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
@@ -94,13 +94,13 @@ class FogOfWarController @AssistedInject constructor(
 
     private fun observeFogExploredTiles(
         fogTileRange: ExplorationTileRange?,
-    ): Flow<Set<ExplorationTile>> = fogTileRange
+    ): Flow<Set<MapTile>> = fogTileRange
         ?.let(observeExploredTiles::invoke)
         ?: flowOf(emptySet())
 
     private suspend fun prepareFogBufferData(
         buffer: FogBufferRegion,
-        exploredTiles: Set<ExplorationTile>,
+        exploredTiles: Set<MapTile>,
     ): PreparedFogBuffer {
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
@@ -345,7 +345,7 @@ class FogOfWarController @AssistedInject constructor(
 
     private suspend fun preparePendingFogBuffer(
         buffer: FogBufferRegion,
-        exploredTiles: Set<ExplorationTile>,
+        exploredTiles: Set<MapTile>,
     ): PreparedFogBuffer? = try {
         prepareFogBufferData(
             buffer = buffer,
@@ -381,7 +381,7 @@ class FogOfWarController @AssistedInject constructor(
 
     private fun startObservingDisplayedFogBuffer(
         buffer: FogBufferRegion,
-        seedExploredTiles: Set<ExplorationTile>? = null,
+        seedExploredTiles: Set<MapTile>? = null,
     ) {
         displayedFogObservationJob?.cancel()
         displayedFogObservationJob = scope.launch {
@@ -419,7 +419,7 @@ class FogOfWarController @AssistedInject constructor(
     @Immutable
     private data class State(
         val isOverlayEnabled: Boolean = true,
-        val canonicalZoom: Int = ExplorationTilePrototype.CANONICAL_ZOOM,
+        val canonicalZoom: Int = CANONICAL_ZOOM,
         val visibleBounds: GeoBounds? = null,
         val visibleTileRange: ExplorationTileRange? = null,
         val displayedFogBuffer: FogBufferRegion? = null,
@@ -433,7 +433,7 @@ class FogOfWarController @AssistedInject constructor(
 
     @Immutable
     private data class DisplayedFogData(
-        val exploredTiles: Set<ExplorationTile>,
+        val exploredTiles: Set<MapTile>,
         val fogRanges: List<ExplorationTileRange>,
         val renderData: FogOfWarRenderData?,
     )

@@ -1,7 +1,7 @@
 package com.github.arhor.journey.feature.map.fow
 
 import androidx.collection.LruCache
-import com.github.arhor.journey.domain.model.ExplorationTileGrid
+import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderBuildResult
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderCacheEntry
@@ -81,7 +81,7 @@ class FowRenderDataFactory @Inject constructor() {
             geoJsonData = GeoJsonData.Features(
                 FeatureCollection(
                     features = key.ranges.mapIndexed { index, fogRange ->
-                        val bounds = ExplorationTileGrid.bounds(fogRange)
+                        val bounds = bounds(fogRange)
                         Feature(
                             geometry = Polygon(
                                 coordinates = listOf(
@@ -105,7 +105,7 @@ class FowRenderDataFactory @Inject constructor() {
     }
 
     private fun createFowRenderDataFromRange(key: ExplorationTileRange): FogOfWarRenderData {
-        val bounds = ExplorationTileGrid.bounds(key)
+        val bounds = bounds(key)
         val renderData = FogOfWarRenderData(
             geoJsonData = GeoJsonData.Features(
                 FeatureCollection(

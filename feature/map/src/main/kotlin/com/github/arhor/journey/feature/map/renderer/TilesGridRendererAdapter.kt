@@ -5,8 +5,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.github.arhor.journey.domain.model.ExplorationTile
-import com.github.arhor.journey.domain.model.ExplorationTileGrid
+import com.github.arhor.journey.domain.internal.bounds
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -65,8 +65,8 @@ internal fun ExplorationTileRange?.toTileGridGeoJsonDataOrNull(): GeoJsonData.Fe
         ?.toTileGridFeatureCollection()
         ?.let(GeoJsonData::Features)
 
-private fun ExplorationTile.toGridPolygon(): Polygon {
-    val bounds = ExplorationTileGrid.bounds(this)
+private fun MapTile.toGridPolygon(): Polygon {
+    val bounds = bounds(this)
 
     return Polygon(
         coordinates = listOf(
