@@ -7,9 +7,6 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStoreFile
-import com.github.arhor.journey.data.repository.DataStoreSettingsRepositoryImpl
-import com.github.arhor.journey.domain.repository.SettingsRepository
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,21 +16,13 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-abstract class PreferencesModule {
-
-    @Binds
+object PreferencesModule {
+    @Provides
     @Singleton
-    abstract fun bindSettingsRepository(impl: DataStoreSettingsRepositoryImpl): SettingsRepository
-
-    companion object {
-        @Provides
-        @Singleton
-        fun provideSettingsDataStore(
-            @ApplicationContext context: Context,
-        ): DataStore<Preferences> = PreferenceDataStoreFactory.create(
-            corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
-            produceFile = { context.preferencesDataStoreFile("journey_settings") },
-        )
-    }
+    fun provideSettingsDataStore(
+        @ApplicationContext context: Context,
+    ): DataStore<Preferences> = PreferenceDataStoreFactory.create(
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        produceFile = { context.preferencesDataStoreFile("journey_settings") },
+    )
 }
-

@@ -1,5 +1,6 @@
 package com.github.arhor.journey.data.di
 
+import com.github.arhor.journey.data.repository.DataStoreSettingsRepositoryImpl
 import com.github.arhor.journey.data.repository.DeterministicResourceSpawnRepository
 import com.github.arhor.journey.data.repository.MapStylesRepositoryImpl
 import com.github.arhor.journey.data.repository.RoomCollectedResourceSpawnRepository
@@ -16,6 +17,7 @@ import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.MapStylesRepository
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
+import com.github.arhor.journey.domain.repository.SettingsRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -56,4 +58,8 @@ interface RepositoryModule {
     @Binds
     fun bindMapStylesRepository(impl: MapStylesRepositoryImpl)
         : MapStylesRepository
+
+    @Binds
+    fun bindSettingsRepository(impl: DataStoreSettingsRepositoryImpl)
+        : SettingsRepository
 }
