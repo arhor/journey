@@ -21,6 +21,7 @@ Gradle modules:
 - `:feature:hero` - hero screen, route, navigation contract, and view model.
 - `:feature:map` - map flow, POI flows, map rendering integration, tracking session UI, and related view models.
 - `:feature:map:fog-of-war` - fog-of-war state, buffering, render-data preparation, diagnostics, and map overlay application.
+- `feature/mini_game` - Godot mini-game source project packaged into the Android app assets for the full-screen POI launch flow.
 - `:feature:settings` - settings screen, navigation contract, Health Connect entry points, and view model.
 
 Primary source locations:
@@ -33,6 +34,7 @@ Primary source locations:
 - Core UI: `core/ui/src/main/kotlin/com/github/arhor/journey/core/ui`
 - Features: `feature/<name>/src/main/kotlin/com/github/arhor/journey/feature/<name>`
 - Map fog of war: `feature/map/fog-of-war/src/main/kotlin/com/github/arhor/journey/feature/map/fow`
+- Godot mini-game assets: `feature/mini_game`
 - App resources: `app/src/main/res`
 
 Build configuration lives in:
@@ -63,6 +65,7 @@ Practical rules:
 - Treat `:app` as the composition root, not as the default place for new business logic.
 - Put app-wide wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
 - Keep feature-specific platform bindings inside the owning feature module when they are not truly app-wide.
+- `:app` packages the Godot mini-game from `feature/mini_game` into its Android assets source set and owns the Android `GodotActivity` launch surface.
 - Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`; features own typed destinations and `*Graph(...)` builders.
 - Use typed navigation contracts with `@Serializable` destinations and `composable<T>` routes, matching existing feature modules.
 - `:feature:map` may start, stop, or observe exploration tracking sessions, but it must not own continuous location collection or the tile-reveal pipeline.
