@@ -13,10 +13,11 @@ data class FogOfWarUiState(
     val bufferedBounds: GeoBounds? = null,
     val visibleTileRange: ExplorationTileRange? = null,
     val fogRanges: List<ExplorationTileRange> = emptyList(),
+    val hiddenExploredRenderData: FogOfWarRenderData? = null,
     val activeRenderData: FogOfWarRenderData? = null,
     val handoffRenderData: FogOfWarRenderData? = null,
     val visibleTileCount: Long = 0,
-    val exploredVisibleTileCount: Int = 0,
+    val visibleExploredTileCount: Int = 0,
     val isSuppressedByVisibleTileLimit: Boolean = false,
     val isRecomputing: Boolean = false,
 )
@@ -24,6 +25,7 @@ data class FogOfWarUiState(
 @Immutable
 data class FogOfWarRenderState(
     val isOverlayEnabled: Boolean = true,
+    val hiddenExploredRenderData: FogOfWarRenderData? = null,
     val activeRenderData: FogOfWarRenderData? = null,
     val handoffRenderData: FogOfWarRenderData? = null,
 )
@@ -31,6 +33,7 @@ data class FogOfWarRenderState(
 val FogOfWarUiState.renderState: FogOfWarRenderState
     get() = FogOfWarRenderState(
         isOverlayEnabled = isOverlayEnabled,
+        hiddenExploredRenderData = hiddenExploredRenderData,
         activeRenderData = activeRenderData,
         handoffRenderData = handoffRenderData,
     )

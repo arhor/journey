@@ -274,7 +274,7 @@ internal fun MapDebugInfoOverlay(
                         MapDebugInfoItem.ExploredHere -> {
                             stringResource(
                                 R.string.map_debug_info_explored_here_value,
-                                state.fogOfWar.exploredVisibleTileCount,
+                                state.fogOfWar.visibleExploredTileCount,
                             )
                         }
 
