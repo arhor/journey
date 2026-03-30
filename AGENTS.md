@@ -6,6 +6,25 @@ If you add or remove modules, move source sets, change architecture conventions,
 update toolchain requirements, or change recommended build/test commands,
 update `AGENTS.md` in the same change.
 
+## Accepted-Plan Handoff
+When the user affirms the immediately preceding `<proposed_plan>` with a short acceptance such as `yes`,
+`implement it`, or `proceed`, treat that as authorization to execute the accepted plan rather than as a new
+one-line request.
+
+For accepted-plan execution:
+
+- Use the implementation handoff contract fields `plan_status`, `recommended_skills`, `review_policy`, and
+  `acceptance_behavior` as the source of truth for whether execution should start and which skills should activate.
+- Reconstruct the implementation task from the accepted plan plus the original user request.
+- Re-infer applicable implementation skills from that reconstructed task instead of relying on the literal
+  acceptance message.
+- Do not model this as carrying skills across turns. Treat it as rebuilding the current implementation context.
+- Auto-apply `implement-compose-feature` when the accepted plan is implementation-ready and clearly describes Android
+  Jetpack Compose feature work.
+- Auto-apply `collective-code-review` for non-trivial code changes unless the user explicitly asked to skip review.
+- If the plan handoff marks the plan as non-implementation or investigation-only, do not start coding from acceptance
+  alone.
+
 ## Project Structure & Module Organization
 This repository is a multi-module Android app built with Kotlin, Jetpack Compose, Hilt, Room, and DataStore.
 

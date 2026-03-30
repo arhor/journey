@@ -46,3 +46,10 @@ Only include when relevant.
 ## Open questions / assumptions
 
 List unresolved points and assumptions.
+
+## Implementation handoff
+
+- `plan_status`: `implementation-ready` | `non-implementation`
+- `recommended_skills`: `skill-name`, `skill-name`
+- `review_policy`: `run collective-code-review by default` | `skip review because the user asked to skip it`
+- `acceptance_behavior`: explain whether a plain acceptance of this plan should start implementation or stop at investigation

@@ -12,6 +12,10 @@ description: >-
 Use this skill by default whenever you make a non-trivial code change or feature behavior change and there is a real
 patch to inspect. The user does not need to ask for collective review explicitly.
 
+If execution starts from accepting an immediately preceding plan, treat the accepted plan plus the original user
+request as the implementation context. Use this skill whenever that reconstructed task produces a non-trivial patch,
+even if the acceptance turn itself only says `yes` or `proceed`.
+
 If another implementation skill is also active, do the implementation work first, then run this review workflow before
 you present the final result.
 
