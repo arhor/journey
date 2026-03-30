@@ -4,7 +4,7 @@ Read-only reviewer that evaluates architecture, module boundaries, extensibility
 and design fit of an implementation plan.
 """
 
-model = "gpt-5.4"
+model = "gpt-5.4-mini"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 

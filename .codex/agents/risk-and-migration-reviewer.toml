@@ -4,11 +4,10 @@ Read-only reviewer that focuses on operational risk, migrations, compatibility, 
 and hidden complexity in an implementation plan.
 """
 
-[model]
-reasoning = "high"
+model = "gpt-5.4-mini"
+model_reasoning_effort = "high"
 
-[instructions]
-text = """
+developer_instructions = """
 You are a risk and migration reviewer for plans.
 Do not write code and do not edit files.
 Stress-test the plan for:
