@@ -27,7 +27,7 @@ import java.time.ZoneOffset
 class CollectResourceSpawnUseCaseTest {
 
     @Test
-    fun `invoke should record claim and award inventory when spawn is nearby`() = runTest {
+    fun `invoke should mark the spawn collected and award inventory when spawn is nearby`() = runTest {
         // Given
         val now = Instant.parse("2026-03-19T10:00:00Z")
         val hero = hero()
@@ -65,7 +65,7 @@ class CollectResourceSpawnUseCaseTest {
             resourceTypeId = "wood",
             amountAwarded = 1,
         )
-        collectedRepository.recordedClaims.map { it.spawnId } shouldContainExactly listOf(spawn.id)
+        collectedRepository.markedCollectedSpawns.map { it.spawnId } shouldContainExactly listOf(spawn.id)
         inventoryRepository.addedResources shouldContainExactly listOf(
             HeroResource(
                 heroId = hero.id,
@@ -180,7 +180,7 @@ class CollectResourceSpawnUseCaseTest {
     }
 
     @Test
-    fun `invoke should execute claim and award inside a single transaction boundary`() = runTest {
+    fun `invoke should mark the spawn collected and award inside a single transaction boundary`() = runTest {
         // Given
         val now = Instant.parse("2026-03-19T10:00:00Z")
         val transactionRunner = RecordingTransactionRunner()
@@ -312,11 +312,11 @@ class CollectResourceSpawnUseCaseTest {
         initialClaims: List<CollectedResourceSpawn> = emptyList(),
         private val isTransactionOpen: () -> Boolean = { false },
     ) : CollectedResourceSpawnRepository {
-        private val claims = initialClaims
+        private val collectedSpawns = initialClaims
             .associateBy { it.heroId to it.spawnId }
             .toMutableMap()
 
-        val recordedClaims = mutableListOf<CollectedResourceSpawn>()
+        val markedCollectedSpawns = mutableListOf<CollectedResourceSpawn>()
         var wasMutationRecordedInsideTransaction: Boolean = false
 
         override fun observeAll(heroId: String): Flow<List<CollectedResourceSpawn>> = emptyFlow()
@@ -324,9 +324,9 @@ class CollectResourceSpawnUseCaseTest {
         override suspend fun isCollected(
             heroId: String,
             spawnId: String,
-        ): Boolean = claims.containsKey(heroId to spawnId)
+        ): Boolean = collectedSpawns.containsKey(heroId to spawnId)
 
-        override suspend fun recordClaim(
+        override suspend fun markCollected(
             heroId: String,
             spawnId: String,
             resourceTypeId: String,
@@ -335,17 +335,17 @@ class CollectResourceSpawnUseCaseTest {
             wasMutationRecordedInsideTransaction = isTransactionOpen()
 
             val key = heroId to spawnId
-            if (claims.containsKey(key)) {
+            if (collectedSpawns.containsKey(key)) {
                 return false
             }
-            val claim = CollectedResourceSpawn(
+            val collectedSpawn = CollectedResourceSpawn(
                 heroId = heroId,
                 typeId = resourceTypeId,
                 spawnId = spawnId,
                 collectedAt = collectedAt,
             )
-            claims[key] = claim
-            recordedClaims += claim
+            collectedSpawns[key] = collectedSpawn
+            markedCollectedSpawns += collectedSpawn
 
             return true
         }

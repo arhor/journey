@@ -19,11 +19,11 @@ import java.time.ZoneOffset
 class RecordCollectedResourceSpawnUseCaseTest {
 
     @Test
-    fun `invoke should record claim for the current hero with the current timestamp`() = runTest {
+    fun `invoke should mark the spawn collected for the current hero with the current timestamp`() = runTest {
         // Given
         val hero = hero(id = "player")
         val now = Instant.parse("2026-03-12T11:00:00Z")
-        val repository = FakeCollectedResourceSpawnRepository(recordResult = true)
+        val repository = FakeCollectedResourceSpawnRepository(markCollectedResult = true)
         val subject = RecordCollectedResourceSpawnUseCase(
             heroRepository = FakeHeroRepository(hero),
             collectedResourceSpawnRepository = repository,
@@ -42,6 +42,26 @@ class RecordCollectedResourceSpawnUseCaseTest {
         repository.lastSpawnId shouldBe "spawn-11"
         repository.lastResourceTypeId shouldBe "wood"
         repository.lastCollectedAt shouldBe now
+    }
+
+    @Test
+    fun `invoke should return false when the spawn was already marked collected`() = runTest {
+        // Given
+        val repository = FakeCollectedResourceSpawnRepository(markCollectedResult = false)
+        val subject = RecordCollectedResourceSpawnUseCase(
+            heroRepository = FakeHeroRepository(hero(id = "player")),
+            collectedResourceSpawnRepository = repository,
+            clock = Clock.fixed(Instant.parse("2026-03-12T11:00:00Z"), ZoneOffset.UTC),
+        )
+
+        // When
+        val actual = subject(
+            spawnId = "spawn-11",
+            resourceTypeId = "wood",
+        )
+
+        // Then
+        actual shouldBe false
     }
 
     private fun hero(id: String): Hero =
@@ -69,7 +89,7 @@ class RecordCollectedResourceSpawnUseCaseTest {
     }
 
     private class FakeCollectedResourceSpawnRepository(
-        private val recordResult: Boolean,
+        private val markCollectedResult: Boolean,
     ) : CollectedResourceSpawnRepository {
         var lastHeroId: String? = null
         var lastSpawnId: String? = null
@@ -83,7 +103,7 @@ class RecordCollectedResourceSpawnUseCaseTest {
             spawnId: String,
         ): Boolean = false
 
-        override suspend fun recordClaim(
+        override suspend fun markCollected(
             heroId: String,
             spawnId: String,
             resourceTypeId: String,
@@ -93,7 +113,7 @@ class RecordCollectedResourceSpawnUseCaseTest {
             lastSpawnId = spawnId
             lastResourceTypeId = resourceTypeId
             lastCollectedAt = collectedAt
-            return recordResult
+            return markCollectedResult
         }
     }
 }

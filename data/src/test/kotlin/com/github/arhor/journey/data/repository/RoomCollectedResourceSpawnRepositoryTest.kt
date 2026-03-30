@@ -15,7 +15,7 @@ import java.time.Instant
 class RoomCollectedResourceSpawnRepositoryTest {
 
     @Test
-    fun `observeAll should map claim entities to domain models`() = runTest {
+    fun `observeAll should map collected spawn entities to domain models`() = runTest {
         // Given
         val collectedAt = Instant.parse("2026-03-11T06:00:00Z")
         val dao = FakeCollectedResourceSpawnDao(
@@ -45,7 +45,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
     }
 
     @Test
-    fun `recordClaim should return false when the same hero spawn pair already exists`() = runTest {
+    fun `markCollected should return false when the same hero spawn pair already exists`() = runTest {
         // Given
         val collectedAt = Instant.parse("2026-03-11T06:00:00Z")
         val dao = FakeCollectedResourceSpawnDao(
@@ -61,7 +61,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
         val subject = RoomCollectedResourceSpawnRepository(dao = dao)
 
         // When
-        val actual = subject.recordClaim(
+        val actual = subject.markCollected(
             heroId = "player",
             spawnId = "spawn-7",
             resourceTypeId = "wood",
@@ -74,14 +74,14 @@ class RoomCollectedResourceSpawnRepositoryTest {
     }
 
     @Test
-    fun `recordClaim should persist claim when hero has not collected spawn yet`() = runTest {
+    fun `markCollected should persist the collected spawn when hero has not collected it yet`() = runTest {
         // Given
         val dao = FakeCollectedResourceSpawnDao(initialEntities = emptyList())
         val subject = RoomCollectedResourceSpawnRepository(dao = dao)
         val collectedAt = Instant.parse("2026-03-11T06:10:00Z")
 
         // When
-        val actual = subject.recordClaim(
+        val actual = subject.markCollected(
             heroId = "player",
             spawnId = "spawn-8",
             resourceTypeId = "ore",

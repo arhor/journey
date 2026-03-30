@@ -64,14 +64,14 @@ class CollectResourceSpawnUseCase @Inject constructor(
         }
 
         return transactionRunner.runInTransaction {
-            val claimInserted = collectedResourceSpawnRepository.recordClaim(
+            val collectedMarkerInserted = collectedResourceSpawnRepository.markCollected(
                 heroId = heroId,
                 spawnId = spawn.id,
                 resourceTypeId = spawn.typeId,
                 collectedAt = collectedAt,
             )
 
-            if (!claimInserted) {
+            if (!collectedMarkerInserted) {
                 ResourceSpawnCollectionResult.AlreadyCollected(spawn.id)
             } else {
                 heroInventoryRepository.addAmount(
