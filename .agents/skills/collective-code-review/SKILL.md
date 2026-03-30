@@ -1,9 +1,9 @@
 ---
-name: collective-review
+name: collective-code-review
 description: Use this skill for implementation tasks that change code and should receive a local multi-agent review before the task is considered done. After making the change, spawn the configured review subagents in parallel, consolidate their findings, address every reasonable comment either by fixing the code or by writing a rebuttal, and summarize what was resolved. Do not use for pure explanation tasks, trivial no-code edits, or when the user explicitly asks to skip review.
 ---
 
-# Collective Review
+# Collective Code Review
 
 Use this skill when the user wants a code change to go through a local, multi-agent review before you present the final
 result.
@@ -118,7 +118,7 @@ After applying warranted fixes:
 
 ### 8) Final response requirements
 
-Your final task summary must include a compact collective review section with:
+Your final task summary must include a compact collective code review section with:
 
 - which reviewer agents ran
 - how many findings were raised

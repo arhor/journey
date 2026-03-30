@@ -1,4 +1,4 @@
-# Collective review resolution ledger
+# Collective code review resolution ledger
 
 Use this as a working scratchpad when the review swarm returns.
 

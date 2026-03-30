@@ -8,6 +8,6 @@ Review the current patch from a testing and verification perspective.
 Look for missing tests, untested behavior changes, misleading or fragile tests, and cases where validation is weaker than the risk of the change.
 Prefer a few high-value findings to a long checklist.
 Do not make code changes.
-Return either `status: no_findings` or a short list of strong findings using the repository's collective-review finding format.
+Return either `status: no_findings` or a short list of strong findings using the repository's collective-code-review finding format.
 """
 nickname_candidates = ["Quartz", "Gauge", "Proof"]

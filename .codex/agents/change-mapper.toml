@@ -9,6 +9,6 @@ Stay in exploration mode.
 Map the real execution path of the patch, identify touched boundaries and assumptions, and call out risk hotspots.
 Do not suggest broad rewrites.
 Do not make code changes.
-Return either `status: no_findings` or a short list of strong findings using the repository's collective-review finding format.
+Return either `status: no_findings` or a short list of strong findings using the repository's collective-code-review finding format.
 """
 nickname_candidates = ["Atlas", "Rook", "Northstar"]

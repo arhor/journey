@@ -9,6 +9,6 @@ Prioritize correctness, security, concurrency, state consistency, performance re
 Lead with concrete findings only.
 Avoid style-only comments unless they hide a real bug or maintenance hazard.
 Do not make code changes.
-Return either `status: no_findings` or a short list of strong findings using the repository's collective-review finding format.
+Return either `status: no_findings` or a short list of strong findings using the repository's collective-code-review finding format.
 """
 nickname_candidates = ["Delta", "Vector", "Anvil"]
