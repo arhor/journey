@@ -1,4 +1,4 @@
-name = "architecture_planner"
+name = "architecture-planner"
 description = """
 Read-only reviewer that evaluates architecture, module boundaries, extensibility,
 and design fit of an implementation plan.

@@ -1,13 +1,16 @@
 ---
 name: collective-plan-review
-description: Use only when the user explicitly asks for a repository investigation, design proposal, or implementation plan to be drafted and then stress-tested by a swarm of expert subagents. Best used in Codex plan mode. Do not use for direct implementation tasks or trivial one-step plans.
+description: >-
+  Automatically use this skill whenever the user asks for a repository-specific investigation, design proposal,
+  or implementation plan that is more than a trivial one-step answer. Draft the plan, run a collective review swarm,
+  and refine it before any code changes begin. Do not use for direct implementation tasks or trivial plans.
 ---
 
 # Collective Plan Review
 
 This skill is for planning work, not coding work.
 
-Use it when the user wants Codex to:
+Use it by default when the user wants Codex to:
 
 - investigate a request,
 - understand the existing codebase,
@@ -15,16 +18,20 @@ Use it when the user wants Codex to:
 - have that plan reviewed by several specialist subagents,
 - refine the plan before any code changes begin.
 
+The user does not need to ask for collective review explicitly. If the task is a real planning request, this review
+workflow should happen automatically.
+
 Do **not** use this skill for:
 
 - direct implementation tasks where code should be changed now,
 - tiny edits that do not need a real plan,
 - generic brainstorming detached from the current repository,
+- quick rough outlines when the user explicitly says to skip review,
 - post-change code review of a working tree. Use the implementation collective-code-review skill for that.
 
 ## Operating mode
 
-Prefer to use this skill while Codex is in **plan mode**.
+Prefer to use this skill while Codex is in **plan mode**, but do not block on that mode.
 
 The goal is to produce a strong, review-tested plan without modifying the repository. Read files, inspect architecture,
 run safe read-only commands if needed, and stop at the plan.
@@ -73,6 +80,9 @@ Give each subagent:
 - the relevant repository context,
 - the current draft plan,
 - explicit instructions to stay in review mode and not edit code.
+
+Prompt `risk-and-migration-reviewer` specifically as the risk and migration reviewer for rollout, compatibility, hidden complexity,
+performance, and failure modes in the draft plan.
 
 Each reviewer must return findings using the structure from `references/plan-findings-format.md`.
 

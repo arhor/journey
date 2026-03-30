@@ -1,12 +1,19 @@
 ---
 name: collective-code-review
-description: Use this skill for implementation tasks that change code and should receive a local multi-agent review before the task is considered done. After making the change, spawn the configured review subagents in parallel, consolidate their findings, address every reasonable comment either by fixing the code or by writing a rebuttal, and summarize what was resolved. Do not use for pure explanation tasks, trivial no-code edits, or when the user explicitly asks to skip review.
+description: >-
+  Automatically use this skill for substantive implementation tasks that modify repository code. Implement the
+  change, run the configured local multi-agent review in parallel, resolve every reasonable finding, and summarize
+  what was fixed or rebutted. Do not use for pure explanation tasks, trivial no-code edits, or when the user
+  explicitly asks to skip review.
 ---
 
 # Collective Code Review
 
-Use this skill when the user wants a code change to go through a local, multi-agent review before you present the final
-result.
+Use this skill by default whenever you make a non-trivial code change or feature behavior change and there is a real
+patch to inspect. The user does not need to ask for collective review explicitly.
+
+If another implementation skill is also active, do the implementation work first, then run this review workflow before
+you present the final result.
 
 ## Goal
 
@@ -25,7 +32,7 @@ Thoughtful disagreement is allowed when supported by repository conventions, con
 Do not use this skill when:
 
 - the task is answer-only, exploratory, or documentation-only
-- the user asks for a fast draft and explicitly says to skip review
+- the user explicitly asks to skip review or only wants a rough draft
 - the change is so tiny that a review swarm would add noise rather than signal
 - there is no code diff and no behavioral change to inspect
 
