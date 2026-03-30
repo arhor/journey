@@ -170,6 +170,248 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `uiState should mark only resource spawns outside current visibility mask as hidden by fog`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 500_000,
+            maxX = 500_012,
+            minY = 500_000,
+            maxY = 500_000,
+        )
+        val visibleTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val hiddenTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.minY,
+        )
+        val visibleSpawnId = "cell-1-slot-0"
+        val hiddenSpawnId = "cell-1-slot-1"
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = visibleSpawnId,
+                    resourceTypeId = "wood",
+                    lat = centerPointOf(visibleTile).lat,
+                    lon = centerPointOf(visibleTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+                resourceSpawn(
+                    id = hiddenSpawnId,
+                    resourceTypeId = "stone",
+                    lat = centerPointOf(hiddenTile).lat,
+                    lon = centerPointOf(hiddenTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = centerPointOf(visibleTile),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects.count { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") } == 2
+            }
+
+            // Then
+            actual.visibleObjects
+                .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                .associate { it.id to it.isHiddenByFog } shouldBe mapOf(
+                "${RESOURCE_SPAWN_ID_PREFIX}:$visibleSpawnId" to false,
+                "${RESOURCE_SPAWN_ID_PREFIX}:$hiddenSpawnId" to true,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should flip resource fog placeholders when tracked visibility moves between spawn tiles`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 500_000,
+            maxX = 500_012,
+            minY = 500_000,
+            maxY = 500_000,
+        )
+        val firstTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val secondTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.minY,
+        )
+        val firstSpawnId = "cell-2-slot-0"
+        val secondSpawnId = "cell-2-slot-1"
+        val initialSession = ExplorationTrackingSession(
+            isActive = true,
+            status = ExplorationTrackingStatus.TRACKING,
+            lastKnownLocation = centerPointOf(firstTile),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = firstSpawnId,
+                    resourceTypeId = "wood",
+                    lat = centerPointOf(firstTile).lat,
+                    lon = centerPointOf(firstTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+                resourceSpawn(
+                    id = secondSpawnId,
+                    resourceTypeId = "coal",
+                    lat = centerPointOf(secondTile).lat,
+                    lon = centerPointOf(secondTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+            trackingSession = initialSession,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            val initial = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects
+                    .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                    .associate { it.id to it.isHiddenByFog } == mapOf(
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to false,
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to true,
+                )
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = initialSession.copy(
+                lastKnownLocation = centerPointOf(secondTile),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val updated = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects
+                    .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                    .associate { it.id to it.isHiddenByFog } == mapOf(
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to true,
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to false,
+                )
+            }
+            initial.visibleObjects
+                .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                .associate { it.id to it.isHiddenByFog } shouldBe mapOf(
+                "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to false,
+                "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to true,
+            )
+            updated.visibleObjects
+                .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                .associate { it.id to it.isHiddenByFog } shouldBe mapOf(
+                "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to true,
+                "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to false,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should keep resource fog placeholders when fog overlay is disabled`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 500_000,
+            maxX = 500_012,
+            minY = 500_000,
+            maxY = 500_000,
+        )
+        val hiddenTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.minY,
+        )
+        val revealTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val hiddenSpawnId = "cell-3-slot-0"
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = hiddenSpawnId,
+                    resourceTypeId = "stone",
+                    lat = centerPointOf(hiddenTile).lat,
+                    lon = centerPointOf(hiddenTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = centerPointOf(revealTile),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            val initial = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects.firstOrNull()?.isHiddenByFog == true
+            }
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.FogOfWarOverlayToggled(isEnabled = false))
+            advanceUntilIdle()
+
+            // Then
+            val updated = fixture.viewModel.awaitContent { !it.fogOfWar.isOverlayEnabled }
+            initial.visibleObjects.single().isHiddenByFog shouldBe true
+            updated.visibleObjects.single().isHiddenByFog shouldBe true
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
     fun `uiState should reuse visible objects list when camera updates do not change objects`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 

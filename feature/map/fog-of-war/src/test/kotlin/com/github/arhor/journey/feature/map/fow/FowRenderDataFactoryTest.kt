@@ -80,8 +80,41 @@ class FowRenderDataFactoryTest {
         (actual.features.single().geometry.coordinates.single().size > 5) shouldBe true
     }
 
+    @Test
+    fun `create should fallback to rectangular polygons when geometry extraction hits an ambiguous boundary vertex`() {
+        // Given
+        val factory = FowRenderDataFactory()
+        val ambiguousFogRanges = listOf(
+            cellRange(x = 0, y = 0),
+            cellRange(x = 0, y = 1),
+            cellRange(x = 0, y = 2),
+            cellRange(x = 1, y = 0),
+            cellRange(x = 1, y = 2),
+            cellRange(x = 2, y = 0),
+            cellRange(x = 2, y = 1),
+        )
+
+        // When
+        val actual = factory.create(ambiguousFogRanges)
+
+        // Then
+        actual.shouldNotBeNull()
+    }
+
     internal fun List<ExplorationTileRange>.toFeatureCollection(): FeatureCollection<Polygon, JsonObject?> =
         this.toTileRegionGeometriesBuildResult()
             .geometries
             .toPolygonFeatureCollection()
+
+    private fun cellRange(
+        x: Int,
+        y: Int,
+        zoom: Int = 16,
+    ): ExplorationTileRange = ExplorationTileRange(
+        zoom = zoom,
+        minX = x,
+        maxX = x,
+        minY = y,
+        maxY = y,
+    )
 }

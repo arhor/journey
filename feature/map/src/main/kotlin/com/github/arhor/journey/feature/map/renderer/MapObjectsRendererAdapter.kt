@@ -70,6 +70,7 @@ fun MapObjectsRendererAdapter(
     val woodBitmap = rememberResourceTypeImageBitmap(ResourceType.WOOD)
     val coalBitmap = rememberResourceTypeImageBitmap(ResourceType.COAL)
     val stoneBitmap = rememberResourceTypeImageBitmap(ResourceType.STONE)
+    val unknownResourceBitmap = rememberDrawableImageBitmap(RESOURCE_UNKNOWN_DRAWABLE_NAME)
     val density = LocalDensity.current
     val resourceIconScale = remember(
         density.density,
@@ -79,6 +80,8 @@ fun MapObjectsRendererAdapter(
         coalBitmap.height,
         stoneBitmap.width,
         stoneBitmap.height,
+        unknownResourceBitmap.width,
+        unknownResourceBitmap.height,
     ) {
         with(density) {
             RESOURCE_ICON_SIZE.toPx() / maxOf(
@@ -88,12 +91,14 @@ fun MapObjectsRendererAdapter(
                 coalBitmap.height,
                 stoneBitmap.width,
                 stoneBitmap.height,
+                unknownResourceBitmap.width,
+                unknownResourceBitmap.height,
             ).toFloat()
         }
     }
-    val resourceSpawnIcon = remember(woodBitmap, coalBitmap, stoneBitmap) {
+    val resourceSpawnIcon = remember(woodBitmap, coalBitmap, stoneBitmap, unknownResourceBitmap) {
         switch(
-            input = feature[PROPERTY_OBJECT_RESOURCE_TYPE_ID].asString(const("")),
+            input = feature[PROPERTY_OBJECT_RESOURCE_ICON_KEY].asString(const("")),
             case(
                 label = ResourceType.WOOD.typeId,
                 output = image(woodBitmap),
@@ -105,6 +110,10 @@ fun MapObjectsRendererAdapter(
             case(
                 label = ResourceType.STONE.typeId,
                 output = image(stoneBitmap),
+            ),
+            case(
+                label = RESOURCE_UNKNOWN_DRAWABLE_NAME,
+                output = image(unknownResourceBitmap),
             ),
             fallback = nil(),
         )
@@ -200,7 +209,15 @@ internal fun MapObjectUiModel.toFeatureProperties(): JsonObject = buildJsonObjec
     description?.let { put(PROPERTY_OBJECT_DESCRIPTION, it) }
     put(PROPERTY_OBJECT_RADIUS_METERS, radiusMeters)
     put(PROPERTY_OBJECT_IS_DISCOVERED, isDiscovered)
+    put(PROPERTY_OBJECT_IS_HIDDEN_BY_FOG, isHiddenByFog)
     resourceType?.let { put(PROPERTY_OBJECT_RESOURCE_TYPE_ID, it.typeId) }
+    resourceIconKey()?.let { put(PROPERTY_OBJECT_RESOURCE_ICON_KEY, it) }
+}
+
+internal fun MapObjectUiModel.resourceIconKey(): String? = when {
+    kind != MapObjectKind.ResourceSpawn -> null
+    isHiddenByFog -> RESOURCE_UNKNOWN_DRAWABLE_NAME
+    else -> resourceType?.typeId
 }
 
 internal fun resolveObjectId(features: List<Feature<*, JsonObject?>>): String? =
@@ -223,24 +240,32 @@ internal const val PROPERTY_OBJECT_TITLE = "title"
 internal const val PROPERTY_OBJECT_DESCRIPTION = "description"
 internal const val PROPERTY_OBJECT_RADIUS_METERS = "radius_meters"
 internal const val PROPERTY_OBJECT_IS_DISCOVERED = "is_discovered"
+internal const val PROPERTY_OBJECT_IS_HIDDEN_BY_FOG = "is_hidden_by_fog"
 internal const val PROPERTY_OBJECT_RESOURCE_TYPE_ID = "resource_type_id"
+internal const val PROPERTY_OBJECT_RESOURCE_ICON_KEY = "resource_icon_key"
 internal const val PROPERTY_IS_CLUSTER = "cluster"
 internal const val PROPERTY_CLUSTER_POINT_COUNT = "point_count"
 internal const val PROPERTY_CLUSTER_POINT_COUNT_ABBREVIATED = "point_count_abbreviated"
 
 internal const val DECLUSTER_ZOOM = 12
 internal const val CLUSTER_RADIUS = 60
+private const val RESOURCE_UNKNOWN_DRAWABLE_NAME = "resource_unknown"
 private val RESOURCE_ICON_SIZE = 20.dp
 
 @Composable
 private fun rememberResourceTypeImageBitmap(resourceType: ResourceType): ImageBitmap {
+    return rememberDrawableImageBitmap(resourceType.drawableName)
+}
+
+@Composable
+private fun rememberDrawableImageBitmap(drawableName: String): ImageBitmap {
     val context = LocalContext.current
-    val drawableId = remember(context.packageName, resourceType) {
-        context.resolveDrawableId(resourceType.drawableName)
+    val drawableId = remember(context.packageName, drawableName) {
+        context.resolveDrawableId(drawableName)
     }
 
     require(drawableId != 0) {
-        "Missing drawable resource for ${resourceType.typeId}."
+        "Missing drawable resource for $drawableName."
     }
 
     return ImageBitmap.imageResource(id = drawableId)

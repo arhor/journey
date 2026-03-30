@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.map.fow
 
+import android.util.Log
 import androidx.collection.LruCache
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.ExplorationTileRange
@@ -15,6 +16,9 @@ import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Polygon
 import org.maplibre.spatialk.geojson.Position
 import javax.inject.Inject
+
+private const val TAG = "FowRenderDataFactory"
+
 
 /**
  * Prepares and memoizes render-ready fog overlay geometry.
@@ -56,7 +60,18 @@ class FowRenderDataFactory @Inject constructor() {
 
     /* ------------------------------------------ Internal implementation ------------------------------------------- */
 
-    private fun createRenderCacheEntry(key: FogOfWarRenderKey): FogOfWarRenderCacheEntry? {
+    private fun createRenderCacheEntry(key: FogOfWarRenderKey): FogOfWarRenderCacheEntry? = try {
+        createSmoothedRenderCacheEntry(key)
+    } catch (e: IllegalStateException) {
+        // TODO: The rounded boundary extractor currently assumes one outgoing edge per grid vertex.
+        //       Hidden-explored masks can produce checkerboard-style corner touches that violate that invariant
+        //       and throw an ambiguous boundary error, so we temporarily fall back to rectangular range polygons
+        //       here to keep rendering alive until the contour tracer is made robust to those non-manifold vertices.
+        Log.e(TAG, "Failed to render fog of war for $key.", e)
+        createFallbackRenderCacheEntry(key)
+    }
+
+    private fun createSmoothedRenderCacheEntry(key: FogOfWarRenderKey): FogOfWarRenderCacheEntry? {
         val geometryResult = key.ranges.toTileRegionGeometriesBuildResult()
         if (geometryResult.geometries.isEmpty()) {
             return null
@@ -74,6 +89,21 @@ class FowRenderDataFactory @Inject constructor() {
         )
 
         return cacheEntry
+    }
+
+    private fun createFallbackRenderCacheEntry(key: FogOfWarRenderKey): FogOfWarRenderCacheEntry? {
+        val renderData = createFowRenderDataFromRanges(key)
+        val expandedCellCount = key.ranges.sumOf(ExplorationTileRange::tileCount)
+
+        return FogOfWarRenderCacheEntry(
+            renderData = renderData,
+            expandedFogCellCount = expandedCellCount,
+            connectedRegionCount = key.ranges.size,
+            boundaryEdgeCount = 0,
+            loopCount = 0,
+            featureCount = key.ranges.size,
+            ringPointCount = 0,
+        )
     }
 
     private fun createFowRenderDataFromRanges(key: FogOfWarRenderKey): FogOfWarRenderData {

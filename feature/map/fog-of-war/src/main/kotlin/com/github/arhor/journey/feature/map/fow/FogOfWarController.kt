@@ -16,6 +16,7 @@ import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.feature.map.fow.model.FogBufferRegion
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderData
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarVisibilityState
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -62,6 +63,10 @@ class FogOfWarController @AssistedInject constructor(
 
     val uiState: Flow<FogOfWarUiState> = _state
         .map(::buildUiState)
+        .distinctUntilChanged()
+
+    val visibilityState: Flow<FogOfWarVisibilityState> = _state
+        .map(::buildVisibilityState)
         .distinctUntilChanged()
 
     init {
@@ -304,6 +309,12 @@ class FogOfWarController @AssistedInject constructor(
             isRecomputing = state.isFogRecomputationInProgress,
         )
     }
+
+    private fun buildVisibilityState(state: State): FogOfWarVisibilityState =
+        FogOfWarVisibilityState(
+            canonicalZoom = state.canonicalZoom,
+            visibilityTileMask = state.visibilityTileMask,
+        )
 
     private fun updateFogViewport(
         visibleBounds: GeoBounds,
