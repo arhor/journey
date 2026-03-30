@@ -1,0 +1,6 @@
+interface:
+    display_name: "Collective Review"
+    short_description: "Implement first, then run a local multi-agent review and resolve the findings."
+    default_prompt: "Use this skill to implement the task, then run a collective local review with the configured reviewer subagents. Address every reasonable comment either with a code change or a brief rebuttal."
+policy:
+    allow_implicit_invocation: false
