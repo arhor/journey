@@ -14,11 +14,11 @@ interface CollectedResourceSpawnRepository {
     ): Boolean
 
     /**
-     * Records the claim if it does not exist yet.
+     * Marks the spawn as collected if it does not exist yet.
      *
-     * Returns `true` when the claim was newly inserted and `false` when it already existed.
+     * Returns `true` when the collected marker was newly inserted and `false` when it already existed.
      */
-    suspend fun recordClaim(
+    suspend fun markCollected(
         heroId: String,
         spawnId: String,
         resourceTypeId: String,

@@ -58,6 +58,7 @@ class MapObjectsRendererAdapterTest {
         feature.properties.get(PROPERTY_OBJECT_DESCRIPTION)?.jsonPrimitive?.contentOrNull shouldBe "Historic tower"
         feature.properties.get(PROPERTY_OBJECT_RADIUS_METERS)?.jsonPrimitive?.contentOrNull shouldBe "120"
         feature.properties.get(PROPERTY_OBJECT_IS_DISCOVERED)?.jsonPrimitive?.contentOrNull shouldBe "true"
+        feature.properties.get(PROPERTY_OBJECT_IS_HIDDEN_BY_FOG)?.jsonPrimitive?.contentOrNull shouldBe "false"
     }
 
     @Test
@@ -84,6 +85,7 @@ class MapObjectsRendererAdapterTest {
         actual.containsKey(PROPERTY_OBJECT_DESCRIPTION) shouldBe false
         actual[PROPERTY_OBJECT_RADIUS_METERS]?.jsonPrimitive?.contentOrNull shouldBe "80"
         actual[PROPERTY_OBJECT_IS_DISCOVERED]?.jsonPrimitive?.contentOrNull shouldBe "false"
+        actual[PROPERTY_OBJECT_IS_HIDDEN_BY_FOG]?.jsonPrimitive?.contentOrNull shouldBe "false"
     }
 
     @Test
@@ -98,6 +100,7 @@ class MapObjectsRendererAdapterTest {
             radiusMeters = 25,
             isDiscovered = false,
             kind = MapObjectKind.ResourceSpawn,
+            isHiddenByFog = true,
             resourceType = ResourceType.WOOD,
         )
 
@@ -106,6 +109,7 @@ class MapObjectsRendererAdapterTest {
 
         // Then
         actual[PROPERTY_OBJECT_RESOURCE_TYPE_ID]?.jsonPrimitive?.contentOrNull shouldBe "wood"
+        actual[PROPERTY_OBJECT_IS_HIDDEN_BY_FOG]?.jsonPrimitive?.contentOrNull shouldBe "true"
     }
 
     @Test
@@ -171,6 +175,7 @@ class MapObjectsRendererAdapterTest {
         radiusMeters: Int,
         isDiscovered: Boolean,
         kind: MapObjectKind,
+        isHiddenByFog: Boolean = false,
         resourceType: ResourceType? = null,
     ): MapObjectUiModel = MapObjectUiModel(
         id = id,
@@ -180,6 +185,7 @@ class MapObjectsRendererAdapterTest {
         position = LatLng(latitude = latitude, longitude = longitude),
         radiusMeters = radiusMeters,
         isDiscovered = isDiscovered,
+        isHiddenByFog = isHiddenByFog,
         resourceType = resourceType,
     )
 

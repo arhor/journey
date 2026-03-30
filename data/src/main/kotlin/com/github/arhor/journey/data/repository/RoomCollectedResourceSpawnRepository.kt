@@ -29,7 +29,7 @@ class RoomCollectedResourceSpawnRepository @Inject constructor(
             spawnId = spawnId,
         )
 
-    override suspend fun recordClaim(
+    override suspend fun markCollected(
         heroId: String,
         spawnId: String,
         resourceTypeId: String,

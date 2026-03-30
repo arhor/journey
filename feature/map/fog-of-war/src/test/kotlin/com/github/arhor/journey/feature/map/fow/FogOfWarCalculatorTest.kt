@@ -149,4 +149,59 @@ class FogOfWarCalculatorTest {
         // Then
         actual shouldContainExactly listOf(tileRange)
     }
+
+    @Test
+    fun `calculateExploredTileRanges should merge arbitrary explored tiles into stable rectangles`() {
+        // Given
+        val tileRange = ExplorationTileRange(
+            zoom = 16,
+            minX = 0,
+            maxX = 3,
+            minY = 0,
+            maxY = 2,
+        )
+        val exploredTiles = setOf(
+            MapTile(zoom = 16, x = 0, y = 0),
+            MapTile(zoom = 16, x = 1, y = 0),
+            MapTile(zoom = 16, x = 0, y = 1),
+            MapTile(zoom = 16, x = 1, y = 1),
+            MapTile(zoom = 16, x = 3, y = 2),
+        )
+
+        // When
+        val actual = fogOfWarCalculator.calculateExploredTileRanges(
+            tileRange = tileRange,
+            exploredTiles = exploredTiles,
+        )
+
+        // Then
+        actual shouldContainExactly listOf(
+            ExplorationTileRange(zoom = 16, minX = 0, maxX = 1, minY = 0, maxY = 1),
+            ExplorationTileRange(zoom = 16, minX = 3, maxX = 3, minY = 2, maxY = 2),
+        )
+    }
+
+    @Test
+    fun `calculateExploredTileRanges should ignore explored tiles from different zoom levels`() {
+        // Given
+        val tileRange = ExplorationTileRange(
+            zoom = 16,
+            minX = 10,
+            maxX = 10,
+            minY = 20,
+            maxY = 20,
+        )
+        val exploredTiles = setOf(
+            MapTile(zoom = 17, x = 10, y = 20),
+        )
+
+        // When
+        val actual = fogOfWarCalculator.calculateExploredTileRanges(
+            tileRange = tileRange,
+            exploredTiles = exploredTiles,
+        )
+
+        // Then
+        actual shouldContainExactly emptyList()
+    }
 }

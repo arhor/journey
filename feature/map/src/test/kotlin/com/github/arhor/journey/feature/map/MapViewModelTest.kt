@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.map
 
+import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
@@ -56,6 +57,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -112,7 +114,7 @@ class MapViewModelTest {
                     "${POI_ID_PREFIX}:$SECOND_POI_ID" to false,
                 )
             } finally {
-                tearDownMainDispatcher()
+                tearDownMainDispatcher(fixture.viewModel)
             }
         }
 
@@ -163,7 +165,249 @@ class MapViewModelTest {
                 "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0",
             )
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should mark only resource spawns outside current visibility mask as hidden by fog`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 500_000,
+            maxX = 500_012,
+            minY = 500_000,
+            maxY = 500_000,
+        )
+        val visibleTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val hiddenTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.minY,
+        )
+        val visibleSpawnId = "cell-1-slot-0"
+        val hiddenSpawnId = "cell-1-slot-1"
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = visibleSpawnId,
+                    resourceTypeId = "wood",
+                    lat = centerPointOf(visibleTile).lat,
+                    lon = centerPointOf(visibleTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+                resourceSpawn(
+                    id = hiddenSpawnId,
+                    resourceTypeId = "stone",
+                    lat = centerPointOf(hiddenTile).lat,
+                    lon = centerPointOf(hiddenTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = centerPointOf(visibleTile),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects.count { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") } == 2
+            }
+
+            // Then
+            actual.visibleObjects
+                .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                .associate { it.id to it.isHiddenByFog } shouldBe mapOf(
+                "${RESOURCE_SPAWN_ID_PREFIX}:$visibleSpawnId" to false,
+                "${RESOURCE_SPAWN_ID_PREFIX}:$hiddenSpawnId" to true,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should flip resource fog placeholders when tracked visibility moves between spawn tiles`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 500_000,
+            maxX = 500_012,
+            minY = 500_000,
+            maxY = 500_000,
+        )
+        val firstTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val secondTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.minY,
+        )
+        val firstSpawnId = "cell-2-slot-0"
+        val secondSpawnId = "cell-2-slot-1"
+        val initialSession = ExplorationTrackingSession(
+            isActive = true,
+            status = ExplorationTrackingStatus.TRACKING,
+            lastKnownLocation = centerPointOf(firstTile),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = firstSpawnId,
+                    resourceTypeId = "wood",
+                    lat = centerPointOf(firstTile).lat,
+                    lon = centerPointOf(firstTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+                resourceSpawn(
+                    id = secondSpawnId,
+                    resourceTypeId = "coal",
+                    lat = centerPointOf(secondTile).lat,
+                    lon = centerPointOf(secondTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+            trackingSession = initialSession,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            val initial = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects
+                    .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                    .associate { it.id to it.isHiddenByFog } == mapOf(
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to false,
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to true,
+                )
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = initialSession.copy(
+                lastKnownLocation = centerPointOf(secondTile),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val updated = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects
+                    .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                    .associate { it.id to it.isHiddenByFog } == mapOf(
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to true,
+                    "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to false,
+                )
+            }
+            initial.visibleObjects
+                .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                .associate { it.id to it.isHiddenByFog } shouldBe mapOf(
+                "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to false,
+                "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to true,
+            )
+            updated.visibleObjects
+                .filter { it.id.startsWith("$RESOURCE_SPAWN_ID_PREFIX:") }
+                .associate { it.id to it.isHiddenByFog } shouldBe mapOf(
+                "${RESOURCE_SPAWN_ID_PREFIX}:$firstSpawnId" to true,
+                "${RESOURCE_SPAWN_ID_PREFIX}:$secondSpawnId" to false,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should keep resource fog placeholders when fog overlay is disabled`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 500_000,
+            maxX = 500_012,
+            minY = 500_000,
+            maxY = 500_000,
+        )
+        val hiddenTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.minY,
+        )
+        val revealTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val hiddenSpawnId = "cell-3-slot-0"
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            resourceSpawns = listOf(
+                resourceSpawn(
+                    id = hiddenSpawnId,
+                    resourceTypeId = "stone",
+                    lat = centerPointOf(hiddenTile).lat,
+                    lon = centerPointOf(hiddenTile).lon,
+                    collectionRadiusMeters = 24.0,
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = centerPointOf(revealTile),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            val initial = fixture.viewModel.awaitContent { content ->
+                content.visibleObjects.firstOrNull()?.isHiddenByFog == true
+            }
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.FogOfWarOverlayToggled(isEnabled = false))
+            advanceUntilIdle()
+
+            // Then
+            val updated = fixture.viewModel.awaitContent { !it.fogOfWar.isOverlayEnabled }
+            initial.visibleObjects.single().isHiddenByFog shouldBe true
+            updated.visibleObjects.single().isHiddenByFog shouldBe true
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -239,7 +483,7 @@ class MapViewModelTest {
             actual.visibleObjects shouldBe initialVisibleObjects
             (actual.visibleObjects === initialVisibleObjects) shouldBe true
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -263,7 +507,7 @@ class MapViewModelTest {
             actual.debug.revealRadiusMeters shouldBe REVEAL_RADIUS_METERS.toInt()
             actual.debug.renderMode shouldBe MapRenderMode.Standard
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -285,7 +529,7 @@ class MapViewModelTest {
             // Then
             actual shouldBe MapUiState.Failure(errorMessage = "Map styles unavailable.")
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -313,7 +557,7 @@ class MapViewModelTest {
             closed.cameraPosition shouldBe initial.cameraPosition
             closed.debug.enabledInfoItems shouldBe emptySet()
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -342,7 +586,7 @@ class MapViewModelTest {
             }
             actual.debug.enabledInfoItems shouldBe setOf(MapDebugInfoItem.VisibleTiles)
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -375,7 +619,7 @@ class MapViewModelTest {
             coVerify(exactly = 0) { fixture.startTrackingSession.invoke() }
             coVerify(exactly = 0) { fixture.stopTrackingSession.invoke() }
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -422,7 +666,7 @@ class MapViewModelTest {
             verify(exactly = 1) { fixture.setExplorationTileCanonicalZoom.invoke(18) }
             verify(exactly = 1) { fixture.setExplorationTileRevealRadius.invoke(42.0) }
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -445,7 +689,7 @@ class MapViewModelTest {
             // Then
             coVerify(exactly = 1) { fixture.startTrackingSession.invoke() }
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -470,7 +714,7 @@ class MapViewModelTest {
             // Then
             effectDeferred.await() shouldBe MapEffect.RequestLocationPermission
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -491,7 +735,7 @@ class MapViewModelTest {
             // Then
             coVerify(exactly = 1) { fixture.stopTrackingSession.invoke() }
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -519,7 +763,7 @@ class MapViewModelTest {
             actual.explorationTrackingCadence shouldBe ExplorationTrackingCadence.FOREGROUND
             actual.userLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -552,7 +796,7 @@ class MapViewModelTest {
             }
             actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -596,7 +840,7 @@ class MapViewModelTest {
             actual.cameraPosition shouldBe manualCameraPosition
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -668,7 +912,7 @@ class MapViewModelTest {
                     )
                 }
             } finally {
-                tearDownMainDispatcher()
+                tearDownMainDispatcher(fixture.viewModel)
             }
         }
 
@@ -697,7 +941,7 @@ class MapViewModelTest {
                 message = "Location permission is required to center the map on your position.",
             )
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -735,14 +979,232 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             // Then
-            val actual = fixture.viewModel.awaitContent { it.fogOfWar.exploredVisibleTileCount == 1 }
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.hiddenExploredRenderData != null }
             actual.fogOfWar.visibleTileCount shouldBe 4L
-            actual.fogOfWar.exploredVisibleTileCount shouldBe 1
+            actual.fogOfWar.visibleExploredTileCount shouldBe 0
+            actual.fogOfWar.hiddenExploredRenderData.shouldNotBeNull()
             actual.fogOfWar.activeRenderData.shouldNotBeNull()
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
+
+    @Test
+    fun `dispatch should dim explored tiles when no usable current location is available`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture(
+            exploredTiles = setOf(
+                MapTile(
+                    zoom = visibleRange.zoom,
+                    x = 10,
+                    y = 20,
+                ),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.hiddenExploredRenderData != null }
+            actual.fogOfWar.visibleExploredTileCount shouldBe 0
+            actual.fogOfWar.hiddenExploredRenderData.shouldNotBeNull()
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should keep only explored tiles near the tracked location fully visible`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 500_000,
+            maxX = 500_012,
+            minY = 500_000,
+            maxY = 500_000,
+        )
+        val visibleTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val hiddenTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.minY,
+        )
+        val fixture = createFixture(
+            exploredTiles = setOf(visibleTile, hiddenTile),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = centerPointOf(visibleTile),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.fogOfWar.visibleExploredTileCount == 1 &&
+                    it.fogOfWar.hiddenExploredRenderData != null
+            }
+            actual.fogOfWar.visibleExploredTileCount shouldBe 1
+            actual.fogOfWar.hiddenExploredRenderData.shouldNotBeNull()
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should avoid full fog recomputation when tracked location jitter stays inside the same visibility mask`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val visibleRange = ExplorationTileRange(
+                zoom = CANONICAL_ZOOM,
+                minX = 10,
+                maxX = 11,
+                minY = 20,
+                maxY = 21,
+            )
+            val initialLocation = centerPointOf(
+                MapTile(
+                    zoom = visibleRange.zoom,
+                    x = visibleRange.minX,
+                    y = visibleRange.minY,
+                ),
+            )
+            val fixture = createFixture(
+                observeExploredTilesFlowFactory = { MutableStateFlow(emptySet()) },
+                trackingSession = ExplorationTrackingSession(
+                    isActive = true,
+                    status = ExplorationTrackingStatus.TRACKING,
+                    lastKnownLocation = initialLocation,
+                ),
+            )
+
+            try {
+                fixture.viewModel.awaitContent()
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBoundsInside(visibleRange),
+                    ),
+                )
+                advanceUntilIdle()
+                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+
+                // When
+                fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                    lastKnownLocation = GeoPoint(
+                        lat = initialLocation.lat + 1e-7,
+                        lon = initialLocation.lon + 1e-7,
+                    ),
+                )
+                advanceUntilIdle()
+
+                // Then
+                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+            } finally {
+                tearDownMainDispatcher(fixture.viewModel)
+            }
+        }
+
+    @Test
+    fun `dispatch should update hidden explored overlay when tracked visibility moves to a different tile cluster`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val visibleRange = ExplorationTileRange(
+                zoom = CANONICAL_ZOOM,
+                minX = 500_000,
+                maxX = 500_012,
+                minY = 500_000,
+                maxY = 500_000,
+            )
+            val firstTile = MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            )
+            val secondTile = MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.maxX,
+                y = visibleRange.minY,
+            )
+            val initialSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = centerPointOf(firstTile),
+            )
+            val fixture = createFixture(
+                exploredTiles = setOf(firstTile, secondTile),
+                trackingSession = initialSession,
+            )
+
+            try {
+                fixture.viewModel.awaitContent()
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = visibleBoundsInside(visibleRange),
+                    ),
+                )
+                advanceUntilIdle()
+                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+
+                val initial = fixture.viewModel.awaitContent {
+                    it.fogOfWar.visibleExploredTileCount == 1 &&
+                        it.fogOfWar.hiddenExploredRenderData != null
+                }
+                val initialHiddenExploredRenderData = initial.fogOfWar.hiddenExploredRenderData
+
+                // When
+                fixture.trackingSessionFlow.value = initialSession.copy(
+                    lastKnownLocation = centerPointOf(secondTile),
+                )
+                advanceUntilIdle()
+
+                // Then
+                val updated = fixture.viewModel.awaitContent {
+                    it.fogOfWar.hiddenExploredRenderData != initialHiddenExploredRenderData
+                }
+                updated.fogOfWar.visibleExploredTileCount shouldBe 1
+                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+            } finally {
+                tearDownMainDispatcher(fixture.viewModel)
+            }
+        }
 
     @Test
     fun `dispatch should avoid fog recomputation while the viewport stays inside the trigger bounds`() = runTest {
@@ -794,7 +1256,7 @@ class MapViewModelTest {
             actual.fogOfWar.isRecomputing shouldBe false
             verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -850,7 +1312,7 @@ class MapViewModelTest {
             actual.fogOfWar.activeRenderData.shouldNotBeNull()
             actual.fogOfWar.bufferedBounds.shouldNotBeNull()
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -925,12 +1387,11 @@ class MapViewModelTest {
                 actual.fogOfWar.activeRenderData.shouldNotBeNull()
                 actual.fogOfWar.bufferedBounds.shouldNotBeNull()
             } finally {
-                tearDownMainDispatcher()
+                tearDownMainDispatcher(fixture.viewModel)
             }
         }
 
     @Test
-    @Ignore("Temporarily ignored due to CI UncompletedCoroutinesError flakiness.")
     fun `dispatch should keep fog coverage while a newer fog buffer is still recomputing`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -985,6 +1446,7 @@ class MapViewModelTest {
             val hasCoverage = recomputing.fogOfWar.activeRenderData != null ||
                 recomputing.fogOfWar.handoffRenderData != null
             hasCoverage shouldBe true
+            recomputing.fogOfWar.hiddenExploredRenderData shouldBe null
 
             allowPendingSwap.complete(Unit)
             runCurrent()
@@ -994,7 +1456,8 @@ class MapViewModelTest {
                     !it.fogOfWar.isRecomputing
             }
         } finally {
-            tearDownMainDispatcher()
+            allowPendingSwap.complete(Unit)
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1059,7 +1522,7 @@ class MapViewModelTest {
             }
             actual.fogOfWar.activeRenderData.shouldNotBeNull()
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1113,7 +1576,7 @@ class MapViewModelTest {
 
                 verify(exactly = 1) { fixture.observeCollectibleResourceSpawns.invoke(any()) }
             } finally {
-                tearDownMainDispatcher()
+                tearDownMainDispatcher(fixture.viewModel)
             }
         }
 
@@ -1173,7 +1636,7 @@ class MapViewModelTest {
             val actual = fixture.viewModel.awaitContent { it.debug.canonicalZoom == 18 }
             actual.fogOfWar.canonicalZoom shouldBe 18
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1229,7 +1692,7 @@ class MapViewModelTest {
                 )
             }
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1271,7 +1734,7 @@ class MapViewModelTest {
             actual.cameraPosition shouldBe gestureCameraPosition
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1316,7 +1779,7 @@ class MapViewModelTest {
             actual.cameraPosition?.target shouldBe LatLng(latitude = 51.1, longitude = 17.03)
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1379,7 +1842,7 @@ class MapViewModelTest {
             actual.cameraPosition?.target shouldBe LatLng(latitude = 51.2, longitude = 17.1)
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1400,7 +1863,7 @@ class MapViewModelTest {
             // Then
             coVerify(exactly = 1) { fixture.clearExploredTiles.invoke() }
         } finally {
-            tearDownMainDispatcher()
+            tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
@@ -1413,7 +1876,9 @@ class MapViewModelTest {
     private suspend fun MapViewModel.awaitFailure(): MapUiState.Failure =
         uiState.first { it is MapUiState.Failure } as MapUiState.Failure
 
-    private fun TestScope.tearDownMainDispatcher() {
+    private fun TestScope.tearDownMainDispatcher(viewModel: MapViewModel) {
+        viewModel.viewModelScope.cancel()
+        advanceTimeBy(5_000L)
         runCurrent()
         advanceUntilIdle()
     }
@@ -1514,6 +1979,7 @@ class MapViewModelTest {
                 fogOfWarControllerFactory = { scope ->
                     FogOfWarController(
                         observeExplorationTileRuntimeConfig = observeExplorationTileRuntimeConfig,
+                        observeExplorationTrackingSession = observeExplorationTrackingSession,
                         observeExploredTiles = observeExploredTiles,
                         getExploredTiles = getExploredTiles,
                         renderDataFactory = FowRenderDataFactory(),
@@ -1574,6 +2040,14 @@ class MapViewModelTest {
                 west = bounds.west + VIEWPORT_BOUNDS_EPSILON,
                 north = bounds.north - VIEWPORT_BOUNDS_EPSILON,
                 east = bounds.east - VIEWPORT_BOUNDS_EPSILON,
+            )
+        }
+
+    private fun centerPointOf(tile: MapTile): GeoPoint =
+        bounds(tile).let { tileBounds ->
+            GeoPoint(
+                lat = (tileBounds.south + tileBounds.north) / 2.0,
+                lon = (tileBounds.west + tileBounds.east) / 2.0,
             )
         }
 

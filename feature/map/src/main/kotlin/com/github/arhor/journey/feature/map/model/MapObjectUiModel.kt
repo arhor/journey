@@ -12,6 +12,7 @@ data class MapObjectUiModel(
     val position: LatLng,
     val radiusMeters: Int,
     val isDiscovered: Boolean,
+    val isHiddenByFog: Boolean = false,
     val resourceType: ResourceType? = null,
 )
 

@@ -18,7 +18,7 @@ class RecordCollectedResourceSpawnUseCase @Inject constructor(
     ): Boolean {
         val hero = heroRepository.getCurrentHero()
 
-        return collectedResourceSpawnRepository.recordClaim(
+        return collectedResourceSpawnRepository.markCollected(
             heroId = hero.id,
             spawnId = spawnId,
             resourceTypeId = resourceTypeId,

@@ -1,4 +1,4 @@
-package com.github.arhor.journey.di
+package com.github.arhor.journey.data.di
 
 import android.content.Context
 import androidx.room.Room
@@ -32,25 +32,37 @@ object DatabaseModule {
             .build()
 
     @Provides
-    fun provideHeroDao(db: JourneyDatabase): HeroDao = db.heroDao()
+    @Singleton
+    fun provideHeroDao(db: JourneyDatabase): HeroDao =
+        db.heroDao()
 
     @Provides
-    fun provideHeroResourceDao(db: JourneyDatabase): HeroResourceDao = db.heroResourceDao()
+    @Singleton
+    fun provideHeroResourceDao(db: JourneyDatabase): HeroResourceDao =
+        db.heroResourceDao()
 
     @Provides
+    @Singleton
     fun provideCollectedResourceSpawnDao(db: JourneyDatabase): CollectedResourceSpawnDao =
         db.collectedResourceSpawnDao()
 
     @Provides
-    fun providePoiDao(db: JourneyDatabase): PoiDao = db.poiDao()
-
-    @Provides
-    fun provideDiscoveredPoiDao(db: JourneyDatabase): DiscoveredPoiDao = db.discoveredPoiDao()
-
-    @Provides
-    fun provideExplorationTileDao(db: JourneyDatabase): ExplorationTileDao = db.explorationTileDao()
+    @Singleton
+    fun providePoiDao(db: JourneyDatabase): PoiDao =
+        db.poiDao()
 
     @Provides
     @Singleton
-    fun provideTransactionRunner(db: JourneyDatabase): TransactionRunner = RoomTransactionRunner(db)
+    fun provideDiscoveredPoiDao(db: JourneyDatabase): DiscoveredPoiDao =
+        db.discoveredPoiDao()
+
+    @Provides
+    @Singleton
+    fun provideExplorationTileDao(db: JourneyDatabase): ExplorationTileDao =
+        db.explorationTileDao()
+
+    @Provides
+    @Singleton
+    fun provideTransactionRunner(db: JourneyDatabase): TransactionRunner =
+        RoomTransactionRunner(db)
 }

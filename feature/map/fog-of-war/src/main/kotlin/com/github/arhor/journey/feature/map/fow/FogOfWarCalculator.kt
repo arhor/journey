@@ -9,22 +9,36 @@ class FogOfWarCalculator @Inject constructor() {
     fun calculateUnexploredFogRanges(
         tileRange: ExplorationTileRange?,
         exploredTiles: Set<MapTile>,
+    ): List<ExplorationTileRange> = calculateRanges(
+        tileRange = tileRange,
+        tileKeys = exploredTiles.toTileKeysFor(tileRange),
+        includeMatchingTiles = false,
+    )
+
+    fun calculateExploredTileRanges(
+        tileRange: ExplorationTileRange?,
+        exploredTiles: Set<MapTile>,
+    ): List<ExplorationTileRange> = calculateRanges(
+        tileRange = tileRange,
+        tileKeys = exploredTiles.toTileKeysFor(tileRange),
+        includeMatchingTiles = true,
+    )
+
+    private fun calculateRanges(
+        tileRange: ExplorationTileRange?,
+        tileKeys: Set<Long>,
+        includeMatchingTiles: Boolean,
     ): List<ExplorationTileRange> {
         if (tileRange == null) {
             return emptyList()
         }
-        val exploredTileKeys = exploredTiles
-            .asSequence()
-            .filter { it.zoom == tileRange.zoom }
-            .mapTo(HashSet(), MapTile::packedValue)
-
         val completedRanges = mutableListOf<ExplorationTileRange>()
         var activeRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
         for (y in tileRange.minY..tileRange.maxY) {
             val currentRanges = mutableMapOf<RowSpan, MutableFogRange>()
 
-            for (span in rowSpans(tileRange, exploredTileKeys, y)) {
+            for (span in rowSpans(tileRange, tileKeys, y, includeMatchingTiles)) {
                 val continuedRange = activeRanges.remove(span)
 
                 if (continuedRange != null) {
@@ -51,22 +65,28 @@ class FogOfWarCalculator @Inject constructor() {
 
     private fun rowSpans(
         visibleRange: ExplorationTileRange,
-        exploredTileKeys: Set<Long>,
+        tileKeys: Set<Long>,
         y: Int,
+        includeMatchingTiles: Boolean,
     ): List<RowSpan> {
         val spans = mutableListOf<RowSpan>()
         var spanStartX: Int? = null
 
         for (x in visibleRange.minX..visibleRange.maxX) {
-            val isExplored = MapTile.pack(
+            val hasMatchingTile = MapTile.pack(
                 zoom = visibleRange.zoom,
                 x = x,
                 y = y,
-            ) in exploredTileKeys
+            ) in tileKeys
+            val shouldIncludeTile = if (includeMatchingTiles) {
+                hasMatchingTile
+            } else {
+                !hasMatchingTile
+            }
 
-            if (!isExplored && spanStartX == null) {
+            if (shouldIncludeTile && spanStartX == null) {
                 spanStartX = x
-            } else if (isExplored && spanStartX != null) {
+            } else if (!shouldIncludeTile && spanStartX != null) {
                 spans += RowSpan(
                     minX = spanStartX,
                     maxX = x - 1,
@@ -103,5 +123,15 @@ class FogOfWarCalculator @Inject constructor() {
             minY = minY,
             maxY = maxY,
         )
+    }
+
+    private fun Set<MapTile>.toTileKeysFor(tileRange: ExplorationTileRange?): Set<Long> {
+        if (tileRange == null) {
+            return emptySet()
+        }
+
+        return asSequence()
+            .filter { tileRange.contains(it) }
+            .mapTo(HashSet(), MapTile::packedValue)
     }
 }

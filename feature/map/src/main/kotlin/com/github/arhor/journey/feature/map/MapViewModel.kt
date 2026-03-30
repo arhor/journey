@@ -8,11 +8,13 @@ import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.ui.MviViewModel
+import com.github.arhor.journey.domain.internal.tileAt
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
@@ -185,11 +187,34 @@ class MapViewModel @Inject constructor(
             .distinctUntilChanged()
 
     private fun observeVisibleResourceSpawnObjects(): Flow<List<MapObjectUiModel>> =
-        observeResourceDerivedData()
-            .map { resourceDerivedData ->
-                resourceDerivedData.resourceSpawns.map { resourceSpawn ->
-                    resourceSpawn.toUiModel()
-                }
+        combine(
+            observeResourceDerivedData(),
+            observeFogVisibilitySnapshot(),
+        ) { resourceDerivedData, fogVisibility ->
+            val canonicalZoom = fogVisibility.canonicalZoom
+                .takeIf { it > 0 }
+                ?: initialTileRuntimeConfig.canonicalZoom
+
+            val visibilityTileMask = fogVisibility.visibilityTileMask
+
+            resourceDerivedData.resourceSpawns.map { resourceSpawn ->
+                resourceSpawn.toUiModel(
+                    isHiddenByFog = resourceSpawn.isHiddenByFog(
+                        canonicalZoom = canonicalZoom,
+                        visibilityTileMask = visibilityTileMask,
+                    ),
+                )
+            }
+        }
+            .distinctUntilChanged()
+
+    private fun observeFogVisibilitySnapshot(): Flow<FogVisibilitySnapshot> =
+        fogOfWarController.visibilityState
+            .map { visibilityState ->
+                FogVisibilitySnapshot(
+                    canonicalZoom = visibilityState.canonicalZoom,
+                    visibilityTileMask = visibilityState.visibilityTileMask,
+                )
             }
             .distinctUntilChanged()
 
@@ -651,7 +676,7 @@ class MapViewModel @Inject constructor(
             isDiscovered = isDiscovered,
         )
 
-    private fun ResourceSpawn.toUiModel(): MapObjectUiModel =
+    private fun ResourceSpawn.toUiModel(isHiddenByFog: Boolean): MapObjectUiModel =
         MapObjectUiModel(
             id = mapObjectId(
                 kind = MapObjectKind.ResourceSpawn,
@@ -663,8 +688,17 @@ class MapViewModel @Inject constructor(
             position = position.toLatLng(),
             radiusMeters = collectionRadiusMeters.toInt(),
             isDiscovered = false,
+            isHiddenByFog = isHiddenByFog,
             resourceType = ResourceType.fromTypeId(typeId),
         )
+
+    private fun ResourceSpawn.isHiddenByFog(
+        canonicalZoom: Int,
+        visibilityTileMask: Set<MapTile>,
+    ): Boolean = tileAt(
+        point = position,
+        zoom = canonicalZoom,
+    ) !in visibilityTileMask
 
     private fun parseMapObjectId(id: String): ParsedMapObjectId? {
         val parts = id.split(MAP_OBJECT_ID_SEPARATOR, limit = 2)
@@ -728,6 +762,12 @@ class MapViewModel @Inject constructor(
     private data class ResourceDerivedData(
         val queryBounds: GeoBounds?,
         val resourceSpawns: List<ResourceSpawn>,
+    )
+
+    @Immutable
+    private data class FogVisibilitySnapshot(
+        val canonicalZoom: Int,
+        val visibilityTileMask: Set<MapTile>,
     )
 
     @Immutable

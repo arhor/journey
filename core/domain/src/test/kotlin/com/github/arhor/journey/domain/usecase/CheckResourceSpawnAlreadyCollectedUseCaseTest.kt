@@ -17,7 +17,7 @@ import java.time.Instant
 class CheckResourceSpawnAlreadyCollectedUseCaseTest {
 
     @Test
-    fun `invoke should query claim state for the current hero`() = runTest {
+    fun `invoke should query collected state for the current hero`() = runTest {
         // Given
         val hero = hero(id = "player")
         val repository = FakeCollectedResourceSpawnRepository(isCollected = true)
@@ -76,7 +76,7 @@ class CheckResourceSpawnAlreadyCollectedUseCaseTest {
             return isCollected
         }
 
-        override suspend fun recordClaim(
+        override suspend fun markCollected(
             heroId: String,
             spawnId: String,
             resourceTypeId: String,

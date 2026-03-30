@@ -6,4 +6,5 @@ internal data class FogOfWarGeometryMetrics(
     val boundaryEdgeCount: Int = 0,
     val loopCount: Int = 0,
     val ringPointCount: Int = 0,
+    val resolvedAmbiguousVertexCount: Int = 0,
 )

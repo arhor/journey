@@ -4,4 +4,5 @@ internal data class TileRegionGeometryMetrics(
     val boundaryEdgeCount: Int,
     val loopCount: Int,
     val ringPointCount: Int,
+    val resolvedAmbiguousVertexCount: Int,
 )
