@@ -1,6 +1,7 @@
 package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.domain.model.ExplorationTileRange
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderMode
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.JsonObject
@@ -81,30 +82,60 @@ class FowRenderDataFactoryTest {
     }
 
     @Test
-    fun `create should fallback to rectangular polygons when geometry extraction hits an ambiguous boundary vertex`() {
+    fun `createDetailed should return smoothed diagnostics when geometry extraction resolves an ambiguous boundary vertex`() {
         // Given
         val factory = FowRenderDataFactory()
-        val ambiguousFogRanges = listOf(
-            cellRange(x = 0, y = 0),
-            cellRange(x = 0, y = 1),
-            cellRange(x = 0, y = 2),
-            cellRange(x = 1, y = 0),
-            cellRange(x = 1, y = 2),
-            cellRange(x = 2, y = 0),
-            cellRange(x = 2, y = 1),
-        )
+        val ambiguousFogRanges = ambiguousBoundaryRanges()
 
         // When
-        val actual = factory.create(ambiguousFogRanges)
+        val actual = factory.createDetailed(ambiguousFogRanges)
 
         // Then
         actual.shouldNotBeNull()
+        actual.renderMode shouldBe FogOfWarRenderMode.SMOOTHED
+        actual.featureCount shouldBe 1
+        actual.loopCount shouldBe 2
+        actual.resolvedAmbiguousVertexCount shouldBe 1
+    }
+
+    @Test
+    fun `createDetailedUncached should fallback to rectangular polygons when smoothed geometry building fails`() {
+        // Given
+        val factory = FowRenderDataFactory()
+        val fogRanges = listOf(
+            cellRange(x = 10, y = 10),
+            cellRange(x = 12, y = 12),
+        )
+
+        // When
+        val actual = factory.createDetailedUncached(fogRanges) {
+            throw IllegalArgumentException("Synthetic geometry failure")
+        }
+
+        // Then
+        actual.shouldNotBeNull()
+        actual.renderMode shouldBe FogOfWarRenderMode.FALLBACK
+        actual.featureCount shouldBe fogRanges.size
+        actual.boundaryEdgeCount shouldBe 0
+        actual.loopCount shouldBe 0
+        actual.ringPointCount shouldBe 0
+        actual.resolvedAmbiguousVertexCount shouldBe 0
     }
 
     internal fun List<ExplorationTileRange>.toFeatureCollection(): FeatureCollection<Polygon, JsonObject?> =
         this.toTileRegionGeometriesBuildResult()
             .geometries
             .toPolygonFeatureCollection()
+
+    private fun ambiguousBoundaryRanges(): List<ExplorationTileRange> = listOf(
+        cellRange(x = 0, y = 0),
+        cellRange(x = 0, y = 1),
+        cellRange(x = 0, y = 2),
+        cellRange(x = 1, y = 0),
+        cellRange(x = 1, y = 2),
+        cellRange(x = 2, y = 0),
+        cellRange(x = 2, y = 1),
+    )
 
     private fun cellRange(
         x: Int,

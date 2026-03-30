@@ -34,6 +34,7 @@ private const val HALF_LONGITUDE_SPAN = 180.0
 private const val FULL_LONGITUDE_SPAN = 360.0
 private const val DEGREES_PER_RADIAN = 180.0 / PI
 private const val FULL_TURN_RADIANS = PI * 2.0
+private const val REPRESENTATIVE_POINT_OFFSET_TILES = 0.05
 
 internal const val GEOMETRY_EPSILON = 1e-9
 
@@ -50,6 +51,7 @@ internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
     var boundaryEdgeCount = 0
     var loopCount = 0
     var ringPointCount = 0
+    var resolvedAmbiguousVertexCount = 0
 
     val geometries = groupBy(ExplorationTileRange::zoom)
         .toSortedMap()
@@ -69,8 +71,10 @@ internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
                     boundaryEdgeCount += geometryResult.metrics.boundaryEdgeCount
                     loopCount += geometryResult.metrics.loopCount
                     ringPointCount += geometryResult.metrics.ringPointCount
-                    geometryResult.geometry
+                    resolvedAmbiguousVertexCount += geometryResult.metrics.resolvedAmbiguousVertexCount
+                    geometryResult.geometries
                 }
+                .flatten()
                 .sortedWith(
                     compareBy<TileRegionGeometry> { it.outerRing.points.first().y }
                         .thenBy { it.outerRing.points.first().x },
@@ -85,6 +89,7 @@ internal fun List<ExplorationTileRange>.toTileRegionGeometriesBuildResult(
             boundaryEdgeCount = boundaryEdgeCount,
             loopCount = loopCount,
             ringPointCount = ringPointCount,
+            resolvedAmbiguousVertexCount = resolvedAmbiguousVertexCount,
         ),
     )
 }
@@ -220,41 +225,81 @@ private fun Set<TileCell>.toTileRegionGeometryBuildResult(
     arcSegmentsPerCorner: Int,
 ): TileRegionGeometryBuildResult {
     val boundaryLoopResult = extractBoundaryLoops()
-    val boundaryLoops = boundaryLoopResult.loops
-    val exteriorLoop = boundaryLoops.maxBy { abs(it.signedAreaGeo()) }
-    val holeLoops = boundaryLoops
-        .filterNot { it === exteriorLoop }
-        .sortedWith(compareBy<List<GridPoint>> { it.minOf(GridPoint::y) }.thenBy { it.minOf(GridPoint::x) })
+    val boundaryLoops = boundaryLoopResult.loops.map { loop ->
+        loop.validateClosedRing(label = "Orthogonal fog boundary loop")
+        LoopDescriptor(
+            points = loop,
+            representativePoint = loop.findInteriorProbePoint(),
+            sortKey = loop.minimumPoint(),
+        )
+    }
+    val containingLoops = boundaryLoops.associateWith { loop ->
+        boundaryLoops.filter { candidate ->
+            candidate !== loop && candidate.points.locatePoint(loop.representativePoint) == PointLocation.INSIDE
+        }
+    }
+    val outerLoops = boundaryLoops
+        .filter { containingLoops.getValue(it).isEmpty() }
+        .sortedWith(compareBy<LoopDescriptor> { it.sortKey.y }.thenBy { it.sortKey.x })
+    val holeLoopsByOuter = boundaryLoops
+        .filter { containingLoops.getValue(it).size == 1 }
+        .groupBy { hole ->
+            outerLoops
+                .filter { outer -> outer.points.locatePoint(hole.representativePoint) == PointLocation.INSIDE }
+                .minByOrNull { abs(it.points.signedAreaGeo()) }
+                ?: error("Failed to assign fog boundary hole to an outer loop.")
+        }
 
-    val geometry = TileRegionGeometry(
-        zoom = zoom,
-        outerRing = TileRegionRing(
-            exteriorLoop
+    boundaryLoops.forEach { loop ->
+        val containingCount = containingLoops.getValue(loop).size
+        check(containingCount <= 1) {
+            "Nested fog boundary loops are unsupported for ${loop.sortKey}."
+        }
+    }
+
+    val strictValidation = boundaryLoopResult.resolvedAmbiguousVertexCount > 0 || holeLoopsByOuter.isNotEmpty()
+    val geometries = outerLoops.map { outerLoop ->
+        val outerRing = TileRegionRing(
+            outerLoop.points
                 .roundOrthogonalLoop(cornerRadiusTiles, arcSegmentsPerCorner)
                 .ensureCounterClockwiseGeo()
                 .canonicalizeClosedRing(),
-        ),
-        holeRings = holeLoops.map { loop ->
-            TileRegionRing(
-                loop.roundOrthogonalLoop(cornerRadiusTiles, arcSegmentsPerCorner)
-                    .ensureClockwiseGeo()
-                    .canonicalizeClosedRing(),
-            )
-        },
-    )
+        )
+        val holeRings = holeLoopsByOuter[outerLoop]
+            .orEmpty()
+            .sortedWith(compareBy<LoopDescriptor> { it.sortKey.y }.thenBy { it.sortKey.x })
+            .map { loop ->
+                TileRegionRing(
+                    loop.points
+                        .roundOrthogonalLoop(cornerRadiusTiles, arcSegmentsPerCorner)
+                        .ensureClockwiseGeo()
+                        .canonicalizeClosedRing(),
+                )
+            }
+        TileRegionGeometry(
+            zoom = zoom,
+            outerRing = outerRing,
+            holeRings = holeRings,
+        ).also { geometry ->
+            geometry.validate(strict = strictValidation)
+        }
+    }
 
     return TileRegionGeometryBuildResult(
-        geometry = geometry,
+        geometries = geometries,
         metrics = TileRegionGeometryMetrics(
             boundaryEdgeCount = boundaryLoopResult.boundaryEdgeCount,
             loopCount = boundaryLoops.size,
-            ringPointCount = geometry.outerRing.points.size + geometry.holeRings.sumOf { it.points.size },
+            ringPointCount = geometries.sumOf { geometry ->
+                geometry.outerRing.points.size + geometry.holeRings.sumOf { it.points.size }
+            },
+            resolvedAmbiguousVertexCount = boundaryLoopResult.resolvedAmbiguousVertexCount,
         ),
     )
 }
 
 private fun Set<TileCell>.extractBoundaryLoops(): BoundaryLoopsResult {
-    val edgesByStart = mutableMapOf<GridVertex, DirectedEdge>()
+    val edgesByStart = mutableMapOf<GridVertex, MutableList<DirectedEdge>>()
 
     for (cell in this) {
         if (TileCell(x = cell.x, y = cell.y - 1) !in this) {
@@ -286,26 +331,44 @@ private fun Set<TileCell>.extractBoundaryLoops(): BoundaryLoopsResult {
         }
     }
 
-    val remainingStarts = edgesByStart.keys.toMutableSet()
+    val remainingEdges = edgesByStart.values
+        .flatten()
+        .toMutableSet()
     val loops = mutableListOf<List<GridPoint>>()
+    val resolvedAmbiguousVertices = mutableSetOf<GridVertex>()
 
-    while (remainingStarts.isNotEmpty()) {
-        val firstStart = remainingStarts.minWith(compareBy<GridVertex> { it.y }.thenBy { it.x })
-        val firstEdge = edgesByStart.getValue(firstStart)
+    while (remainingEdges.isNotEmpty()) {
+        val firstEdge = remainingEdges.minWith(
+            compareBy<DirectedEdge> { it.start.y }
+                .thenBy { it.start.x }
+                .thenBy { it.end.y }
+                .thenBy { it.end.x },
+        )
         val vertices = mutableListOf<GridVertex>()
         var currentEdge = firstEdge
 
         while (true) {
-            remainingStarts.remove(currentEdge.start)
+            check(remainingEdges.remove(currentEdge)) {
+                "Encountered a duplicate fog boundary traversal at ${currentEdge.start}."
+            }
             vertices += currentEdge.start
 
-            if (currentEdge.end == firstStart) {
+            if (currentEdge.end == firstEdge.start) {
                 vertices += currentEdge.end
                 break
             }
 
-            currentEdge = edgesByStart[currentEdge.end]
-                ?: error("Failed to continue fog boundary loop at ${currentEdge.end}.")
+            val nextEdges = edgesByStart[currentEdge.end]
+                .orEmpty()
+                .filter(remainingEdges::contains)
+            if (nextEdges.size == 2) {
+                resolvedAmbiguousVertices += currentEdge.end
+            }
+
+            currentEdge = resolveNextBoundaryEdge(
+                currentEdge = currentEdge,
+                nextEdges = nextEdges,
+            )
         }
 
         loops += vertices.simplifyOrthogonalLoop()
@@ -313,16 +376,46 @@ private fun Set<TileCell>.extractBoundaryLoops(): BoundaryLoopsResult {
 
     return BoundaryLoopsResult(
         loops = loops,
-        boundaryEdgeCount = edgesByStart.size,
+        boundaryEdgeCount = edgesByStart.values.sumOf(List<DirectedEdge>::size),
+        resolvedAmbiguousVertexCount = resolvedAmbiguousVertices.size,
     )
 }
 
-private fun MutableMap<GridVertex, DirectedEdge>.addBoundaryEdge(
+private fun Set<TileCell>.resolveNextBoundaryEdge(
+    currentEdge: DirectedEdge,
+    nextEdges: List<DirectedEdge>,
+): DirectedEdge {
+    return when (nextEdges.size) {
+        0 -> error("Failed to continue fog boundary loop at ${currentEdge.end}.")
+        1 -> nextEdges.single()
+        2 -> {
+            check(hasAlternatingOccupancy(vertex = currentEdge.end)) {
+                "Encountered an unsupported ambiguous fog boundary edge at ${currentEdge.end}."
+            }
+            val desiredDirection = currentEdge.direction().turnLeft()
+            nextEdges.firstOrNull { it.direction() == desiredDirection }
+                ?: error("Failed to resolve fog boundary loop at ${currentEdge.end}.")
+        }
+        else -> error("Encountered an unsupported fog boundary degree at ${currentEdge.end}.")
+    }
+}
+
+private fun Set<TileCell>.hasAlternatingOccupancy(vertex: GridVertex): Boolean {
+    val northWest = TileCell(x = vertex.x - 1, y = vertex.y - 1) in this
+    val northEast = TileCell(x = vertex.x, y = vertex.y - 1) in this
+    val southEast = TileCell(x = vertex.x, y = vertex.y) in this
+    val southWest = TileCell(x = vertex.x - 1, y = vertex.y) in this
+
+    return (northWest && southEast && !northEast && !southWest)
+        || (northEast && southWest && !northWest && !southEast)
+}
+
+private fun MutableMap<GridVertex, MutableList<DirectedEdge>>.addBoundaryEdge(
     start: GridVertex,
     end: GridVertex,
 ) {
-    val previous = put(start, DirectedEdge(start = start, end = end))
-    check(previous == null) { "Encountered an ambiguous fog boundary edge at $start." }
+    getOrPut(start) { mutableListOf() }
+        .add(DirectedEdge(start = start, end = end))
 }
 
 private fun List<GridVertex>.simplifyOrthogonalLoop(): List<GridPoint> {
@@ -427,6 +520,43 @@ private fun List<GridPoint>.signedAreaGeo(): Double {
     return area / 2.0
 }
 
+private fun TileRegionGeometry.validate(strict: Boolean) {
+    outerRing.points.validateClosedRing(label = "Fog outer ring", validateSelfIntersection = strict)
+    holeRings.forEachIndexed { index, ring ->
+        ring.points.validateClosedRing(label = "Fog hole ring #$index", validateSelfIntersection = strict)
+    }
+
+    if (!strict) {
+        return
+    }
+
+    holeRings.forEachIndexed { index, holeRing ->
+        check(!outerRing.points.sharesPointsWith(holeRing.points)) {
+            "Fog hole ring #$index still touches the outer ring after smoothing."
+        }
+        check(!outerRing.points.intersectsWith(holeRing.points)) {
+            "Fog hole ring #$index intersects the outer ring after smoothing."
+        }
+        val representativePoint = holeRing.points.findInteriorProbePoint()
+        check(outerRing.points.locatePoint(representativePoint) == PointLocation.INSIDE) {
+            "Fog hole ring #$index is not strictly inside the outer ring."
+        }
+    }
+
+    for (leftIndex in holeRings.indices) {
+        for (rightIndex in leftIndex + 1 until holeRings.size) {
+            val left = holeRings[leftIndex].points
+            val right = holeRings[rightIndex].points
+            check(!left.sharesPointsWith(right)) {
+                "Fog hole rings #$leftIndex and #$rightIndex share a boundary point."
+            }
+            check(!left.intersectsWith(right)) {
+                "Fog hole rings #$leftIndex and #$rightIndex intersect."
+            }
+        }
+    }
+}
+
 private fun tileYToLatitude(
     tileY: Double,
     zoom: Int,
@@ -445,6 +575,194 @@ private fun MutableList<GridPoint>.addIfDistinct(point: GridPoint) {
     }
 }
 
+private fun List<GridPoint>.validateClosedRing(
+    label: String,
+    validateSelfIntersection: Boolean = true,
+) {
+    require(size >= 4) { "$label must contain at least 4 points." }
+    require(first().closeTo(last(), GEOMETRY_EPSILON)) { "$label must be closed." }
+
+    for (index in 0 until lastIndex) {
+        check(!this[index].closeTo(this[index + 1], GEOMETRY_EPSILON)) {
+            "$label contains consecutive duplicate points at index $index."
+        }
+    }
+
+    if (validateSelfIntersection) {
+        validateNoSelfIntersections(label = label)
+    }
+}
+
+private fun List<GridPoint>.validateNoSelfIntersections(label: String) {
+    val segmentCount = lastIndex
+
+    for (leftIndex in 0 until segmentCount) {
+        val leftStart = this[leftIndex]
+        val leftEnd = this[leftIndex + 1]
+
+        for (rightIndex in leftIndex + 1 until segmentCount) {
+            if (areAdjacentSegments(leftIndex, rightIndex, segmentCount)) {
+                continue
+            }
+
+            val rightStart = this[rightIndex]
+            val rightEnd = this[rightIndex + 1]
+
+            check(!segmentsIntersect(leftStart, leftEnd, rightStart, rightEnd)) {
+                "$label intersects itself between segments $leftIndex and $rightIndex."
+            }
+        }
+    }
+}
+
+private fun List<GridPoint>.findInteriorProbePoint(): GridPoint {
+    for (index in 0 until lastIndex) {
+        val start = this[index]
+        val end = this[index + 1]
+        val segment = end - start
+        val segmentLength = segment.length()
+        if (segmentLength <= GEOMETRY_EPSILON) {
+            continue
+        }
+
+        val midpoint = GridPoint(
+            x = (start.x + end.x) / 2.0,
+            y = (start.y + end.y) / 2.0,
+        )
+        val offset = min(REPRESENTATIVE_POINT_OFFSET_TILES, segmentLength / 4.0)
+        val normal = GridPoint(
+            x = -segment.y / segmentLength * offset,
+            y = segment.x / segmentLength * offset,
+        )
+        val candidates = listOf(
+            midpoint + normal,
+            midpoint - normal,
+        )
+
+        candidates.firstOrNull { candidate -> locatePoint(candidate) == PointLocation.INSIDE }
+            ?.let { return it }
+    }
+
+    error("Failed to find an interior probe point for a fog boundary loop.")
+}
+
+private fun List<GridPoint>.locatePoint(point: GridPoint): PointLocation {
+    for (index in 0 until lastIndex) {
+        if (point.isOnSegment(start = this[index], end = this[index + 1])) {
+            return PointLocation.BOUNDARY
+        }
+    }
+
+    var isInside = false
+
+    for (index in 0 until lastIndex) {
+        val start = this[index]
+        val end = this[index + 1]
+        val intersectsRay = (start.y > point.y) != (end.y > point.y) &&
+            point.x < ((end.x - start.x) * (point.y - start.y) / (end.y - start.y) + start.x)
+
+        if (intersectsRay) {
+            isInside = !isInside
+        }
+    }
+
+    return if (isInside) PointLocation.INSIDE else PointLocation.OUTSIDE
+}
+
+private fun List<GridPoint>.sharesPointsWith(other: List<GridPoint>): Boolean {
+    return dropLast(1).any { point ->
+        other.dropLast(1).any { candidate -> point.closeTo(candidate, GEOMETRY_EPSILON) }
+    }
+}
+
+private fun List<GridPoint>.intersectsWith(other: List<GridPoint>): Boolean {
+    for (leftIndex in 0 until lastIndex) {
+        val leftStart = this[leftIndex]
+        val leftEnd = this[leftIndex + 1]
+
+        for (rightIndex in 0 until other.lastIndex) {
+            val rightStart = other[rightIndex]
+            val rightEnd = other[rightIndex + 1]
+
+            if (segmentsIntersect(leftStart, leftEnd, rightStart, rightEnd)) {
+                return true
+            }
+        }
+    }
+
+    return false
+}
+
+private fun GridPoint.isOnSegment(
+    start: GridPoint,
+    end: GridPoint,
+): Boolean {
+    val cross = ((end.x - start.x) * (y - start.y)) - ((end.y - start.y) * (x - start.x))
+    if (!cross.closeTo(0.0, GEOMETRY_EPSILON)) {
+        return false
+    }
+
+    val minX = min(start.x, end.x) - GEOMETRY_EPSILON
+    val maxX = kotlin.math.max(start.x, end.x) + GEOMETRY_EPSILON
+    val minY = min(start.y, end.y) - GEOMETRY_EPSILON
+    val maxY = kotlin.math.max(start.y, end.y) + GEOMETRY_EPSILON
+
+    return x in minX..maxX && y in minY..maxY
+}
+
+private fun segmentsIntersect(
+    startA: GridPoint,
+    endA: GridPoint,
+    startB: GridPoint,
+    endB: GridPoint,
+): Boolean {
+    val orientation1 = orientation(startA, endA, startB)
+    val orientation2 = orientation(startA, endA, endB)
+    val orientation3 = orientation(startB, endB, startA)
+    val orientation4 = orientation(startB, endB, endA)
+
+    if (orientation1 * orientation2 < 0.0 && orientation3 * orientation4 < 0.0) {
+        return true
+    }
+
+    return (orientation1.closeTo(0.0, GEOMETRY_EPSILON) && startB.isOnSegment(startA, endA)) ||
+        (orientation2.closeTo(0.0, GEOMETRY_EPSILON) && endB.isOnSegment(startA, endA)) ||
+        (orientation3.closeTo(0.0, GEOMETRY_EPSILON) && startA.isOnSegment(startB, endB)) ||
+        (orientation4.closeTo(0.0, GEOMETRY_EPSILON) && endA.isOnSegment(startB, endB))
+}
+
+private fun orientation(
+    start: GridPoint,
+    end: GridPoint,
+    point: GridPoint,
+): Double = ((end.x - start.x) * (point.y - start.y)) - ((end.y - start.y) * (point.x - start.x))
+
+private fun areAdjacentSegments(
+    leftIndex: Int,
+    rightIndex: Int,
+    segmentCount: Int,
+): Boolean {
+    return leftIndex == rightIndex ||
+        abs(leftIndex - rightIndex) == 1 ||
+        (leftIndex == 0 && rightIndex == segmentCount - 1) ||
+        (rightIndex == 0 && leftIndex == segmentCount - 1)
+}
+
+private fun List<GridPoint>.minimumPoint(): GridPoint {
+    val openLoop = dropLast(1)
+
+    return openLoop.minWith(compareBy<GridPoint> { it.y }.thenBy { it.x })
+}
+
+private fun DirectedEdge.direction(): EdgeDirection {
+    return when {
+        end.x > start.x -> EdgeDirection.EAST
+        end.x < start.x -> EdgeDirection.WEST
+        end.y > start.y -> EdgeDirection.SOUTH
+        else -> EdgeDirection.NORTH
+    }
+}
+
 private fun areCollinear(a: GridVertex, b: GridVertex, c: GridVertex): Boolean {
     return (a.x == b.x && b.x == c.x)
         || (a.y == b.y && b.y == c.y)
@@ -457,4 +775,31 @@ private fun areCollinear(a: GridPoint, b: GridPoint, c: GridPoint): Boolean {
 
 private fun Double.closeTo(that: Double, epsilon: Double = GEOMETRY_EPSILON): Boolean {
     return abs(this - that) <= epsilon
+}
+
+private data class LoopDescriptor(
+    val points: List<GridPoint>,
+    val representativePoint: GridPoint,
+    val sortKey: GridPoint,
+)
+
+private enum class PointLocation {
+    INSIDE,
+    OUTSIDE,
+    BOUNDARY,
+}
+
+private enum class EdgeDirection {
+    NORTH,
+    EAST,
+    SOUTH,
+    WEST,
+    ;
+
+    fun turnLeft(): EdgeDirection = when (this) {
+        NORTH -> WEST
+        EAST -> NORTH
+        SOUTH -> EAST
+        WEST -> SOUTH
+    }
 }

@@ -1,6 +1,6 @@
 package com.github.arhor.journey.feature.map.fow.model
 
 internal data class TileRegionGeometryBuildResult(
-    val geometry: TileRegionGeometry,
+    val geometries: List<TileRegionGeometry>,
     val metrics: TileRegionGeometryMetrics,
 )
