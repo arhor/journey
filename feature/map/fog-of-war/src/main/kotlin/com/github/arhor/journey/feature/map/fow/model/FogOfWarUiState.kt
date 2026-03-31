@@ -3,7 +3,6 @@ package com.github.arhor.journey.feature.map.fow.model
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.domain.model.MapTile
 
 @Immutable
 data class FogOfWarUiState(
@@ -21,26 +20,12 @@ data class FogOfWarUiState(
     val visibleExploredTileCount: Int = 0,
     val isSuppressedByVisibleTileLimit: Boolean = false,
     val isRecomputing: Boolean = false,
-)
+) {
 
-@Immutable
-data class FogOfWarVisibilityState(
-    val canonicalZoom: Int = 0,
-    val visibilityTileMask: Set<MapTile> = emptySet(),
-)
-
-@Immutable
-data class FogOfWarRenderState(
-    val isOverlayEnabled: Boolean = true,
-    val hiddenExploredRenderData: FogOfWarRenderData? = null,
-    val activeRenderData: FogOfWarRenderData? = null,
-    val handoffRenderData: FogOfWarRenderData? = null,
-)
-
-val FogOfWarUiState.renderState: FogOfWarRenderState
-    get() = FogOfWarRenderState(
+    fun toRenderState(): FogOfWarRenderState = FogOfWarRenderState(
         isOverlayEnabled = isOverlayEnabled,
         hiddenExploredRenderData = hiddenExploredRenderData,
         activeRenderData = activeRenderData,
         handoffRenderData = handoffRenderData,
     )
+}

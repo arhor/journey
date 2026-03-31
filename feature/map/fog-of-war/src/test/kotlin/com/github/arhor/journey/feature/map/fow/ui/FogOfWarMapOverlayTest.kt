@@ -4,13 +4,12 @@ import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
-import com.github.arhor.journey.feature.map.fow.model.renderState
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.collections.shouldContainExactly
-import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.matchers.shouldBe
-import org.maplibre.compose.sources.GeoJsonData
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.Test
+import org.maplibre.compose.sources.GeoJsonData
 
 class FogOfWarMapOverlayTest {
 
@@ -142,8 +141,8 @@ class FogOfWarMapOverlayTest {
         )
 
         // When
-        val baselineRenderState = baseline.renderState
-        val updatedRenderState = updatedDiagnostics.renderState
+        val baselineRenderState = baseline.toRenderState()
+        val updatedRenderState = updatedDiagnostics.toRenderState()
 
         // Then
         baselineRenderState shouldBe updatedRenderState

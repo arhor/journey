@@ -32,7 +32,6 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.fow.ui.FogOfWarOverlay
-import com.github.arhor.journey.feature.map.fow.model.renderState
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -284,7 +283,7 @@ internal fun MapContent(
                         )
                     }
 
-                    FogOfWarOverlay(state = state.fogOfWar.renderState)
+                    FogOfWarOverlay(state = state.fogOfWar.toRenderState())
 
                     if (
                         state.debug.isTilesGridOverlayEnabled &&
