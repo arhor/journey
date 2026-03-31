@@ -21,7 +21,7 @@ For accepted-plan execution:
 - Do not model this as carrying skills across turns. Treat it as rebuilding the current implementation context.
 - Auto-apply `implement-compose-feature` when the accepted plan is implementation-ready and clearly describes Android
   Jetpack Compose feature work.
-- Auto-apply `collective-code-review` for non-trivial code changes unless the user explicitly asked to skip review.
+- Auto-apply `swarm-code-review` for non-trivial code changes unless the user explicitly asked to skip review.
 - If the plan handoff marks the plan as non-implementation or investigation-only, do not start coding from acceptance
   alone.
 

@@ -1,5 +1,5 @@
 ---
-name: collective-code-review
+name: swarm-code-review
 description: >-
   Automatically use this skill for substantive implementation tasks that modify repository code. Implement the
   change, run the configured local multi-agent review in parallel, resolve every reasonable finding, and summarize
@@ -7,10 +7,10 @@ description: >-
   explicitly asks to skip review.
 ---
 
-# Collective Code Review
+# Swarm Code Review
 
 Use this skill by default whenever you make a non-trivial code change or feature behavior change and there is a real
-patch to inspect. The user does not need to ask for collective review explicitly.
+patch to inspect. The user does not need to ask for swarm review explicitly.
 
 If execution starts from accepting an immediately preceding plan, treat the accepted plan plus the original user
 request as the implementation context. Use this skill whenever that reconstructed task produces a non-trivial patch,
@@ -129,7 +129,7 @@ After applying warranted fixes:
 
 ### 8) Final response requirements
 
-Your final task summary must include a compact collective code review section with:
+Your final task summary must include a compact swarm code review section with:
 
 - which reviewer agents ran
 - how many findings were raised

@@ -1,12 +1,12 @@
 ---
-name: collective-plan-review
+name: swarm-plan-review
 description: >-
   Automatically use this skill whenever the user asks for a repository-specific investigation, design proposal,
-  or implementation plan that is more than a trivial one-step answer. Draft the plan, run a collective review swarm,
+  or implementation plan that is more than a trivial one-step answer. Draft the plan, run a swarm review,
   and refine it before any code changes begin. Do not use for direct implementation tasks or trivial plans.
 ---
 
-# Collective Plan Review
+# Swarm Plan Review
 
 This skill is for planning work, not coding work.
 
@@ -18,7 +18,7 @@ Use it by default when the user wants Codex to:
 - have that plan reviewed by several specialist subagents,
 - refine the plan before any code changes begin.
 
-The user does not need to ask for collective review explicitly. If the task is a real planning request, this review
+The user does not need to ask for swarm review explicitly. If the task is a real planning request, this review
 workflow should happen automatically.
 
 Do **not** use this skill for:
@@ -27,7 +27,7 @@ Do **not** use this skill for:
 - tiny edits that do not need a real plan,
 - generic brainstorming detached from the current repository,
 - quick rough outlines when the user explicitly says to skip review,
-- post-change code review of a working tree. Use the implementation collective-code-review skill for that.
+- post-change code review of a working tree. Use the implementation `swarm-code-review` skill for that.
 
 ## Operating mode
 
@@ -129,7 +129,7 @@ The **Implementation handoff** section must be concise and structured. It must i
 
 - `plan_status`: `implementation-ready` or `non-implementation`
 - `recommended_skills`: the repo skill or skills that should be used when execution starts
-- `review_policy`: whether `collective-code-review` should run by default or be skipped because the user asked to skip review
+- `review_policy`: whether `swarm-code-review` should run by default or be skipped because the user asked to skip review
 - `acceptance_behavior`: whether a plain acceptance of the plan should start implementation or stop at investigation
 
 When `plan_status` is `implementation-ready`, state explicitly that a plain acceptance of the plan should execute it
