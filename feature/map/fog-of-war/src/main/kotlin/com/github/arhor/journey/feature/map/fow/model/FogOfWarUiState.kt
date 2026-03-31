@@ -6,7 +6,6 @@ import com.github.arhor.journey.domain.model.GeoBounds
 
 @Immutable
 data class FogOfWarUiState(
-    val isOverlayEnabled: Boolean = true,
     val canonicalZoom: Int = 0,
     val visibleBounds: GeoBounds? = null,
     val triggerBounds: GeoBounds? = null,
@@ -23,7 +22,6 @@ data class FogOfWarUiState(
 ) {
 
     fun toRenderState(): FogOfWarRenderState = FogOfWarRenderState(
-        isOverlayEnabled = isOverlayEnabled,
         hiddenExploredRenderData = hiddenExploredRenderData,
         activeRenderData = activeRenderData,
         handoffRenderData = handoffRenderData,

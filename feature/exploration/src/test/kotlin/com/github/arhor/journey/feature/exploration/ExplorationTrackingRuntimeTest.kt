@@ -142,6 +142,38 @@ class ExplorationTrackingRuntimeTest {
     }
 
     @Test
+    fun `startIfNeeded should reveal again for the same location after reveal radius changes`() = runTest {
+        // Given
+        val userLocationSource = FakeUserLocationSource()
+        val configHolder = ExplorationTileRuntimeConfigHolder()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
+        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
+        val runtime = ExplorationTrackingRuntime(
+            appScope = backgroundScope,
+            userLocationSource = userLocationSource,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
+            configHolder = configHolder,
+        )
+        val location = GeoPoint(lat = 40.7128, lon = -74.0060)
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns emptyList()
+
+        // When
+        runtime.startIfNeeded()
+        runCurrent()
+        userLocationSource.emit(UserLocationUpdate.Available(location))
+        runCurrent()
+        configHolder.setRevealRadiusMeters(100.0)
+        userLocationSource.emit(UserLocationUpdate.Available(location))
+        runCurrent()
+
+        // Then
+        coVerify(exactly = 2) { revealExplorationTilesAtLocation.invoke(location) }
+        coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(location) }
+    }
+
+    @Test
     fun `startIfNeeded should trigger nearby collection for distinct location buckets even when reveal tiles are unchanged`() = runTest {
         // Given
         val userLocationSource = FakeUserLocationSource()

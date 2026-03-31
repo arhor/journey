@@ -9,7 +9,6 @@ import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.internal.tileAt
-import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
@@ -18,7 +17,6 @@ import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
-import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
@@ -26,10 +24,7 @@ import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
-import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUseCase
-import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
-import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
 import com.github.arhor.journey.feature.map.model.CameraPositionState
@@ -75,12 +70,6 @@ private data class State(
     val isFollowingUserLocation: Boolean = true,
     val recenterRequestToken: Int = 0,
     val isAwaitingLocationPermissionResult: Boolean = false,
-    val isDebugControlsSheetVisible: Boolean = false,
-    val enabledDebugInfoItems: Set<MapDebugInfoItem> = emptySet(),
-    val isTilesGridOverlayEnabled: Boolean = false,
-    val canonicalZoom: Int,
-    val revealRadiusMeters: Int,
-    val mapRenderMode: MapRenderMode = MapRenderMode.Standard,
     val visibleBounds: GeoBounds? = null,
     val viewportSize: MapViewportSize? = null,
     val resourceQueryBounds: GeoBounds? = null,
@@ -95,14 +84,10 @@ class MapViewModel @Inject constructor(
     private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
-    private val clearExploredTiles: ClearExploredTilesUseCase,
     private val getExplorationTileRuntimeConfig: GetExplorationTileRuntimeConfigUseCase,
-    private val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
-    private val setExplorationTileRevealRadius: SetExplorationTileRevealRadiusUseCase,
     private val fogOfWarControllerFactory: FogOfWarController.Factory,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
-    private val stopExplorationTrackingSession: StopExplorationTrackingSessionUseCase,
     private val mapTilePrewarmer: MapTilePrewarmer,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
@@ -112,12 +97,7 @@ class MapViewModel @Inject constructor(
     }
 
     private val initialTileRuntimeConfig = getExplorationTileRuntimeConfig()
-    private val _state = MutableStateFlow(
-        State(
-            canonicalZoom = initialTileRuntimeConfig.canonicalZoom,
-            revealRadiusMeters = initialTileRuntimeConfig.revealRadiusMeters.toInt(),
-        ),
-    )
+    private val _state = MutableStateFlow(State())
     private val trackingSession = observeExplorationTrackingSession()
         .stateIn(
             scope = viewModelScope,
@@ -235,16 +215,6 @@ class MapViewModel @Inject constructor(
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
             is MapIntent.MapOpened -> onMapOpened()
-            is MapIntent.DebugControlsClicked -> onDebugControlsClicked()
-            is MapIntent.DebugControlsDismissed -> onDebugControlsDismissed()
-            is MapIntent.DebugInfoVisibilityChanged -> onDebugInfoVisibilityChanged(intent)
-            is MapIntent.FogOfWarOverlayToggled -> onFogOfWarOverlayToggled(intent)
-            is MapIntent.TilesGridOverlayToggled -> onTilesGridOverlayToggled(intent)
-            is MapIntent.CanonicalZoomChanged -> onCanonicalZoomChanged(intent)
-            is MapIntent.RevealRadiusMetersChanged -> onRevealRadiusMetersChanged(intent)
-            is MapIntent.MapRenderModeSelected -> onMapRenderModeSelected(intent)
-            is MapIntent.ResumeTrackingClicked -> onResumeTrackingClicked()
-            is MapIntent.StopTrackingClicked -> onStopTrackingClicked()
             is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
             is MapIntent.MapViewportSizeChanged -> onMapViewportSizeChanged(intent)
             is MapIntent.CameraGestureStarted -> onCameraGestureStarted(intent)
@@ -255,7 +225,6 @@ class MapViewModel @Inject constructor(
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
             is MapIntent.AddPoiClicked -> onAddPoiClicked()
-            is MapIntent.ResetExploredTilesClicked -> onClearExploredTilesClicked()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
@@ -266,75 +235,6 @@ class MapViewModel @Inject constructor(
         ?: flowOf(emptyList())
 
     private suspend fun onMapOpened() {
-        startTrackingSessionIfNeeded()
-    }
-
-    private fun onDebugControlsClicked() {
-        _state.update {
-            it.copy(isDebugControlsSheetVisible = true)
-        }
-    }
-
-    private fun onDebugControlsDismissed() {
-        _state.update {
-            it.copy(isDebugControlsSheetVisible = false)
-        }
-    }
-
-    private fun onDebugInfoVisibilityChanged(intent: MapIntent.DebugInfoVisibilityChanged) {
-        _state.update { state ->
-            val enabledItems = state.enabledDebugInfoItems.toMutableSet().apply {
-                if (intent.isVisible) {
-                    add(intent.item)
-                } else {
-                    remove(intent.item)
-                }
-            }
-
-            state.copy(enabledDebugInfoItems = enabledItems.toSet())
-        }
-    }
-
-    private fun onFogOfWarOverlayToggled(intent: MapIntent.FogOfWarOverlayToggled) {
-        fogOfWarController.setOverlayEnabled(intent.isEnabled)
-    }
-
-    private fun onTilesGridOverlayToggled(intent: MapIntent.TilesGridOverlayToggled) {
-        _state.update {
-            it.copy(isTilesGridOverlayEnabled = intent.isEnabled)
-        }
-    }
-
-    private fun onCanonicalZoomChanged(intent: MapIntent.CanonicalZoomChanged) {
-        val canonicalZoom = intent.value.coerceIn(
-            minimumValue = ExplorationTileRuntimeConfig.MIN_CANONICAL_ZOOM,
-            maximumValue = ExplorationTileRuntimeConfig.MAX_CANONICAL_ZOOM,
-        )
-        setExplorationTileCanonicalZoom(canonicalZoom)
-
-        _state.update {
-            it.copy(canonicalZoom = canonicalZoom)
-        }
-    }
-
-    private fun onRevealRadiusMetersChanged(intent: MapIntent.RevealRadiusMetersChanged) {
-        val revealRadiusMeters = intent.value.coerceAtLeast(
-            minimumValue = ExplorationTileRuntimeConfig.MIN_REVEAL_RADIUS_METERS.toInt(),
-        )
-        setExplorationTileRevealRadius(revealRadiusMeters.toDouble())
-
-        _state.update {
-            it.copy(revealRadiusMeters = revealRadiusMeters)
-        }
-    }
-
-    private fun onMapRenderModeSelected(intent: MapIntent.MapRenderModeSelected) {
-        _state.update {
-            it.copy(mapRenderMode = intent.mode)
-        }
-    }
-
-    private suspend fun onResumeTrackingClicked() {
         startTrackingSessionIfNeeded()
     }
 
@@ -354,14 +254,6 @@ class MapViewModel @Inject constructor(
                     ),
                 )
             }
-        }
-    }
-
-    private suspend fun onStopTrackingClicked() {
-        try {
-            stopExplorationTrackingSession()
-        } catch (e: Throwable) {
-            emitEffect(MapEffect.ShowMessage(e.message ?: TRACKING_STOP_FAILED_MESSAGE))
         }
     }
 
@@ -405,14 +297,6 @@ class MapViewModel @Inject constructor(
                     selectedStyle = it,
                     visibleObjects = resolvedVisibleObjects,
                     fogOfWar = fogOfWar,
-                    debug = MapDebugUiState(
-                        isSheetVisible = state.isDebugControlsSheetVisible,
-                        enabledInfoItems = state.enabledDebugInfoItems,
-                        isTilesGridOverlayEnabled = state.isTilesGridOverlayEnabled,
-                        canonicalZoom = state.canonicalZoom,
-                        revealRadiusMeters = state.revealRadiusMeters,
-                        renderMode = state.mapRenderMode,
-                    ),
                 )
             },
             onFailure = {
@@ -629,15 +513,6 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private suspend fun onClearExploredTilesClicked() {
-        try {
-            clearExploredTiles()
-            emitEffect(MapEffect.ShowMessage(EXPLORATION_CLEAR_SUCCESS_MESSAGE))
-        } catch (e: Throwable) {
-            emitEffect(MapEffect.ShowMessage(e.message ?: EXPLORATION_CLEAR_FAILED_MESSAGE))
-        }
-    }
-
     private fun requestTilePrewarm(
         targetCamera: CameraPositionState,
         animationDuration: kotlin.time.Duration,
@@ -830,12 +705,6 @@ class MapViewModel @Inject constructor(
             "Current location is not available yet."
         const val TRACKING_START_FAILED_MESSAGE =
             "Failed to start exploration tracking."
-        const val TRACKING_STOP_FAILED_MESSAGE =
-            "Failed to stop exploration tracking."
-        const val EXPLORATION_CLEAR_SUCCESS_MESSAGE =
-            "Explored tiles cleared."
-        const val EXPLORATION_CLEAR_FAILED_MESSAGE =
-            "Failed to clear explored tiles."
         const val MAP_OBJECT_ID_SEPARATOR = ":"
     }
 }

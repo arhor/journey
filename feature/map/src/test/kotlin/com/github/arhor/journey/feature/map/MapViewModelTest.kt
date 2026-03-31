@@ -4,7 +4,6 @@ import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
-import com.github.arhor.journey.domain.REVEAL_RADIUS_METERS
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationProgress
@@ -21,7 +20,6 @@ import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
-import com.github.arhor.journey.domain.usecase.ClearExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
@@ -32,10 +30,7 @@ import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSession
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
-import com.github.arhor.journey.domain.usecase.SetExplorationTileCanonicalZoomUseCase
-import com.github.arhor.journey.domain.usecase.SetExplorationTileRevealRadiusUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
-import com.github.arhor.journey.domain.usecase.StopExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
@@ -73,7 +68,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.AfterClass
-import org.junit.Ignore
 import org.junit.Test
 import java.time.Instant
 import kotlin.math.ceil
@@ -345,7 +339,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should keep resource fog placeholders when fog overlay is disabled`() = runTest {
+    fun `dispatch should keep resource spawns hidden when they remain outside the tracked visibility mask`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -398,14 +392,8 @@ class MapViewModelTest {
                 content.visibleObjects.firstOrNull()?.isHiddenByFog == true
             }
 
-            // When
-            fixture.viewModel.dispatch(MapIntent.FogOfWarOverlayToggled(isEnabled = false))
-            advanceUntilIdle()
-
             // Then
-            val updated = fixture.viewModel.awaitContent { !it.fogOfWar.isOverlayEnabled }
             initial.visibleObjects.single().isHiddenByFog shouldBe true
-            updated.visibleObjects.single().isHiddenByFog shouldBe true
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -488,7 +476,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose clean debug defaults by default`() = runTest {
+    fun `uiState should expose runtime-config fog defaults by default`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -499,13 +487,30 @@ class MapViewModelTest {
             val actual = fixture.viewModel.awaitContent()
 
             // Then
-            actual.debug.isSheetVisible shouldBe false
-            actual.debug.enabledInfoItems shouldBe emptySet()
-            actual.fogOfWar.isOverlayEnabled shouldBe true
-            actual.debug.isTilesGridOverlayEnabled shouldBe false
-            actual.debug.canonicalZoom shouldBe CANONICAL_ZOOM
-            actual.debug.revealRadiusMeters shouldBe REVEAL_RADIUS_METERS.toInt()
-            actual.debug.renderMode shouldBe MapRenderMode.Standard
+            actual.fogOfWar.canonicalZoom shouldBe CANONICAL_ZOOM
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should expose configured canonical zoom when runtime config overrides default`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            tileRuntimeConfig = ExplorationTileRuntimeConfig(
+                canonicalZoom = 18,
+                revealRadiusMeters = 42.0,
+            ),
+        )
+
+        try {
+            // When
+            val actual = fixture.viewModel.awaitContent { it.fogOfWar.canonicalZoom == 18 }
+
+            // Then
+            actual.fogOfWar.canonicalZoom shouldBe 18
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -528,143 +533,6 @@ class MapViewModelTest {
 
             // Then
             actual shouldBe MapUiState.Failure(errorMessage = "Map styles unavailable.")
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
-    fun `dispatch should toggle debug sheet visibility without affecting camera state`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture()
-
-        try {
-            val initial = fixture.viewModel.awaitContent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.DebugControlsClicked)
-            advanceUntilIdle()
-            val opened = fixture.viewModel.awaitContent { it.debug.isSheetVisible }
-
-            fixture.viewModel.dispatch(MapIntent.DebugControlsDismissed)
-            advanceUntilIdle()
-            val closed = fixture.viewModel.awaitContent { !it.debug.isSheetVisible }
-
-            // Then
-            opened.cameraPosition shouldBe initial.cameraPosition
-            closed.cameraPosition shouldBe initial.cameraPosition
-            closed.debug.enabledInfoItems shouldBe emptySet()
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
-    fun `dispatch should keep debug info items independent when one item is enabled`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture()
-
-        try {
-            fixture.viewModel.awaitContent()
-
-            // When
-            fixture.viewModel.dispatch(
-                MapIntent.DebugInfoVisibilityChanged(
-                    item = MapDebugInfoItem.VisibleTiles,
-                    isVisible = true,
-                ),
-            )
-            advanceUntilIdle()
-
-            // Then
-            val actual = fixture.viewModel.awaitContent {
-                MapDebugInfoItem.VisibleTiles in it.debug.enabledInfoItems
-            }
-            actual.debug.enabledInfoItems shouldBe setOf(MapDebugInfoItem.VisibleTiles)
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
-    fun `dispatch should update local rendering toggles without invoking actions`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture()
-
-        try {
-            fixture.viewModel.awaitContent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.FogOfWarOverlayToggled(isEnabled = false))
-            fixture.viewModel.dispatch(MapIntent.TilesGridOverlayToggled(isEnabled = true))
-            fixture.viewModel.dispatch(MapIntent.MapRenderModeSelected(mode = MapRenderMode.Debug))
-            advanceUntilIdle()
-
-            // Then
-            val actual = fixture.viewModel.awaitContent {
-                !it.fogOfWar.isOverlayEnabled &&
-                    it.debug.isTilesGridOverlayEnabled &&
-                    it.debug.renderMode == MapRenderMode.Debug
-            }
-            actual.fogOfWar.isOverlayEnabled shouldBe false
-            actual.debug.isTilesGridOverlayEnabled shouldBe true
-            actual.debug.renderMode shouldBe MapRenderMode.Debug
-            coVerify(exactly = 0) { fixture.clearExploredTiles.invoke() }
-            coVerify(exactly = 0) { fixture.startTrackingSession.invoke() }
-            coVerify(exactly = 0) { fixture.stopTrackingSession.invoke() }
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
-    @Ignore("Still relies on immediate zoom changes")
-    fun `dispatch should update exploration prototype values without invoking actions`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val initialVisibleRange = ExplorationTileRange(
-            zoom = CANONICAL_ZOOM,
-            minX = 10,
-            maxX = 11,
-            minY = 20,
-            maxY = 21,
-        )
-        val fixture = createFixture()
-
-        try {
-            fixture.viewModel.awaitContent()
-            fixture.viewModel.dispatch(
-                MapIntent.CameraViewportChanged(
-                    visibleBounds = visibleBoundsInside(initialVisibleRange),
-                ),
-            )
-            advanceUntilIdle()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.CanonicalZoomChanged(value = 18))
-            fixture.viewModel.dispatch(MapIntent.RevealRadiusMetersChanged(value = 42))
-            advanceUntilIdle()
-
-            // Then
-            val actual = fixture.viewModel.awaitContent {
-                it.debug.canonicalZoom == 18 && it.debug.revealRadiusMeters == 42
-            }
-            actual.debug.canonicalZoom shouldBe 18
-            actual.debug.revealRadiusMeters shouldBe 42
-            actual.fogOfWar.canonicalZoom shouldBe 18
-            actual.fogOfWar.visibleTileRange?.zoom shouldBe 18
-            coVerify(exactly = 0) { fixture.clearExploredTiles.invoke() }
-            coVerify(exactly = 0) { fixture.startTrackingSession.invoke() }
-            coVerify(exactly = 0) { fixture.stopTrackingSession.invoke() }
-            verify(exactly = 1) { fixture.setExplorationTileCanonicalZoom.invoke(18) }
-            verify(exactly = 1) { fixture.setExplorationTileRevealRadius.invoke(42.0) }
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -713,27 +581,6 @@ class MapViewModelTest {
 
             // Then
             effectDeferred.await() shouldBe MapEffect.RequestLocationPermission
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
-    fun `dispatch should stop exploration tracking when stop tracking is clicked`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture()
-
-        try {
-            fixture.viewModel.awaitContent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.StopTrackingClicked)
-            advanceUntilIdle()
-
-            // Then
-            coVerify(exactly = 1) { fixture.stopTrackingSession.invoke() }
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -1581,66 +1428,6 @@ class MapViewModelTest {
         }
 
     @Test
-    @Ignore("Still relies on immediate zoom changes")
-    fun `uiState should emit current canonical zoom immediately when precise fog data is still loading`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val initialVisibleRange = ExplorationTileRange(
-            zoom = CANONICAL_ZOOM,
-            minX = 10,
-            maxX = 11,
-            minY = 20,
-            maxY = 21,
-        )
-        val fixture = createFixture(
-            observeExploredTilesFlowFactory = { range ->
-                when (range.zoom) {
-                    CANONICAL_ZOOM -> MutableStateFlow(emptySet())
-                    18 -> flow {
-                        delay(1_000L)
-                        emit(emptySet())
-                    }
-
-                    else -> MutableStateFlow(emptySet())
-                }
-            },
-        )
-
-        try {
-            fixture.viewModel.awaitContent()
-            fixture.viewModel.dispatch(
-                MapIntent.CameraViewportChanged(
-                    visibleBounds = visibleBoundsInside(initialVisibleRange),
-                ),
-            )
-            advanceUntilIdle()
-            runCurrent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.CanonicalZoomChanged(value = 18))
-            runCurrent()
-            advanceTimeBy(999L)
-            runCurrent()
-
-            // Then
-            val pending = fixture.viewModel.awaitContent { it.debug.canonicalZoom == 18 }
-            pending.fogOfWar.canonicalZoom shouldBe 18
-            pending.fogOfWar.visibleTileRange?.zoom shouldBe 18
-            pending.fogOfWar.fogRanges.all { it.zoom == 18 } shouldBe true
-            pending.fogOfWar.activeRenderData.shouldNotBeNull()
-
-            advanceTimeBy(1L)
-            advanceUntilIdle()
-
-            val actual = fixture.viewModel.awaitContent { it.debug.canonicalZoom == 18 }
-            actual.fogOfWar.canonicalZoom shouldBe 18
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
     fun `dispatch should keep tapped map position after user location updates`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -1846,27 +1633,6 @@ class MapViewModelTest {
         }
     }
 
-    @Test
-    fun `dispatch should clear explored tiles when prototype clear action is tapped`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture()
-
-        try {
-            fixture.viewModel.awaitContent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.ResetExploredTilesClicked)
-            advanceUntilIdle()
-
-            // Then
-            coVerify(exactly = 1) { fixture.clearExploredTiles.invoke() }
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
     private suspend fun MapViewModel.awaitContent(
         predicate: (MapUiState.Content) -> Boolean = { true },
     ): MapUiState.Content = uiState
@@ -1891,12 +1657,8 @@ class MapViewModelTest {
         val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
         val observeExploredTiles: ObserveExploredTilesUseCase,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
-        val clearExploredTiles: ClearExploredTilesUseCase,
         val getExploredTiles: GetExploredTilesUseCase,
-        val setExplorationTileCanonicalZoom: SetExplorationTileCanonicalZoomUseCase,
-        val setExplorationTileRevealRadius: SetExplorationTileRevealRadiusUseCase,
         val startTrackingSession: StartExplorationTrackingSessionUseCase,
-        val stopTrackingSession: StopExplorationTrackingSessionUseCase,
     )
 
     private fun createFixture(
@@ -1920,15 +1682,11 @@ class MapViewModelTest {
         val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
-        val clearExploredTiles = mockk<ClearExploredTilesUseCase>()
         val getExploredTiles = mockk<GetExploredTilesUseCase>()
         val getExplorationTileRuntimeConfig = mockk<GetExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
-        val setExplorationTileCanonicalZoom = mockk<SetExplorationTileCanonicalZoomUseCase>()
-        val setExplorationTileRevealRadius = mockk<SetExplorationTileRevealRadiusUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
-        val stopTrackingSession = mockk<StopExplorationTrackingSessionUseCase>()
         val mapTilePrewarmer = mockk<MapTilePrewarmer>()
 
         val mapStyle = MapStyle.remote(
@@ -1951,8 +1709,6 @@ class MapViewModelTest {
         every { getExplorationTileRuntimeConfig.invoke() } returns tileRuntimeConfig
         every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(tileRuntimeConfig)
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow
-        every { setExplorationTileCanonicalZoom.invoke(any()) } just runs
-        every { setExplorationTileRevealRadius.invoke(any()) } just runs
         every { mapTilePrewarmer.prewarm(any()) } returns Job()
         coEvery { getExploredTiles.invoke(any()) } coAnswers {
             getExploredTilesOverride?.invoke(arg(0))
@@ -1961,9 +1717,7 @@ class MapViewModelTest {
         }
 
         coEvery { discoverPointOfInterest.invoke(any()) } just runs
-        coEvery { clearExploredTiles.invoke() } just runs
         coEvery { startTrackingSession.invoke() } returns startTrackingResult
-        coEvery { stopTrackingSession.invoke() } just runs
 
         return Fixture(
             viewModel = MapViewModel(
@@ -1972,10 +1726,7 @@ class MapViewModelTest {
                 observeExplorationProgress = observeExplorationProgress,
                 observeSelectedMapStyle = observeSelectedMapStyle,
                 discoverPointOfInterest = discoverPointOfInterest,
-                clearExploredTiles = clearExploredTiles,
                 getExplorationTileRuntimeConfig = getExplorationTileRuntimeConfig,
-                setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
-                setExplorationTileRevealRadius = setExplorationTileRevealRadius,
                 fogOfWarControllerFactory = { scope ->
                     FogOfWarController(
                         observeExplorationTileRuntimeConfig = observeExplorationTileRuntimeConfig,
@@ -1989,7 +1740,6 @@ class MapViewModelTest {
                 },
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
-                stopExplorationTrackingSession = stopTrackingSession,
                 mapTilePrewarmer = mapTilePrewarmer,
             ),
             mapStyle = mapStyle,
@@ -1998,12 +1748,8 @@ class MapViewModelTest {
             observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
             observeExploredTiles = observeExploredTiles,
             discoverPointOfInterest = discoverPointOfInterest,
-            clearExploredTiles = clearExploredTiles,
             getExploredTiles = getExploredTiles,
-            setExplorationTileCanonicalZoom = setExplorationTileCanonicalZoom,
-            setExplorationTileRevealRadius = setExplorationTileRevealRadius,
             startTrackingSession = startTrackingSession,
-            stopTrackingSession = stopTrackingSession,
         )
     }
 

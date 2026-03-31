@@ -114,16 +114,6 @@ class FogOfWarController @AssistedInject constructor(
         }
     }
 
-    fun setOverlayEnabled(isEnabled: Boolean) {
-        if (_state.value.isOverlayEnabled == isEnabled) {
-            return
-        }
-
-        _state.update {
-            it.copy(isOverlayEnabled = isEnabled)
-        }
-    }
-
     fun updateViewport(visibleBounds: GeoBounds) {
         updateFogViewport(visibleBounds = visibleBounds)
     }
@@ -142,7 +132,6 @@ class FogOfWarController @AssistedInject constructor(
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
-            val diagnosticsEnabled = BuildConfig.DEBUG
             val fogRanges = fogOfWarCalculator.calculateUnexploredFogRanges(
                 tileRange = buffer.bufferedTileRange,
                 exploredTiles = exploredTiles,
@@ -150,16 +139,8 @@ class FogOfWarController @AssistedInject constructor(
 
             coroutineContext.ensureActive()
 
-            val renderOutput = if (diagnosticsEnabled) {
-                renderDataFactory.createDetailed(fogRanges = fogRanges)
-            } else {
-                null
-            }
-
-            coroutineContext.ensureActive()
-
-            val renderData = renderOutput?.renderData
-                ?: renderDataFactory.create(fogRanges = fogRanges)
+            val renderData = renderDataFactory.createDetailed(fogRanges = fogRanges)
+                ?.renderData
 
             coroutineContext.ensureActive()
             val hiddenExploredRenderData = createHiddenExploredRenderData(
@@ -277,32 +258,19 @@ class FogOfWarController @AssistedInject constructor(
         val fogRanges = displayedFogData?.fogRanges
             ?: fallbackFogTileRange?.let(::listOf)
             ?: emptyList()
-        val activeRenderData = if (!state.isOverlayEnabled) {
-            null
-        } else {
-            displayedFogData?.renderData
-                ?: fallbackFogTileRange?.let(renderDataFactory::createFullRange)
-        }
+        val activeRenderData = displayedFogData?.renderData
+            ?: fallbackFogTileRange?.let(renderDataFactory::createFullRange)
 
         return FogOfWarUiState(
-            isOverlayEnabled = state.isOverlayEnabled,
             canonicalZoom = state.canonicalZoom,
             visibleBounds = state.visibleBounds,
             triggerBounds = state.displayedFogBuffer?.triggerBounds,
             bufferedBounds = state.displayedFogBuffer?.bufferedBounds,
             visibleTileRange = state.visibleTileRange,
             fogRanges = fogRanges,
-            hiddenExploredRenderData = if (state.isOverlayEnabled) {
-                displayedFogData?.hiddenExploredRenderData
-            } else {
-                null
-            },
+            hiddenExploredRenderData = displayedFogData?.hiddenExploredRenderData,
             activeRenderData = activeRenderData,
-            handoffRenderData = if (state.isOverlayEnabled) {
-                state.pendingHandoffRenderData
-            } else {
-                null
-            },
+            handoffRenderData = state.pendingHandoffRenderData,
             visibleTileCount = state.visibleTileCount,
             visibleExploredTileCount = visibleExploredTileCount,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
@@ -575,7 +543,6 @@ class FogOfWarController @AssistedInject constructor(
 
     @Immutable
     private data class State(
-        val isOverlayEnabled: Boolean = true,
         val canonicalZoom: Int = CANONICAL_ZOOM,
         val visibilityTileMask: Set<MapTile> = emptySet(),
         val visibleBounds: GeoBounds? = null,
