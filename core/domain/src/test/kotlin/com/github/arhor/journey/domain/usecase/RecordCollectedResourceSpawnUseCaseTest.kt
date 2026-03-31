@@ -33,14 +33,14 @@ class RecordCollectedResourceSpawnUseCaseTest {
         // When
         val actual = subject(
             spawnId = "spawn-11",
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
         )
 
         // Then
         actual shouldBe true
         repository.lastHeroId shouldBe hero.id
         repository.lastSpawnId shouldBe "spawn-11"
-        repository.lastResourceTypeId shouldBe "wood"
+        repository.lastResourceTypeId shouldBe "scrap"
         repository.lastCollectedAt shouldBe now
     }
 
@@ -57,7 +57,7 @@ class RecordCollectedResourceSpawnUseCaseTest {
         // When
         val actual = subject(
             spawnId = "spawn-11",
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
         )
 
         // Then

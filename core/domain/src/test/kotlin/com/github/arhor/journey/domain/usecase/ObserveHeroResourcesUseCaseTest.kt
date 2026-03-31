@@ -25,7 +25,7 @@ class ObserveHeroResourcesUseCaseTest {
         val expected = listOf(
             HeroResource(
                 heroId = hero.id,
-                resourceTypeId = "wood",
+                resourceTypeId = "scrap",
                 amount = 3,
                 updatedAt = Instant.parse("2026-03-12T08:00:00Z"),
             ),

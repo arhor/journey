@@ -28,7 +28,7 @@ object DatabaseModule {
         @ApplicationContext context: Context,
     ): JourneyDatabase =
         Room.databaseBuilder(context, JourneyDatabase::class.java, "journey.db")
-            .addMigrations()
+            .addMigrations(*JourneyDatabase.MIGRATIONS)
             .build()
 
     @Provides

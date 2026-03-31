@@ -19,7 +19,7 @@ import java.time.Instant
 class HeroViewModelTest {
 
     @Test
-    fun `uiState should expose wood coal and stone resource amounts when hero resources are emitted`() = runTest {
+    fun `uiState should expose scrap components and fuel resource amounts when hero resources are emitted`() = runTest {
         // Given
         val hero = hero()
         val observeHero = mockk<ObserveHeroUseCase>()
@@ -30,7 +30,7 @@ class HeroViewModelTest {
             listOf(
                 HeroResource(
                     heroId = hero.id,
-                    resourceTypeId = ResourceType.WOOD.typeId,
+                    resourceTypeId = ResourceType.SCRAP.typeId,
                     amount = 7,
                     updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
                 ),
@@ -48,15 +48,15 @@ class HeroViewModelTest {
         // Then
         actual.resources shouldBe listOf(
             HeroResourceAmountUiModel(
-                resourceType = ResourceType.WOOD,
+                resourceType = ResourceType.SCRAP,
                 amount = 7,
             ),
             HeroResourceAmountUiModel(
-                resourceType = ResourceType.COAL,
+                resourceType = ResourceType.COMPONENTS,
                 amount = 0,
             ),
             HeroResourceAmountUiModel(
-                resourceType = ResourceType.STONE,
+                resourceType = ResourceType.FUEL,
                 amount = 0,
             ),
         )

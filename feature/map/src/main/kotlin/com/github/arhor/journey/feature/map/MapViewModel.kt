@@ -551,21 +551,24 @@ class MapViewModel @Inject constructor(
             isDiscovered = isDiscovered,
         )
 
-    private fun ResourceSpawn.toUiModel(isHiddenByFog: Boolean): MapObjectUiModel =
-        MapObjectUiModel(
+    private fun ResourceSpawn.toUiModel(isHiddenByFog: Boolean): MapObjectUiModel {
+        val resourceType = ResourceType.fromTypeId(typeId)
+
+        return MapObjectUiModel(
             id = mapObjectId(
                 kind = MapObjectKind.ResourceSpawn,
                 rawId = id,
             ),
             kind = MapObjectKind.ResourceSpawn,
-            title = typeId,
+            title = resourceType?.displayName ?: typeId,
             description = null,
             position = position.toLatLng(),
             radiusMeters = collectionRadiusMeters.toInt(),
             isDiscovered = false,
             isHiddenByFog = isHiddenByFog,
-            resourceType = ResourceType.fromTypeId(typeId),
+            resourceType = resourceType,
         )
+    }
 
     private fun ResourceSpawn.isHiddenByFog(
         canonicalZoom: Int,

@@ -67,49 +67,49 @@ fun MapObjectsRendererAdapter(
         source.setData(geoJsonData)
     }
 
-    val woodBitmap = rememberResourceTypeImageBitmap(ResourceType.WOOD)
-    val coalBitmap = rememberResourceTypeImageBitmap(ResourceType.COAL)
-    val stoneBitmap = rememberResourceTypeImageBitmap(ResourceType.STONE)
+    val scrapBitmap = rememberResourceTypeImageBitmap(ResourceType.SCRAP)
+    val componentsBitmap = rememberResourceTypeImageBitmap(ResourceType.COMPONENTS)
+    val fuelBitmap = rememberResourceTypeImageBitmap(ResourceType.FUEL)
     val unknownResourceBitmap = rememberDrawableImageBitmap(RESOURCE_UNKNOWN_DRAWABLE_NAME)
     val density = LocalDensity.current
     val resourceIconScale = remember(
         density.density,
-        woodBitmap.width,
-        woodBitmap.height,
-        coalBitmap.width,
-        coalBitmap.height,
-        stoneBitmap.width,
-        stoneBitmap.height,
+        scrapBitmap.width,
+        scrapBitmap.height,
+        componentsBitmap.width,
+        componentsBitmap.height,
+        fuelBitmap.width,
+        fuelBitmap.height,
         unknownResourceBitmap.width,
         unknownResourceBitmap.height,
     ) {
         with(density) {
             RESOURCE_ICON_SIZE.toPx() / maxOf(
-                woodBitmap.width,
-                woodBitmap.height,
-                coalBitmap.width,
-                coalBitmap.height,
-                stoneBitmap.width,
-                stoneBitmap.height,
+                scrapBitmap.width,
+                scrapBitmap.height,
+                componentsBitmap.width,
+                componentsBitmap.height,
+                fuelBitmap.width,
+                fuelBitmap.height,
                 unknownResourceBitmap.width,
                 unknownResourceBitmap.height,
             ).toFloat()
         }
     }
-    val resourceSpawnIcon = remember(woodBitmap, coalBitmap, stoneBitmap, unknownResourceBitmap) {
+    val resourceSpawnIcon = remember(scrapBitmap, componentsBitmap, fuelBitmap, unknownResourceBitmap) {
         switch(
             input = feature[PROPERTY_OBJECT_RESOURCE_ICON_KEY].asString(const("")),
             case(
-                label = ResourceType.WOOD.typeId,
-                output = image(woodBitmap),
+                label = ResourceType.SCRAP.typeId,
+                output = image(scrapBitmap),
             ),
             case(
-                label = ResourceType.COAL.typeId,
-                output = image(coalBitmap),
+                label = ResourceType.COMPONENTS.typeId,
+                output = image(componentsBitmap),
             ),
             case(
-                label = ResourceType.STONE.typeId,
-                output = image(stoneBitmap),
+                label = ResourceType.FUEL.typeId,
+                output = image(fuelBitmap),
             ),
             case(
                 label = RESOURCE_UNKNOWN_DRAWABLE_NAME,

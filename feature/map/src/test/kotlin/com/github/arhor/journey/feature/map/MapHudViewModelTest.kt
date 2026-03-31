@@ -39,13 +39,13 @@ class MapHudViewModelTest {
                 listOf(
                     HeroResource(
                         heroId = hero.id,
-                        resourceTypeId = ResourceType.WOOD.typeId,
+                        resourceTypeId = ResourceType.SCRAP.typeId,
                         amount = 1_250,
                         updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
                     ),
                     HeroResource(
                         heroId = hero.id,
-                        resourceTypeId = ResourceType.STONE.typeId,
+                        resourceTypeId = ResourceType.FUEL.typeId,
                         amount = 1_300_000,
                         updatedAt = Instant.parse("2026-03-01T12:05:00Z"),
                     ),
@@ -67,17 +67,17 @@ class MapHudViewModelTest {
                 levelLabel = "Lv 4",
                 resources = listOf(
                     MapHudResourceUiModel(
-                        resourceType = ResourceType.WOOD,
+                        resourceType = ResourceType.SCRAP,
                         amount = 1_250,
                         amountLabel = "1.2K",
                     ),
                     MapHudResourceUiModel(
-                        resourceType = ResourceType.COAL,
+                        resourceType = ResourceType.COMPONENTS,
                         amount = 0,
                         amountLabel = "0",
                     ),
                     MapHudResourceUiModel(
-                        resourceType = ResourceType.STONE,
+                        resourceType = ResourceType.FUEL,
                         amount = 1_300_000,
                         amountLabel = "1.3M",
                     ),

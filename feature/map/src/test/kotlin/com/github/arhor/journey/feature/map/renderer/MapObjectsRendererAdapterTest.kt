@@ -93,7 +93,7 @@ class MapObjectsRendererAdapterTest {
         // Given
         val objectUiModel = mapObject(
             id = "spawn-1",
-            title = "wood",
+            title = "Scrap",
             description = null,
             latitude = 50.45,
             longitude = 30.52,
@@ -101,14 +101,14 @@ class MapObjectsRendererAdapterTest {
             isDiscovered = false,
             kind = MapObjectKind.ResourceSpawn,
             isHiddenByFog = true,
-            resourceType = ResourceType.WOOD,
+            resourceType = ResourceType.SCRAP,
         )
 
         // When
         val actual = objectUiModel.toFeatureProperties()
 
         // Then
-        actual[PROPERTY_OBJECT_RESOURCE_TYPE_ID]?.jsonPrimitive?.contentOrNull shouldBe "wood"
+        actual[PROPERTY_OBJECT_RESOURCE_TYPE_ID]?.jsonPrimitive?.contentOrNull shouldBe "scrap"
         actual[PROPERTY_OBJECT_IS_HIDDEN_BY_FOG]?.jsonPrimitive?.contentOrNull shouldBe "true"
     }
 

@@ -1,5 +1,5 @@
 <resources>
-    <string name="core_ui_resource_wood">Wood</string>
-    <string name="core_ui_resource_coal">Coal</string>
-    <string name="core_ui_resource_stone">Stone</string>
+    <string name="core_ui_resource_scrap">Scrap</string>
+    <string name="core_ui_resource_components">Components</string>
+    <string name="core_ui_resource_fuel">Fuel</string>
 </resources>

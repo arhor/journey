@@ -3,6 +3,8 @@ package com.github.arhor.journey.data.local.db
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.data.local.db.dao.CollectedResourceSpawnDao
 import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
@@ -25,7 +27,7 @@ import com.github.arhor.journey.data.local.db.entity.PoiEntity
         DiscoveredPoiEntity::class,
         ExploredTileEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(
@@ -47,5 +49,47 @@ abstract class JourneyDatabase : RoomDatabase() {
 
     abstract fun explorationTileDao(): ExplorationTileDao
 
-    companion object
+    companion object {
+        val MIGRATIONS: Array<Migration>
+            get() = arrayOf(MIGRATION_1_2)
+
+        private val MIGRATION_1_2 = Migration(1, 2) { db ->
+            val legacyResourceIdMappings = listOf(
+                "wood" to ResourceType.SCRAP,
+                "stone" to ResourceType.COMPONENTS,
+                "coal" to ResourceType.FUEL,
+            )
+
+            fun remapTypeIds(
+                tableName: String,
+                columnName: String = "typeId",
+            ) {
+                legacyResourceIdMappings.forEach { (oldTypeId, newType) ->
+                    db.execSQL(
+                        """
+                        UPDATE $tableName
+                        SET $columnName = '${newType.typeId}'
+                        WHERE $columnName = '$oldTypeId'
+                        """.trimIndent(),
+                    )
+                }
+            }
+
+            fun remapCollectedSpawnIds() {
+                legacyResourceIdMappings.forEach { (oldTypeId, newType) ->
+                    db.execSQL(
+                        """
+                        UPDATE collected_resource_spawns
+                        SET spawnId = SUBSTR(spawnId, 1, length(spawnId) - ${oldTypeId.length}) || '${newType.typeId}'
+                        WHERE spawnId LIKE '%:$oldTypeId'
+                        """.trimIndent(),
+                    )
+                }
+            }
+
+            remapTypeIds(tableName = "hero_resources")
+            remapTypeIds(tableName = "collected_resource_spawns")
+            remapCollectedSpawnIds()
+        }
+    }
 }

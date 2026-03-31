@@ -56,8 +56,31 @@ class DeterministicResourceSpawnRepositoryTest {
         val ids = spawns.map { it.id }
         val expectedEpochDay = query.at.atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
         ids.distinct() shouldContainExactly ids
-        ids.all { it.startsWith("resource-spawn:v1:$expectedEpochDay:") } shouldBe true
-        ids.all { it.split(':').size == 7 } shouldBe true
+        ids shouldContainExactly listOf(
+            "resource-spawn:v1:$expectedEpochDay:4800:9800:0:scrap",
+            "resource-spawn:v1:$expectedEpochDay:4800:9800:1:fuel",
+        )
+        spawns.map { it.typeId } shouldContainExactly listOf("scrap", "fuel")
+    }
+
+    @Test
+    fun `getActiveSpawns should expose only the new public resource ids`() = runTest {
+        // Given
+        val query = ResourceSpawnQuery(
+            at = Instant.parse("2026-03-19T10:00:00Z"),
+            bounds = GeoBounds(
+                south = 49.0000,
+                west = 24.0000,
+                north = 49.0100,
+                east = 24.0100,
+            ),
+        )
+
+        // When
+        val spawns = subject.getActiveSpawns(query)
+
+        // Then
+        spawns.map { it.typeId }.all { it in setOf("scrap", "components", "fuel") } shouldBe true
     }
 
     @Test

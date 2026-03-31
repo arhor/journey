@@ -26,7 +26,7 @@ class AddHeroResourceUseCaseTest {
         val repository = FakeHeroResourcesRepository(
             addResult = HeroResource(
                 heroId = hero.id,
-                resourceTypeId = "wood",
+                resourceTypeId = "scrap",
                 amount = 4,
                 updatedAt = now,
             ),
@@ -39,14 +39,14 @@ class AddHeroResourceUseCaseTest {
 
         // When
         val actual = subject(
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
             amount = 3,
         )
 
         // Then
         actual shouldBe repository.addResult
         repository.lastAddHeroId shouldBe hero.id
-        repository.lastAddResourceTypeId shouldBe "wood"
+        repository.lastAddResourceTypeId shouldBe "scrap"
         repository.lastAddAmount shouldBe 3
         repository.lastAddUpdatedAt shouldBe now
     }

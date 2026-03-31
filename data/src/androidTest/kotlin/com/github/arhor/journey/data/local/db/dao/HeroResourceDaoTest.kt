@@ -57,13 +57,13 @@ class HeroResourceDaoTest {
         // When
         heroResourceDao.incrementAmount(
             heroId = "player",
-            typeId = "wood",
+            typeId = "scrap",
             amountDelta = 1,
             updatedAt = Instant.ofEpochMilli(1_700_000_100_000L),
         )
         heroResourceDao.incrementAmount(
             heroId = "player",
-            typeId = "wood",
+            typeId = "scrap",
             amountDelta = 2,
             updatedAt = Instant.ofEpochMilli(1_700_000_200_000L),
         )
@@ -71,12 +71,12 @@ class HeroResourceDaoTest {
         // Then
         heroResourceDao.getAmount(
             heroId = "player",
-            typeId = "wood",
+            typeId = "scrap",
         ) shouldBe 3
         heroResourceDao.observeAll(heroId = "player").first() shouldBe listOf(
             HeroResourceEntity(
                 heroId = "player",
-                typeId = "wood",
+                typeId = "scrap",
                 amount = 3,
                 updatedAt = Instant.ofEpochMilli(1_700_000_200_000L),
             ),

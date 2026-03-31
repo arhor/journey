@@ -23,7 +23,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
                 CollectedResourceSpawnEntity(
                     heroId = "player",
                     spawnId = "spawn-2",
-                    typeId = "stone",
+                    typeId = "components",
                     collectedAt = collectedAt,
                 ),
             ),
@@ -38,7 +38,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
             CollectedResourceSpawn(
                 heroId = "player",
                 spawnId = "spawn-2",
-                typeId = "stone",
+                typeId = "components",
                 collectedAt = collectedAt,
             ),
         )
@@ -53,7 +53,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
                 CollectedResourceSpawnEntity(
                     heroId = "player",
                     spawnId = "spawn-7",
-                    typeId = "wood",
+                    typeId = "scrap",
                     collectedAt = collectedAt,
                 ),
             ),
@@ -64,7 +64,7 @@ class RoomCollectedResourceSpawnRepositoryTest {
         val actual = subject.markCollected(
             heroId = "player",
             spawnId = "spawn-7",
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
             collectedAt = Instant.parse("2026-03-11T06:05:00Z"),
         )
 

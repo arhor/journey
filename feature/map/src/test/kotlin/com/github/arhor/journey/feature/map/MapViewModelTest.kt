@@ -124,7 +124,7 @@ class MapViewModelTest {
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = "cell-1-slot-0",
-                    resourceTypeId = "wood",
+                    resourceTypeId = "scrap",
                     lat = 50.46,
                     lon = 30.53,
                     collectionRadiusMeters = 24.0,
@@ -158,6 +158,9 @@ class MapViewModelTest {
                 "${POI_ID_PREFIX}:$FIRST_POI_ID",
                 "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0",
             )
+            actual.visibleObjects
+                .first { it.id == "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0" }
+                .title shouldBe "Scrap"
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -192,14 +195,14 @@ class MapViewModelTest {
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = visibleSpawnId,
-                    resourceTypeId = "wood",
+                    resourceTypeId = "scrap",
                     lat = centerPointOf(visibleTile).lat,
                     lon = centerPointOf(visibleTile).lon,
                     collectionRadiusMeters = 24.0,
                 ),
                 resourceSpawn(
                     id = hiddenSpawnId,
-                    resourceTypeId = "stone",
+                    resourceTypeId = "components",
                     lat = centerPointOf(hiddenTile).lat,
                     lon = centerPointOf(hiddenTile).lon,
                     collectionRadiusMeters = 24.0,
@@ -272,14 +275,14 @@ class MapViewModelTest {
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = firstSpawnId,
-                    resourceTypeId = "wood",
+                    resourceTypeId = "scrap",
                     lat = centerPointOf(firstTile).lat,
                     lon = centerPointOf(firstTile).lon,
                     collectionRadiusMeters = 24.0,
                 ),
                 resourceSpawn(
                     id = secondSpawnId,
-                    resourceTypeId = "coal",
+                    resourceTypeId = "fuel",
                     lat = centerPointOf(secondTile).lat,
                     lon = centerPointOf(secondTile).lon,
                     collectionRadiusMeters = 24.0,
@@ -366,7 +369,7 @@ class MapViewModelTest {
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = hiddenSpawnId,
-                    resourceTypeId = "stone",
+                    resourceTypeId = "components",
                     lat = centerPointOf(hiddenTile).lat,
                     lon = centerPointOf(hiddenTile).lon,
                     collectionRadiusMeters = 24.0,
@@ -411,7 +414,7 @@ class MapViewModelTest {
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = "cell-1-slot-0",
-                    resourceTypeId = "wood",
+                    resourceTypeId = "scrap",
                     lat = 50.46,
                     lon = 30.53,
                     collectionRadiusMeters = 24.0,
@@ -1397,7 +1400,7 @@ class MapViewModelTest {
                 resourceSpawns = listOf(
                     resourceSpawn(
                         id = "cell-1-slot-0",
-                        resourceTypeId = "wood",
+                        resourceTypeId = "scrap",
                         lat = 50.46,
                         lon = 30.53,
                         collectionRadiusMeters = 24.0,
@@ -1584,7 +1587,7 @@ class MapViewModelTest {
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = spawnId,
-                    resourceTypeId = "stone",
+                    resourceTypeId = "components",
                     lat = 51.2,
                     lon = 17.1,
                     collectionRadiusMeters = 20.0,
