@@ -1,10 +1,13 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.domain.model.CollectedResourceSpawnReward
 import com.github.arhor.journey.domain.model.GeoPoint
-import com.github.arhor.journey.domain.model.ResourceSpawnCollectionResult
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
+import com.github.arhor.journey.domain.model.error.CollectResourceSpawnError
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
+import kotlinx.coroutines.CancellationException
 import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,7 +21,7 @@ class CollectNearbyResourceSpawnsUseCase @Inject constructor(
     private val collectResourceSpawn: CollectResourceSpawnUseCase,
     private val clock: Clock,
 ) {
-    suspend operator fun invoke(location: GeoPoint): List<ResourceSpawnCollectionResult> {
+    suspend operator fun invoke(location: GeoPoint): List<Output<CollectedResourceSpawnReward, CollectResourceSpawnError>> {
         val collectedAt = clock.instant()
         val hero = heroRepository.getCurrentHero()
         val nearbySpawns = resourceSpawnRepository.getActiveSpawns(
@@ -38,9 +41,15 @@ class CollectNearbyResourceSpawnsUseCase @Inject constructor(
                     collectedAt = collectedAt,
                 )
             } catch (e: Throwable) {
-                ResourceSpawnCollectionResult.Failed(
-                    spawnId = spawn.id,
-                    message = e.message,
+                if (e is CancellationException) {
+                    throw e
+                }
+
+                Output.Failure(
+                    CollectResourceSpawnError.Unexpected(
+                        spawnId = spawn.id,
+                        cause = e,
+                    ),
                 )
             }
         }

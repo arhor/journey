@@ -16,11 +16,11 @@ import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
-import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.model.Watchtower
 import com.github.arhor.journey.domain.model.WatchtowerPhase
 import com.github.arhor.journey.domain.model.WatchtowerResourceCost
 import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
+import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
@@ -326,19 +326,19 @@ class MapViewModel @Inject constructor(
 
     private suspend fun startTrackingSessionIfNeeded() {
         when (val result = startExplorationTrackingSession()) {
-            StartExplorationTrackingSessionResult.AlreadyActive,
-            StartExplorationTrackingSessionResult.Started -> Unit
+            is Output.Success -> Unit
+            is Output.Failure -> when (val error = result.error) {
+                StartExplorationTrackingSessionError.PermissionRequired -> {
+                    emitEffect(MapEffect.RequestLocationPermission)
+                }
 
-            StartExplorationTrackingSessionResult.PermissionRequired -> {
-                emitEffect(MapEffect.RequestLocationPermission)
-            }
-
-            is StartExplorationTrackingSessionResult.Failed -> {
-                emitEffect(
-                    MapEffect.ShowMessage(
-                        result.message ?: TRACKING_START_FAILED_MESSAGE,
-                    ),
-                )
+                is StartExplorationTrackingSessionError.LaunchFailed -> {
+                    emitEffect(
+                        MapEffect.ShowMessage(
+                            error.message ?: TRACKING_START_FAILED_MESSAGE,
+                        ),
+                    )
+                }
             }
         }
     }

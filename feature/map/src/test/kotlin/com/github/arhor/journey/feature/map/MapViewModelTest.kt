@@ -20,13 +20,13 @@ import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
-import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
 import com.github.arhor.journey.domain.model.Watchtower
 import com.github.arhor.journey.domain.model.WatchtowerPhase
 import com.github.arhor.journey.domain.model.WatchtowerResourceCost
 import com.github.arhor.journey.domain.model.WatchtowerRevealSnapshot
 import com.github.arhor.journey.domain.model.WatchtowerState
 import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
+import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
@@ -1386,7 +1386,7 @@ class MapViewModelTest {
 
         // Given
         val fixture = createFixture(
-            startTrackingResult = StartExplorationTrackingSessionResult.Started,
+            startTrackingResult = Output.Success(Unit),
         )
 
         try {
@@ -1409,7 +1409,7 @@ class MapViewModelTest {
 
         // Given
         val fixture = createFixture(
-            startTrackingResult = StartExplorationTrackingSessionResult.PermissionRequired,
+            startTrackingResult = Output.Failure(StartExplorationTrackingSessionError.PermissionRequired),
         )
 
         try {
@@ -1423,6 +1423,40 @@ class MapViewModelTest {
 
             // Then
             effectDeferred.await() shouldBe MapEffect.RequestLocationPermission
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should show fallback message when map open tracking launch fails without message`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            startTrackingResult = Output.Failure(
+                StartExplorationTrackingSessionError.LaunchFailed(
+                    IllegalStateException(),
+                ),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            val effectDeferred = async {
+                fixture.viewModel.effects
+                    .first { it is MapEffect.ShowMessage }
+            }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.MapOpened)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage(
+                "Failed to start exploration tracking.",
+            )
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -1543,7 +1577,7 @@ class MapViewModelTest {
                 trackingSession = ExplorationTrackingSession(
                     lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
                 ),
-                startTrackingResult = StartExplorationTrackingSessionResult.AlreadyActive,
+                startTrackingResult = Output.Success(Unit),
             )
             val manualCameraPosition = CameraPositionState(
                 target = LatLng(latitude = 40.7580, longitude = -73.9855),
@@ -2546,8 +2580,7 @@ class MapViewModelTest {
         getExploredTilesOverride: (suspend (ExplorationTileRange) -> Set<MapTile>)? = null,
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
-        startTrackingResult: StartExplorationTrackingSessionResult =
-            StartExplorationTrackingSessionResult.AlreadyActive,
+        startTrackingResult: Output<Unit, StartExplorationTrackingSessionError> = Output.Success(Unit),
         claimWatchtowerResult: Output<WatchtowerState, ClaimWatchtowerError> = Output.Success(
             watchtowerState(
                 watchtowerId = "watchtower-1",

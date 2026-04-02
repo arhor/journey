@@ -13,6 +13,7 @@ import com.github.arhor.journey.domain.usecase.DiscoverWatchtowersByClearedTiles
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -184,10 +185,13 @@ class ExplorationTrackingRuntime @Inject constructor(
             return
         }
 
-        runCatching {
+        try {
             collectNearbyResourceSpawns(location)
-        }.onSuccess {
             lastNearbyCollectionBucket = bucket
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            // Keep nearby collection best-effort without swallowing structured cancellation.
         }
     }
 
