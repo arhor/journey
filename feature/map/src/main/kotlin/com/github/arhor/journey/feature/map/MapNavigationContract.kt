@@ -36,6 +36,7 @@ fun NavGraphBuilder.mapGraph(
     snackbarHostState: SnackbarHostState,
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenMiniGame: () -> Unit,
 ) {
     composable<MapDestination> {
         MapRoute(
@@ -59,6 +60,7 @@ fun NavGraphBuilder.mapGraph(
     composable<PoiDetailsDestination> {
         PoiDetailsRoute(
             onBack = navController::navigateUp,
+            onOpenMiniGame = onOpenMiniGame,
         )
     }
 

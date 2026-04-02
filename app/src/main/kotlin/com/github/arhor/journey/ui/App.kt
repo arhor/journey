@@ -17,7 +17,9 @@ val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> {
 }
 
 @Composable
-fun App() {
+fun App(
+    onOpenMiniGame: () -> Unit,
+) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -33,6 +35,7 @@ fun App() {
                     controller = navController,
                     innerPadding = innerPadding,
                     snackbarHostState = snackbarHostState,
+                    onOpenMiniGame = onOpenMiniGame,
                 )
             }
         }

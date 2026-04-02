@@ -8,13 +8,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.usecase.SetExplorationTrackingCadenceUseCase
-import com.github.arhor.journey.feature.map.MiniGameHost
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity(), MiniGameHost {
+class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var setExplorationTrackingCadence: SetExplorationTrackingCadenceUseCase
@@ -22,7 +21,11 @@ class MainActivity : ComponentActivity(), MiniGameHost {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { App() }
+        setContent {
+            App(
+                onOpenMiniGame = ::openMiniGame,
+            )
+        }
     }
 
     override fun onStart() {
@@ -39,7 +42,7 @@ class MainActivity : ComponentActivity(), MiniGameHost {
         }
     }
 
-    override fun openMiniGame() {
+    private fun openMiniGame() {
         startActivity(Intent(this, MiniGameActivity::class.java))
     }
 }

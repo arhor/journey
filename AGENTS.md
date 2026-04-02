@@ -12,7 +12,7 @@ This repository is a multi-module Android app built with Kotlin, Jetpack Compose
 Gradle modules:
 
 - `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, and app-level Hilt modules.
-- `:domain` - pure Kotlin/JVM domain layer with models, repository contracts, use cases, and progression logic.
+- `:core:domain` - pure Kotlin/JVM domain layer with models, repository contracts, use cases, and progression logic.
 - `:data` - Android data layer with Room database/DAOs/entities, DataStore-backed repositories, mappers, and seeds.
 - `:core:common` - shared non-UI primitives such as `Output`, `DomainError`, and qualifiers.
 - `:core:navigation` - shared navigation types such as `BottomNavDestination`.
@@ -21,20 +21,19 @@ Gradle modules:
 - `:feature:hero` - hero screen, route, navigation contract, and view model.
 - `:feature:map` - map flow, POI flows, map rendering integration, tracking session UI, and related view models.
 - `:feature:map:fog-of-war` - fog-of-war state, buffering, render-data preparation, diagnostics, and map overlay application.
-- `feature/mini_game` - Godot mini-game source project packaged into the Android app assets for the full-screen POI launch flow.
 - `:feature:settings` - settings screen, navigation contract, Health Connect entry points, and view model.
 
 Primary source locations:
 
 - App: `app/src/main/kotlin/com/github/arhor/journey`
-- Domain: `domain/src/main/kotlin/com/github/arhor/journey/domain`
+- Domain: `core/domain/src/main/kotlin/com/github/arhor/journey/domain`
 - Data: `data/src/main/kotlin/com/github/arhor/journey/data`
 - Core common: `core/common/src/main/java/com/github/arhor/journey`
 - Core navigation: `core/navigation/src/main/kotlin/com/github/arhor/journey/core/navigation`
 - Core UI: `core/ui/src/main/kotlin/com/github/arhor/journey/core/ui`
 - Features: `feature/<name>/src/main/kotlin/com/github/arhor/journey/feature/<name>`
 - Map fog of war: `feature/map/fog-of-war/src/main/kotlin/com/github/arhor/journey/feature/map/fow`
-- Godot mini-game assets: `feature/mini_game`
+- Godot mini-game assets: `app/src/main/assets/minigame.pck`
 - App resources: `app/src/main/res`
 
 Build configuration lives in:
@@ -43,7 +42,7 @@ Build configuration lives in:
 - `build.gradle.kts`
 - `app/build.gradle.kts`
 - `data/build.gradle.kts`
-- `domain/build.gradle.kts`
+- `core/domain/build.gradle.kts`
 - `core/*/build.gradle.kts`
 - `feature/*/build.gradle.kts`
 - `gradle/libs.versions.toml`
@@ -52,20 +51,20 @@ Build configuration lives in:
 ## Architecture & Dependency Rules
 Keep dependency direction intact:
 
-- `:app -> :data, :domain, :core:*, :feature:*`
+- `:app -> :data, :core:domain, :core:*, :feature:*`
 - `:core:ui -> :core:common`
-- `:feature:* -> :domain, :core:*`
+- `:feature:* -> :core:domain, :core:*`
 - `:feature:map -> :feature:map:fog-of-war`
-- `:data -> :domain, :core:common`
-- `:domain -> :core:common`
+- `:data -> :core:domain, :core:common`
+- `:core:domain -> :core:common`
 
 Practical rules:
 
-- Keep `:domain` Android-free.
+- Keep `:core:domain` Android-free.
 - Treat `:app` as the composition root, not as the default place for new business logic.
 - Put app-wide wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
 - Keep feature-specific platform bindings inside the owning feature module when they are not truly app-wide.
-- `:app` packages the Godot mini-game from `feature/mini_game` into its Android assets source set and owns the Android `GodotActivity` launch surface.
+- `:app` packages the exported Godot mini-game bundle from `app/src/main/assets/minigame.pck` and owns the Android `GodotActivity` launch surface.
 - Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`; features own typed destinations and `*Graph(...)` builders.
 - Use typed navigation contracts with `@Serializable` destinations and `composable<T>` routes, matching existing feature modules.
 - `:feature:map` may start, stop, or observe exploration tracking sessions, but it must not own continuous location collection or the tile-reveal pipeline.
@@ -89,7 +88,7 @@ Shared UI placement:
 
 ## Data & Domain Conventions
 
-- Repository interfaces live in `:domain`; implementations live in `:data`.
+- Repository interfaces live in `:core:domain`; implementations live in `:data`.
 - Room entities, DAOs, and mappers stay in `:data`.
 - Use the existing typed `Output<T, E : DomainError>` pattern for recoverable domain/data flows that already model success/failure explicitly.
 
