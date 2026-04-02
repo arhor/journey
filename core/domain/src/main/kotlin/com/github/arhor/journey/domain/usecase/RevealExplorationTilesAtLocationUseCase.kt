@@ -21,10 +21,10 @@ class RevealExplorationTilesAtLocationUseCase @Inject constructor(
             zoom = config.canonicalZoom,
         )
 
-        if (tiles.isNotEmpty()) {
-            repository.markExplored(tiles)
+        if (tiles.isEmpty()) {
+            return emptySet()
         }
 
-        return tiles
+        return repository.markExplored(tiles)
     }
 }

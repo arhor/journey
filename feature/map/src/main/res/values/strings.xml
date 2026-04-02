@@ -23,4 +23,18 @@
     <string name="poi_details_coordinates_value">%1$.6f, %2$.6f</string>
     <string name="poi_details_description_label">Description</string>
     <string name="poi_details_description_empty">No description available.</string>
+    <string name="watchtower_status_dormant">Dormant watchtower</string>
+    <string name="watchtower_status_claimed">Claimed watchtower</string>
+    <string name="watchtower_distance_label">Distance</string>
+    <string name="watchtower_distance_value">%1$d m away</string>
+    <string name="watchtower_level_label">Tower level</string>
+    <string name="watchtower_level_value">Level %1$d</string>
+    <string name="watchtower_reveal_radius_label">Current reveal radius</string>
+    <string name="watchtower_next_reveal_radius_label">Next reveal radius</string>
+    <string name="watchtower_radius_value">%1$d m</string>
+    <string name="watchtower_claim_cost_label">Claim cost</string>
+    <string name="watchtower_upgrade_cost_label">Upgrade cost</string>
+    <string name="watchtower_claim_button">Claim watchtower</string>
+    <string name="watchtower_upgrade_button">Upgrade watchtower</string>
+    <string name="watchtower_max_level_label">Maximum level reached.</string>
 </resources>

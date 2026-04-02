@@ -9,6 +9,7 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
+import com.github.arhor.journey.domain.usecase.DiscoverWatchtowersByClearedTilesUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
@@ -31,6 +32,7 @@ class ExplorationTrackingRuntime @Inject constructor(
     @AppCoroutineScope private val appScope: CoroutineScope,
     private val userLocationSource: UserLocationSource,
     private val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
+    private val discoverWatchtowersByClearedTiles: DiscoverWatchtowersByClearedTilesUseCase,
     private val collectNearbyResourceSpawns: CollectNearbyResourceSpawnsUseCase,
     private val configHolder: ExplorationTileRuntimeConfigHolder,
 ) {
@@ -169,7 +171,10 @@ class ExplorationTrackingRuntime @Inject constructor(
             return
         }
 
-        revealExplorationTilesAtLocation(update.location)
+        val newlyClearedTiles = revealExplorationTilesAtLocation(update.location)
+        if (newlyClearedTiles.isNotEmpty()) {
+            discoverWatchtowersByClearedTiles(newlyClearedTiles)
+        }
         lastRevealedTiles = revealTiles
     }
 

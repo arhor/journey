@@ -3,6 +3,7 @@ package com.github.arhor.journey.feature.map
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.DiscoveredPoi
@@ -20,17 +21,30 @@ import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
+import com.github.arhor.journey.domain.model.Watchtower
+import com.github.arhor.journey.domain.model.WatchtowerPhase
+import com.github.arhor.journey.domain.model.WatchtowerResourceCost
+import com.github.arhor.journey.domain.model.WatchtowerRevealSnapshot
+import com.github.arhor.journey.domain.model.WatchtowerState
+import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
+import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
+import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
+import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveClaimedWatchtowerRevealTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
+import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
@@ -38,6 +52,7 @@ import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
+import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
 import com.github.arhor.journey.feature.map.prewarm.MapTilePrewarmer
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -165,6 +180,830 @@ class MapViewModelTest {
             tearDownMainDispatcher(fixture.viewModel)
         }
     }
+
+    @Test
+    fun `dispatch should expose a local watchtower sheet when a watchtower marker is tapped`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = centerPointOf(
+                        MapTile(
+                            zoom = visibleRange.zoom,
+                            x = visibleRange.minX,
+                            y = visibleRange.minY,
+                        ),
+                    ),
+                    phase = WatchtowerPhase.DISCOVERED_DORMANT,
+                    canClaim = true,
+                    claimCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.SCRAP.typeId,
+                        amount = 5,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = centerPointOf(
+                    MapTile(
+                        zoom = visibleRange.zoom,
+                        x = visibleRange.minX,
+                        y = visibleRange.minY,
+                    ),
+                ),
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.ObjectTapped("$WATCHTOWER_ID_PREFIX:tower-1"),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.selectedWatchtower?.id == "tower-1" }
+            actual.visibleObjects.any { it.id == "$WATCHTOWER_ID_PREFIX:tower-1" } shouldBe true
+            actual.selectedWatchtower?.canClaim shouldBe true
+            actual.selectedWatchtower?.claimCostLabel shouldBe "5 Scrap"
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should keep the selected watchtower sheet while camera moves outside its visible marker bounds`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val offscreenRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 100,
+            maxX = 101,
+            minY = 200,
+            maxY = 201,
+        )
+        val tower = watchtower(
+            id = "tower-persistent",
+            location = centerPointOf(
+                MapTile(
+                    zoom = initialRange.zoom,
+                    x = initialRange.minX,
+                    y = initialRange.minY,
+                ),
+            ),
+            phase = WatchtowerPhase.DISCOVERED_DORMANT,
+            claimCost = WatchtowerResourceCost(
+                resourceTypeId = ResourceType.SCRAP.typeId,
+                amount = 5,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(tower),
+            observeVisibleWatchtowersFlowFactory = { bounds ->
+                MutableStateFlow(
+                    if (bounds.contains(tower.location)) {
+                        listOf(tower)
+                    } else {
+                        emptyList()
+                    },
+                )
+            },
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = tower.location,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(initialRange),
+                ),
+            )
+            advanceUntilIdle()
+            fixture.viewModel.dispatch(MapIntent.ObjectTapped("$WATCHTOWER_ID_PREFIX:tower-persistent"))
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(offscreenRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.selectedWatchtower?.id == "tower-persistent" }
+            actual.selectedWatchtower?.id shouldBe "tower-persistent"
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should not mark a watchtower claimable when the player is in range but lacks resources`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-unaffordable",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.DISCOVERED_DORMANT,
+                    claimCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.SCRAP.typeId,
+                        amount = 5,
+                    ),
+                ),
+            ),
+            resourceAmountsByType = mapOf(
+                ResourceType.SCRAP.typeId to 0,
+                ResourceType.COMPONENTS.typeId to 99,
+                ResourceType.FUEL.typeId to 99,
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.ObjectTapped("$WATCHTOWER_ID_PREFIX:tower-unaffordable"))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { it.selectedWatchtower?.id == "tower-unaffordable" }
+            actual.visibleObjects
+                .first { it.id == "$WATCHTOWER_ID_PREFIX:tower-unaffordable" }
+                .watchtowerMarkerState shouldBe WatchtowerMarkerState.DISCOVERED_DORMANT
+            actual.selectedWatchtower?.canClaim shouldBe false
+            actual.selectedWatchtower?.claimDisabledReason shouldBe "Not enough Scrap."
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should show claimed message when selected watchtower claim succeeds`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.DISCOVERED_DORMANT,
+                    canClaim = true,
+                    claimCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.SCRAP.typeId,
+                        amount = 5,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+            claimWatchtowerResult = Output.Success(
+                watchtowerState(
+                    watchtowerId = "tower-1",
+                    claimedAt = Instant.parse("2026-04-01T10:00:00Z"),
+                    level = 1,
+                    updatedAt = Instant.parse("2026-04-01T10:00:00Z"),
+                ),
+            ),
+        )
+
+        try {
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-1",
+            )
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.ClaimSelectedWatchtower)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage("Watchtower claimed.")
+            coVerify(exactly = 1) { fixture.claimWatchtower.invoke("tower-1", towerLocation) }
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should clear selected watchtower when claim result reports not found`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.DISCOVERED_DORMANT,
+                    canClaim = true,
+                    claimCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.SCRAP.typeId,
+                        amount = 5,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+            claimWatchtowerResult = Output.Failure(
+                ClaimWatchtowerError.NotFound("tower-1"),
+            ),
+        )
+
+        try {
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-1",
+            )
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.ClaimSelectedWatchtower)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage("Watchtower is no longer available.")
+            val actual = fixture.viewModel.awaitContent { it.selectedWatchtower == null }
+            actual.selectedWatchtower shouldBe null
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should show resource requirement message when claim result reports insufficient resources`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val visibleRange = ExplorationTileRange(
+                zoom = CANONICAL_ZOOM,
+                minX = 10,
+                maxX = 11,
+                minY = 20,
+                maxY = 21,
+            )
+            val towerLocation = centerPointOf(
+                MapTile(
+                    zoom = visibleRange.zoom,
+                    x = visibleRange.minX,
+                    y = visibleRange.minY,
+                ),
+            )
+            val fixture = createFixture(
+                pointsOfInterest = emptyList(),
+                watchtowers = listOf(
+                    watchtower(
+                        id = "tower-1",
+                        location = towerLocation,
+                        phase = WatchtowerPhase.DISCOVERED_DORMANT,
+                        canClaim = true,
+                        claimCost = WatchtowerResourceCost(
+                            resourceTypeId = ResourceType.SCRAP.typeId,
+                            amount = 5,
+                        ),
+                    ),
+                ),
+                trackingSession = ExplorationTrackingSession(
+                    isActive = true,
+                    status = ExplorationTrackingStatus.TRACKING,
+                    lastKnownLocation = towerLocation,
+                ),
+                claimWatchtowerResult = Output.Failure(
+                    ClaimWatchtowerError.InsufficientResources(
+                        watchtowerId = "tower-1",
+                        resourceTypeId = ResourceType.SCRAP.typeId,
+                        requiredAmount = 5,
+                        availableAmount = 0,
+                    ),
+                ),
+            )
+
+            try {
+                selectWatchtower(
+                    fixture = fixture,
+                    visibleRange = visibleRange,
+                    watchtowerId = "tower-1",
+                )
+                val effectDeferred = async { fixture.viewModel.effects.first() }
+                runCurrent()
+
+                // When
+                fixture.viewModel.dispatch(MapIntent.ClaimSelectedWatchtower)
+                advanceUntilIdle()
+
+                // Then
+                effectDeferred.await() shouldBe MapEffect.ShowMessage("Not enough Scrap.")
+            } finally {
+                tearDownMainDispatcher(fixture.viewModel)
+            }
+        }
+
+    @Test
+    fun `dispatch should show upgraded level when selected watchtower upgrade succeeds`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.CLAIMED,
+                    canUpgrade = true,
+                    level = 1,
+                    nextUpgradeCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.COMPONENTS.typeId,
+                        amount = 10,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+            upgradeWatchtowerResult = Output.Success(
+                watchtowerState(
+                    watchtowerId = "tower-1",
+                    claimedAt = Instant.parse("2026-03-31T10:00:00Z"),
+                    level = 7,
+                    updatedAt = Instant.parse("2026-04-01T10:00:00Z"),
+                ),
+            ),
+        )
+
+        try {
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-1",
+            )
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.UpgradeSelectedWatchtower)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage("Watchtower upgraded to level 7")
+            coVerify(exactly = 1) { fixture.upgradeWatchtower.invoke("tower-1", towerLocation) }
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should show max level message when upgrade result reports max level`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.CLAIMED,
+                    canUpgrade = true,
+                    level = 1,
+                    nextUpgradeCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.COMPONENTS.typeId,
+                        amount = 10,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+            upgradeWatchtowerResult = Output.Failure(
+                UpgradeWatchtowerError.AlreadyAtMaxLevel("tower-1"),
+            ),
+        )
+
+        try {
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-1",
+            )
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.UpgradeSelectedWatchtower)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage("Watchtower is already at maximum level.")
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should show not claimed message when upgrade result reports unclaimed watchtower`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.CLAIMED,
+                    canUpgrade = true,
+                    level = 1,
+                    nextUpgradeCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.COMPONENTS.typeId,
+                        amount = 10,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+            upgradeWatchtowerResult = Output.Failure(
+                UpgradeWatchtowerError.NotClaimed("tower-1"),
+            ),
+        )
+
+        try {
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-1",
+            )
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.UpgradeSelectedWatchtower)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage("Claim the watchtower before upgrading it.")
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should clear selected watchtower when upgrade result reports not found`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.CLAIMED,
+                    canUpgrade = true,
+                    level = 1,
+                    nextUpgradeCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.COMPONENTS.typeId,
+                        amount = 10,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+            upgradeWatchtowerResult = Output.Failure(
+                UpgradeWatchtowerError.NotFound("tower-1"),
+            ),
+        )
+
+        try {
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-1",
+            )
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.UpgradeSelectedWatchtower)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage("Watchtower is no longer available.")
+            val actual = fixture.viewModel.awaitContent { it.selectedWatchtower == null }
+            actual.selectedWatchtower shouldBe null
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should show out of range message when upgrade result reports distance failure`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
+            ),
+        )
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-1",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.CLAIMED,
+                    canUpgrade = true,
+                    level = 1,
+                    nextUpgradeCost = WatchtowerResourceCost(
+                        resourceTypeId = ResourceType.COMPONENTS.typeId,
+                        amount = 10,
+                    ),
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+            upgradeWatchtowerResult = Output.Failure(
+                UpgradeWatchtowerError.NotInRange(
+                    watchtowerId = "tower-1",
+                    distanceMeters = 50.0,
+                    interactionRadiusMeters = 25.0,
+                ),
+            ),
+        )
+
+        try {
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-1",
+            )
+            val effectDeferred = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.UpgradeSelectedWatchtower)
+            advanceUntilIdle()
+
+            // Then
+            effectDeferred.await() shouldBe MapEffect.ShowMessage("Move closer to interact with the watchtower.")
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should show resource requirement message when upgrade result reports insufficient resources`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val visibleRange = ExplorationTileRange(
+                zoom = CANONICAL_ZOOM,
+                minX = 10,
+                maxX = 11,
+                minY = 20,
+                maxY = 21,
+            )
+            val towerLocation = centerPointOf(
+                MapTile(
+                    zoom = visibleRange.zoom,
+                    x = visibleRange.minX,
+                    y = visibleRange.minY,
+                ),
+            )
+            val fixture = createFixture(
+                pointsOfInterest = emptyList(),
+                watchtowers = listOf(
+                    watchtower(
+                        id = "tower-1",
+                        location = towerLocation,
+                        phase = WatchtowerPhase.CLAIMED,
+                        canUpgrade = true,
+                        level = 1,
+                        nextUpgradeCost = WatchtowerResourceCost(
+                            resourceTypeId = ResourceType.COMPONENTS.typeId,
+                            amount = 10,
+                        ),
+                    ),
+                ),
+                trackingSession = ExplorationTrackingSession(
+                    isActive = true,
+                    status = ExplorationTrackingStatus.TRACKING,
+                    lastKnownLocation = towerLocation,
+                ),
+                upgradeWatchtowerResult = Output.Failure(
+                    UpgradeWatchtowerError.InsufficientResources(
+                        watchtowerId = "tower-1",
+                        resourceTypeId = ResourceType.COMPONENTS.typeId,
+                        requiredAmount = 10,
+                        availableAmount = 0,
+                    ),
+                ),
+            )
+
+            try {
+                selectWatchtower(
+                    fixture = fixture,
+                    visibleRange = visibleRange,
+                    watchtowerId = "tower-1",
+                )
+                val effectDeferred = async { fixture.viewModel.effects.first() }
+                runCurrent()
+
+                // When
+                fixture.viewModel.dispatch(MapIntent.UpgradeSelectedWatchtower)
+                advanceUntilIdle()
+
+                // Then
+                effectDeferred.await() shouldBe MapEffect.ShowMessage("Not enough Components.")
+            } finally {
+                tearDownMainDispatcher(fixture.viewModel)
+            }
+        }
 
     @Test
     fun `uiState should mark only resource spawns outside current visibility mask as hidden by fog`() = runTest {
@@ -1652,6 +2491,25 @@ class MapViewModelTest {
         advanceUntilIdle()
     }
 
+    private suspend fun TestScope.selectWatchtower(
+        fixture: Fixture,
+        visibleRange: ExplorationTileRange,
+        watchtowerId: String,
+    ) {
+        fixture.viewModel.awaitContent()
+        fixture.viewModel.dispatch(
+            MapIntent.CameraViewportChanged(
+                visibleBounds = visibleBoundsInside(visibleRange),
+            ),
+        )
+        advanceUntilIdle()
+        fixture.viewModel.dispatch(
+            MapIntent.ObjectTapped("$WATCHTOWER_ID_PREFIX:$watchtowerId"),
+        )
+        advanceUntilIdle()
+        fixture.viewModel.awaitContent { it.selectedWatchtower?.id == watchtowerId }
+    }
+
     private data class Fixture(
         val viewModel: MapViewModel,
         val mapStyle: MapStyle,
@@ -1659,7 +2517,11 @@ class MapViewModelTest {
         val mapTilePrewarmer: MapTilePrewarmer,
         val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
         val observeExploredTiles: ObserveExploredTilesUseCase,
+        val observeVisibleWatchtowers: ObserveVisibleWatchtowersUseCase,
         val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
+        val claimWatchtower: ClaimWatchtowerUseCase,
+        val upgradeWatchtower: UpgradeWatchtowerUseCase,
+        val getWatchtower: GetWatchtowerUseCase,
         val getExploredTiles: GetExploredTilesUseCase,
         val startTrackingSession: StartExplorationTrackingSessionUseCase,
     )
@@ -1672,19 +2534,49 @@ class MapViewModelTest {
         resourceSpawns: List<ResourceSpawn> = emptyList(),
         explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<MapTile> = emptySet(),
+        watchtowerRevealSnapshot: WatchtowerRevealSnapshot = WatchtowerRevealSnapshot(emptySet()),
+        watchtowers: List<Watchtower> = emptyList(),
+        observeVisibleWatchtowersFlowFactory: ((GeoBounds) -> Flow<List<Watchtower>>)? = null,
+        resourceAmountsByType: Map<String, Int> = mapOf(
+            ResourceType.SCRAP.typeId to 99,
+            ResourceType.COMPONENTS.typeId to 99,
+            ResourceType.FUEL.typeId to 99,
+        ),
         observeExploredTilesFlowFactory: ((ExplorationTileRange) -> Flow<Set<MapTile>>)? = null,
         getExploredTilesOverride: (suspend (ExplorationTileRange) -> Set<MapTile>)? = null,
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: StartExplorationTrackingSessionResult =
             StartExplorationTrackingSessionResult.AlreadyActive,
+        claimWatchtowerResult: Output<WatchtowerState, ClaimWatchtowerError> = Output.Success(
+            watchtowerState(
+                watchtowerId = "watchtower-1",
+                claimedAt = Instant.parse("2026-04-01T10:00:00Z"),
+                level = 1,
+                updatedAt = Instant.parse("2026-04-01T10:00:00Z"),
+            ),
+        ),
+        upgradeWatchtowerResult: Output<WatchtowerState, UpgradeWatchtowerError> = Output.Success(
+            watchtowerState(
+                watchtowerId = "watchtower-1",
+                claimedAt = Instant.parse("2026-03-31T10:00:00Z"),
+                level = 2,
+                updatedAt = Instant.parse("2026-04-01T10:00:00Z"),
+            ),
+        ),
     ): Fixture {
         val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
         val observeCollectibleResourceSpawns = mockk<ObserveCollectibleResourceSpawnsUseCase>()
         val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
         val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
+        val observeClaimedWatchtowerRevealTiles = mockk<ObserveClaimedWatchtowerRevealTilesUseCase>()
+        val observeVisibleWatchtowers = mockk<ObserveVisibleWatchtowersUseCase>()
+        val observeHeroResourceAmount = mockk<ObserveHeroResourceAmountUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
+        val claimWatchtower = mockk<ClaimWatchtowerUseCase>()
+        val upgradeWatchtower = mockk<UpgradeWatchtowerUseCase>()
+        val getWatchtower = mockk<GetWatchtowerUseCase>()
         val getExploredTiles = mockk<GetExploredTilesUseCase>()
         val getExplorationTileRuntimeConfig = mockk<GetExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
@@ -1706,9 +2598,20 @@ class MapViewModelTest {
             observeExploredTilesFlowFactory?.invoke(arg(0))
                 ?: MutableStateFlow(exploredTiles)
         }
+        every { observeClaimedWatchtowerRevealTiles.invoke(any(), any()) } returns MutableStateFlow(watchtowerRevealSnapshot)
+        every { observeVisibleWatchtowers.invoke(any()) } answers {
+            observeVisibleWatchtowersFlowFactory?.invoke(arg(0))
+                ?: MutableStateFlow(watchtowers)
+        }
+        every { observeHeroResourceAmount.invoke(any()) } answers {
+            MutableStateFlow(resourceAmountsByType[arg(0)] ?: 0)
+        }
         every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
             mapStyleOutput ?: Output.Success(mapStyle),
         )
+        coEvery { getWatchtower.invoke(any()) } answers {
+            watchtowers.firstOrNull { it.id == arg(0) }
+        }
         every { getExplorationTileRuntimeConfig.invoke() } returns tileRuntimeConfig
         every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(tileRuntimeConfig)
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow
@@ -1720,6 +2623,8 @@ class MapViewModelTest {
         }
 
         coEvery { discoverPointOfInterest.invoke(any()) } just runs
+        coEvery { claimWatchtower.invoke(any(), any()) } returns claimWatchtowerResult
+        coEvery { upgradeWatchtower.invoke(any(), any()) } returns upgradeWatchtowerResult
         coEvery { startTrackingSession.invoke() } returns startTrackingResult
 
         return Fixture(
@@ -1729,12 +2634,18 @@ class MapViewModelTest {
                 observeExplorationProgress = observeExplorationProgress,
                 observeSelectedMapStyle = observeSelectedMapStyle,
                 discoverPointOfInterest = discoverPointOfInterest,
+                observeVisibleWatchtowers = observeVisibleWatchtowers,
+                observeHeroResourceAmount = observeHeroResourceAmount,
+                claimWatchtower = claimWatchtower,
+                upgradeWatchtower = upgradeWatchtower,
+                getWatchtower = getWatchtower,
                 getExplorationTileRuntimeConfig = getExplorationTileRuntimeConfig,
                 fogOfWarControllerFactory = { scope ->
                     FogOfWarController(
                         observeExplorationTileRuntimeConfig = observeExplorationTileRuntimeConfig,
                         observeExplorationTrackingSession = observeExplorationTrackingSession,
                         observeExploredTiles = observeExploredTiles,
+                        observeClaimedWatchtowerRevealTiles = observeClaimedWatchtowerRevealTiles,
                         getExploredTiles = getExploredTiles,
                         renderDataFactory = FowRenderDataFactory(),
                         fogOfWarCalculator = FogOfWarCalculator(),
@@ -1750,7 +2661,11 @@ class MapViewModelTest {
             mapTilePrewarmer = mapTilePrewarmer,
             observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
             observeExploredTiles = observeExploredTiles,
+            observeVisibleWatchtowers = observeVisibleWatchtowers,
             discoverPointOfInterest = discoverPointOfInterest,
+            claimWatchtower = claimWatchtower,
+            upgradeWatchtower = upgradeWatchtower,
+            getWatchtower = getWatchtower,
             getExploredTiles = getExploredTiles,
             startTrackingSession = startTrackingSession,
         )
@@ -1781,6 +2696,51 @@ class MapViewModelTest {
         position = GeoPoint(lat = lat, lon = lon),
         collectionRadiusMeters = collectionRadiusMeters,
     )
+
+    private fun watchtower(
+        id: String,
+        location: GeoPoint,
+        phase: WatchtowerPhase,
+        canClaim: Boolean = false,
+        canUpgrade: Boolean = false,
+        level: Int? = null,
+        revealRadiusMeters: Double? = null,
+        nextRevealRadiusMeters: Double? = null,
+        claimCost: WatchtowerResourceCost? = null,
+        nextUpgradeCost: WatchtowerResourceCost? = null,
+        distanceMeters: Double? = 0.0,
+    ): Watchtower =
+        Watchtower(
+            id = id,
+            name = "Watchtower $id",
+            description = "Description $id",
+            location = location,
+            interactionRadiusMeters = 25.0,
+            phase = phase,
+            level = level,
+            revealRadiusMeters = revealRadiusMeters,
+            claimCost = claimCost,
+            nextUpgradeCost = nextUpgradeCost,
+            nextRevealRadiusMeters = nextRevealRadiusMeters,
+            canClaim = canClaim,
+            canUpgrade = canUpgrade,
+            distanceMeters = distanceMeters,
+        )
+
+    private fun watchtowerState(
+        watchtowerId: String,
+        discoveredAt: Instant = Instant.parse("2026-03-31T08:00:00Z"),
+        claimedAt: Instant? = null,
+        level: Int = 0,
+        updatedAt: Instant = discoveredAt,
+    ): WatchtowerState =
+        WatchtowerState(
+            watchtowerId = watchtowerId,
+            discoveredAt = discoveredAt,
+            claimedAt = claimedAt,
+            level = level,
+            updatedAt = updatedAt,
+        )
 
     private fun visibleBoundsInside(range: ExplorationTileRange): GeoBounds =
         bounds(range).let { bounds ->
@@ -1839,5 +2799,6 @@ class MapViewModelTest {
         const val SECOND_POI_ID = 2L
         const val POI_ID_PREFIX = "poi"
         const val RESOURCE_SPAWN_ID_PREFIX = "spawn"
+        const val WATCHTOWER_ID_PREFIX = "watchtower"
     }
 }

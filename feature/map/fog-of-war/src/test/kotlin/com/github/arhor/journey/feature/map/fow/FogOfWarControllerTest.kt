@@ -7,7 +7,9 @@ import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapTile
+import com.github.arhor.journey.domain.model.WatchtowerRevealSnapshot
 import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveClaimedWatchtowerRevealTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
@@ -61,22 +63,113 @@ class FogOfWarControllerTest {
         }
     }
 
+    @Test
+    fun `uiState should treat claimed watchtower coverage as cleared and visible fog tiles`() = runTest {
+        // Given
+        val controllerScope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val revealedTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val fixture = createFixture(
+            scope = controllerScope,
+            exploredTiles = emptySet(),
+            watchtowerRevealSnapshot = WatchtowerRevealSnapshot(
+                tiles = setOf(revealedTile),
+                revision = 7,
+            ),
+        )
+
+        try {
+            // When
+            fixture.controller.updateViewport(visibleBoundsInside(visibleRange))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.controller.uiState.first { it.visibleExploredTileCount == 1 }
+            actual.visibleExploredTileCount shouldBe 1
+            actual.hiddenExploredRenderData shouldBe null
+            fixture.controller.visibilityState.first().visibilityTileMask shouldBe setOf(revealedTile)
+        } finally {
+            controllerScope.cancel()
+            advanceUntilIdle()
+        }
+    }
+
+    @Test
+    fun `uiState should union walked exploration with claimed watchtower coverage when deriving hidden explored fog`() = runTest {
+        // Given
+        val controllerScope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val walkedTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.maxX,
+            y = visibleRange.maxY,
+        )
+        val revealedTile = MapTile(
+            zoom = visibleRange.zoom,
+            x = visibleRange.minX,
+            y = visibleRange.minY,
+        )
+        val fixture = createFixture(
+            scope = controllerScope,
+            exploredTiles = setOf(walkedTile),
+            watchtowerRevealSnapshot = WatchtowerRevealSnapshot(
+                tiles = setOf(revealedTile),
+                revision = 3,
+            ),
+        )
+
+        try {
+            // When
+            fixture.controller.updateViewport(visibleBoundsInside(visibleRange))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.controller.uiState.first { it.hiddenExploredRenderData != null }
+            actual.visibleExploredTileCount shouldBe 1
+            actual.hiddenExploredRenderData.shouldNotBeNull()
+            fixture.controller.visibilityState.first().visibilityTileMask shouldBe setOf(revealedTile)
+        } finally {
+            controllerScope.cancel()
+            advanceUntilIdle()
+        }
+    }
+
     private fun createFixture(
         scope: CoroutineScope,
         exploredTiles: Set<MapTile>,
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
+        watchtowerRevealSnapshot: WatchtowerRevealSnapshot = WatchtowerRevealSnapshot(emptySet()),
     ): Fixture {
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
+        val observeClaimedWatchtowerRevealTiles = mockk<ObserveClaimedWatchtowerRevealTilesUseCase>()
         val getExploredTiles = mockk<GetExploredTilesUseCase>()
         val configFlow = MutableStateFlow(ExplorationTileRuntimeConfig())
         val trackingSessionFlow = MutableStateFlow(trackingSession)
         val exploredTilesFlow = MutableStateFlow(exploredTiles)
+        val watchtowerRevealFlow = MutableStateFlow(watchtowerRevealSnapshot)
 
         every { observeExplorationTileRuntimeConfig.invoke() } returns configFlow
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow
         every { observeExploredTiles.invoke(any()) } returns exploredTilesFlow
+        every { observeClaimedWatchtowerRevealTiles.invoke(any(), any()) } returns watchtowerRevealFlow
         coEvery { getExploredTiles.invoke(any()) } returns exploredTiles
 
         return Fixture(
@@ -84,6 +177,7 @@ class FogOfWarControllerTest {
                 observeExplorationTileRuntimeConfig = observeExplorationTileRuntimeConfig,
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 observeExploredTiles = observeExploredTiles,
+                observeClaimedWatchtowerRevealTiles = observeClaimedWatchtowerRevealTiles,
                 getExploredTiles = getExploredTiles,
                 renderDataFactory = FowRenderDataFactory(),
                 fogOfWarCalculator = FogOfWarCalculator(),

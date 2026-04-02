@@ -5,7 +5,9 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
+import com.github.arhor.journey.domain.usecase.DiscoverWatchtowersByClearedTilesUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
@@ -26,6 +28,9 @@ class ExplorationTrackingRuntimeTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    private fun discoverWatchtowersUseCase(): DiscoverWatchtowersByClearedTilesUseCase =
+        mockk(relaxed = true)
+
     @Test
     fun `startIfNeeded should reveal exploration tiles once for repeated updates in the same tile cluster`() = runTest {
         // Given
@@ -36,6 +41,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
@@ -67,6 +73,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = mockk(relaxed = true),
+            discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
@@ -91,6 +98,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = FakeUserLocationSource(),
             revealExplorationTilesAtLocation = mockk(relaxed = true),
+            discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
@@ -120,6 +128,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = configHolder,
         )
@@ -152,6 +161,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = configHolder,
         )
@@ -186,6 +196,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = configHolder,
         )
@@ -220,6 +231,7 @@ class ExplorationTrackingRuntimeTest {
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = mockk(relaxed = true),
+            discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
@@ -240,6 +252,36 @@ class ExplorationTrackingRuntimeTest {
 
         // Then
         coVerify(exactly = 2) { collectNearbyResourceSpawns.invoke(location) }
+    }
+
+    @Test
+    fun `startIfNeeded should pass newly cleared tiles to watchtower discovery`() = runTest {
+        // Given
+        val userLocationSource = FakeUserLocationSource()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
+        val discoverWatchtowersByClearedTiles = mockk<DiscoverWatchtowersByClearedTilesUseCase>()
+        val runtime = ExplorationTrackingRuntime(
+            appScope = backgroundScope,
+            userLocationSource = userLocationSource,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
+            discoverWatchtowersByClearedTiles = discoverWatchtowersByClearedTiles,
+            collectNearbyResourceSpawns = mockk(relaxed = true),
+            configHolder = ExplorationTileRuntimeConfigHolder(),
+        )
+        val location = GeoPoint(lat = 40.7128, lon = -74.0060)
+        val clearedTiles = setOf(MapTile(zoom = 16, x = 12_345, y = 54_321))
+
+        coEvery { revealExplorationTilesAtLocation.invoke(location) } returns clearedTiles
+        coEvery { discoverWatchtowersByClearedTiles.invoke(clearedTiles) } returns setOf("watchtower-1")
+
+        // When
+        runtime.startIfNeeded()
+        runCurrent()
+        userLocationSource.emit(UserLocationUpdate.Available(location))
+        runCurrent()
+
+        // Then
+        coVerify(exactly = 1) { discoverWatchtowersByClearedTiles.invoke(clearedTiles) }
     }
 
     private class FakeUserLocationSource : UserLocationSource {

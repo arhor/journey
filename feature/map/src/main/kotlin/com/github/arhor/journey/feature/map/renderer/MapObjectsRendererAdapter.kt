@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.sp
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
+import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -165,6 +166,89 @@ fun MapObjectsRendererAdapter(
         },
     )
 
+    val watchtowerMarkerStateExpression = feature[PROPERTY_OBJECT_WATCHTOWER_STATE].asString(
+        const(WatchtowerMarkerState.DISCOVERED_DORMANT.name),
+    )
+    val watchtowerMarkerColor = remember {
+        switch(
+            input = watchtowerMarkerStateExpression,
+            case(
+                label = WatchtowerMarkerState.CLAIMABLE.name,
+                output = const(Color(0xFFFFB300)),
+            ),
+            case(
+                label = WatchtowerMarkerState.CLAIMED.name,
+                output = const(Color(0xFF00695C)),
+            ),
+            case(
+                label = WatchtowerMarkerState.UPGRADE_AVAILABLE.name,
+                output = const(Color(0xFF00897B)),
+            ),
+            fallback = const(Color(0xFF546E7A)),
+        )
+    }
+    val watchtowerHaloColor = remember {
+        switch(
+            input = watchtowerMarkerStateExpression,
+            case(
+                label = WatchtowerMarkerState.CLAIMABLE.name,
+                output = const(Color(0x33FFB300)),
+            ),
+            case(
+                label = WatchtowerMarkerState.CLAIMED.name,
+                output = const(Color(0x3300695C)),
+            ),
+            case(
+                label = WatchtowerMarkerState.UPGRADE_AVAILABLE.name,
+                output = const(Color(0x3300897B)),
+            ),
+            fallback = const(Color(0x22546E7A)),
+        )
+    }
+
+    CircleLayer(
+        id = WATCHTOWER_HALO_LAYER_ID,
+        source = source,
+        minZoom = DECLUSTER_ZOOM.toFloat(),
+        filter = feature[PROPERTY_OBJECT_KIND].asString(const("")) eq const(MapObjectKind.Watchtower.idPrefix),
+        color = watchtowerHaloColor,
+        radius = step(
+            input = feature[PROPERTY_OBJECT_WATCHTOWER_LEVEL].asNumber(const(1f)),
+            fallback = const(18.dp),
+            2 to const(21.dp),
+            3 to const(24.dp),
+        ),
+        strokeColor = const(Color.Transparent),
+        onClick = { features ->
+            resolveObjectId(features)?.let { objectId ->
+                onObjectTapped(objectId)
+                ClickResult.Consume
+            } ?: ClickResult.Pass
+        },
+    )
+
+    CircleLayer(
+        id = WATCHTOWER_LAYER_ID,
+        source = source,
+        minZoom = DECLUSTER_ZOOM.toFloat(),
+        filter = feature[PROPERTY_OBJECT_KIND].asString(const("")) eq const(MapObjectKind.Watchtower.idPrefix),
+        color = watchtowerMarkerColor,
+        strokeColor = const(Color.White),
+        strokeWidth = const(2.dp),
+        radius = step(
+            input = feature[PROPERTY_OBJECT_WATCHTOWER_LEVEL].asNumber(const(1f)),
+            fallback = const(9.dp),
+            2 to const(11.dp),
+            3 to const(13.dp),
+        ),
+        onClick = { features ->
+            resolveObjectId(features)?.let { objectId ->
+                onObjectTapped(objectId)
+                ClickResult.Consume
+            } ?: ClickResult.Pass
+        },
+    )
+
     SymbolLayer(
         id = RESOURCE_SPAWN_LAYER_ID,
         source = source,
@@ -212,6 +296,8 @@ internal fun MapObjectUiModel.toFeatureProperties(): JsonObject = buildJsonObjec
     put(PROPERTY_OBJECT_IS_HIDDEN_BY_FOG, isHiddenByFog)
     resourceType?.let { put(PROPERTY_OBJECT_RESOURCE_TYPE_ID, it.typeId) }
     resourceIconKey()?.let { put(PROPERTY_OBJECT_RESOURCE_ICON_KEY, it) }
+    watchtowerMarkerState?.let { put(PROPERTY_OBJECT_WATCHTOWER_STATE, it.name) }
+    watchtowerLevel?.let { put(PROPERTY_OBJECT_WATCHTOWER_LEVEL, it) }
 }
 
 internal fun MapObjectUiModel.resourceIconKey(): String? = when {
@@ -232,6 +318,8 @@ internal const val GAME_ENTITIES_SOURCE_ID = "game-entities-source"
 internal const val CLUSTER_LAYER_ID = "game-entities-cluster-layer"
 internal const val CLUSTER_COUNT_LAYER_ID = "game-entities-cluster-count-layer"
 internal const val OBJECT_LAYER_ID = "game-entities-object-layer"
+internal const val WATCHTOWER_HALO_LAYER_ID = "watchtower-halo-layer"
+internal const val WATCHTOWER_LAYER_ID = "watchtower-layer"
 internal const val RESOURCE_SPAWN_LAYER_ID = "resource-spawn-layer"
 
 internal const val PROPERTY_OBJECT_ID = "object_id"
@@ -243,6 +331,8 @@ internal const val PROPERTY_OBJECT_IS_DISCOVERED = "is_discovered"
 internal const val PROPERTY_OBJECT_IS_HIDDEN_BY_FOG = "is_hidden_by_fog"
 internal const val PROPERTY_OBJECT_RESOURCE_TYPE_ID = "resource_type_id"
 internal const val PROPERTY_OBJECT_RESOURCE_ICON_KEY = "resource_icon_key"
+internal const val PROPERTY_OBJECT_WATCHTOWER_STATE = "watchtower_state"
+internal const val PROPERTY_OBJECT_WATCHTOWER_LEVEL = "watchtower_level"
 internal const val PROPERTY_IS_CLUSTER = "cluster"
 internal const val PROPERTY_CLUSTER_POINT_COUNT = "point_count"
 internal const val PROPERTY_CLUSTER_POINT_COUNT_ABBREVIATED = "point_count_abbreviated"

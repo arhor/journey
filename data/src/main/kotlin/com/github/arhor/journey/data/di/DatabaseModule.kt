@@ -10,6 +10,7 @@ import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.dao.HeroDao
 import com.github.arhor.journey.data.local.db.dao.HeroResourceDao
 import com.github.arhor.journey.data.local.db.dao.PoiDao
+import com.github.arhor.journey.data.local.db.dao.WatchtowerStateDao
 import com.github.arhor.journey.domain.TransactionRunner
 import dagger.Module
 import dagger.Provides
@@ -60,6 +61,11 @@ object DatabaseModule {
     @Singleton
     fun provideExplorationTileDao(db: JourneyDatabase): ExplorationTileDao =
         db.explorationTileDao()
+
+    @Provides
+    @Singleton
+    fun provideWatchtowerStateDao(db: JourneyDatabase): WatchtowerStateDao =
+        db.watchtowerStateDao()
 
     @Provides
     @Singleton

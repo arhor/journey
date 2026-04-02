@@ -340,6 +340,15 @@ internal fun MapContent(
                 .padding(16.dp),
         )
     }
+
+    state.selectedWatchtower?.let { selectedWatchtower ->
+        WatchtowerBottomSheet(
+            state = selectedWatchtower,
+            onDismiss = { dispatch(MapIntent.DismissWatchtowerSheet) },
+            onClaim = { dispatch(MapIntent.ClaimSelectedWatchtower) },
+            onUpgrade = { dispatch(MapIntent.UpgradeSelectedWatchtower) },
+        )
+    }
 }
 
 private const val CAMERA_SETTLE_DEBOUNCE_MS = 100L

@@ -133,6 +133,30 @@ fun tilesInBounds(
     zoom: Int = CANONICAL_ZOOM,
 ): Set<MapTile> = tileRange(bounds, zoom).asSequence().toSet()
 
+fun GeoBounds.expandedByMeters(
+    paddingMeters: Double,
+): GeoBounds {
+    val normalizedPaddingMeters = paddingMeters.coerceAtLeast(0.0)
+    if (normalizedPaddingMeters == 0.0) {
+        return this
+    }
+
+    val centerPoint = GeoPoint(
+        lat = (south + north) / 2.0,
+        lon = (west + east) / 2.0,
+    )
+    val latitudePaddingDegrees = normalizedPaddingMeters / METERS_PER_LAT_DEGREE
+    val longitudePaddingDegrees = normalizedPaddingMeters /
+        (cos(Math.toRadians(centerPoint.lat)).coerceAtLeast(COS_EPSILON) * METERS_PER_LAT_DEGREE)
+
+    return GeoBounds(
+        south = (south - latitudePaddingDegrees).coerceIn(MIN_LAT, MAX_LAT),
+        west = (west - longitudePaddingDegrees).coerceIn(MIN_LON, MAX_LON),
+        north = (north + latitudePaddingDegrees).coerceIn(MIN_LAT, MAX_LAT),
+        east = (east + longitudePaddingDegrees).coerceIn(MIN_LON, MAX_LON),
+    )
+}
+
 fun revealTilesAround(
     point: GeoPoint,
     radiusMeters: Double = REVEAL_RADIUS_METERS,
