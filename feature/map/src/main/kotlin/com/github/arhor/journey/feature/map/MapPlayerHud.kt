@@ -160,7 +160,7 @@ private fun ResourceAmountChip(
     ) {
         ResourceTypeIcon(
             resourceType = state.resourceType,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(30.dp),
             contentDescription = null,
         )
         Text(
@@ -216,9 +216,9 @@ private fun MapPlayerHudDefaultPreview() {
                 heroInitial = "A",
                 levelLabel = "Lv 7",
                 resources = listOf(
-                    MapHudResourceUiModel(ResourceType.WOOD, amount = 18, amountLabel = "18"),
-                    MapHudResourceUiModel(ResourceType.COAL, amount = 7, amountLabel = "7"),
-                    MapHudResourceUiModel(ResourceType.STONE, amount = 0, amountLabel = "0"),
+                    MapHudResourceUiModel(ResourceType.SCRAP, amount = 18, amountLabel = "18"),
+                    MapHudResourceUiModel(ResourceType.COMPONENTS, amount = 7, amountLabel = "7"),
+                    MapHudResourceUiModel(ResourceType.FUEL, amount = 0, amountLabel = "0"),
                 ),
             ),
             onHeroClick = {},
@@ -236,9 +236,9 @@ private fun MapPlayerHudLargeNumbersPreview() {
                 heroInitial = "A",
                 levelLabel = "Lv 12",
                 resources = listOf(
-                    MapHudResourceUiModel(ResourceType.WOOD, amount = 1_250, amountLabel = "1.2K"),
-                    MapHudResourceUiModel(ResourceType.COAL, amount = 12_300, amountLabel = "12K"),
-                    MapHudResourceUiModel(ResourceType.STONE, amount = 1_300_000, amountLabel = "1.3M"),
+                    MapHudResourceUiModel(ResourceType.SCRAP, amount = 1_250, amountLabel = "1.2K"),
+                    MapHudResourceUiModel(ResourceType.COMPONENTS, amount = 12_300, amountLabel = "12K"),
+                    MapHudResourceUiModel(ResourceType.FUEL, amount = 1_300_000, amountLabel = "1.3M"),
                 ),
             ),
             onHeroClick = {},

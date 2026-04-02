@@ -1,5 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.CollectedResourceSpawn
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
@@ -33,14 +34,14 @@ class RecordCollectedResourceSpawnUseCaseTest {
         // When
         val actual = subject(
             spawnId = "spawn-11",
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
         )
 
         // Then
-        actual shouldBe true
+        actual shouldBe Output.Success(true)
         repository.lastHeroId shouldBe hero.id
         repository.lastSpawnId shouldBe "spawn-11"
-        repository.lastResourceTypeId shouldBe "wood"
+        repository.lastResourceTypeId shouldBe "scrap"
         repository.lastCollectedAt shouldBe now
     }
 
@@ -57,11 +58,11 @@ class RecordCollectedResourceSpawnUseCaseTest {
         // When
         val actual = subject(
             spawnId = "spawn-11",
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
         )
 
         // Then
-        actual shouldBe false
+        actual shouldBe Output.Success(false)
     }
 
     private fun hero(id: String): Hero =

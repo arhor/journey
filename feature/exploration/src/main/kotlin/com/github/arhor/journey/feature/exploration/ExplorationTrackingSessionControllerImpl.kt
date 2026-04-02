@@ -1,10 +1,12 @@
 package com.github.arhor.journey.feature.exploration
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
-import com.github.arhor.journey.domain.model.StartExplorationTrackingSessionResult
+import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.tracking.ExplorationTrackingSessionController
 import com.github.arhor.journey.feature.exploration.location.LocationPermissionChecker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -18,23 +20,26 @@ class ExplorationTrackingSessionControllerImpl @Inject constructor(
 
     override fun observeSession(): Flow<ExplorationTrackingSession> = runtime.observeSession()
 
-    override suspend fun startSessionIfNeeded(): StartExplorationTrackingSessionResult {
+    override suspend fun startSessionIfNeeded(): Output<Unit, StartExplorationTrackingSessionError> {
         if (runtime.snapshot().isActive) {
-            return StartExplorationTrackingSessionResult.AlreadyActive
+            return Output.Success(Unit)
         }
 
         if (!permissionChecker.hasAnyLocationPermission()) {
             runtime.markPermissionDenied()
-            return StartExplorationTrackingSessionResult.PermissionRequired
+            return Output.Failure(StartExplorationTrackingSessionError.PermissionRequired)
         }
 
         return try {
             runtime.markStarting()
             serviceLauncher.start()
-            StartExplorationTrackingSessionResult.Started
+            Output.Success(Unit)
         } catch (e: Throwable) {
+            if (e is CancellationException) {
+                throw e
+            }
             runtime.stop()
-            StartExplorationTrackingSessionResult.Failed(e.message)
+            Output.Failure(StartExplorationTrackingSessionError.LaunchFailed(e))
         }
     }
 

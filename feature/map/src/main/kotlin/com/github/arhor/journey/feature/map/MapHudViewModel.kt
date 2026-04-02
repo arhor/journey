@@ -2,6 +2,8 @@ package com.github.arhor.journey.feature.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.arhor.journey.core.common.combine as combineOutputs
+import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroResource
@@ -24,8 +26,15 @@ class MapHudViewModel @Inject constructor(
 ) : ViewModel() {
 
     val uiState: StateFlow<MapHudUiState> =
-        combine(observeHero(), observeHeroResources()) { hero, resources ->
-            hero.toMapHudUiState(resources = resources)
+        combine(observeHero(), observeHeroResources()) { heroOutput, resourcesOutput ->
+            combineOutputs(heroOutput, resourcesOutput).fold(
+                onSuccess = { (hero, resources) ->
+                    hero.toMapHudUiState(resources = resources)
+                },
+                onFailure = {
+                    MapHudUiState.Unavailable
+                },
+            )
         }
             .catch { emit(MapHudUiState.Unavailable) }
             .stateIn(

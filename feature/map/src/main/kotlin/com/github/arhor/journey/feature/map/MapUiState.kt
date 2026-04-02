@@ -31,7 +31,7 @@ sealed interface MapUiState {
         val explorationTrackingStatus: ExplorationTrackingStatus,
         val selectedStyle: MapStyle?,
         val visibleObjects: List<MapObjectUiModel>,
+        val selectedWatchtower: WatchtowerSheetUiState?,
         val fogOfWar: FogOfWarUiState,
-        val debug: MapDebugUiState,
     ) : MapUiState
 }

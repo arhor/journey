@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.hero
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.internal.ProgressionPolicy
 import com.github.arhor.journey.domain.model.Hero
@@ -19,20 +20,22 @@ import java.time.Instant
 class HeroViewModelTest {
 
     @Test
-    fun `uiState should expose wood coal and stone resource amounts when hero resources are emitted`() = runTest {
+    fun `uiState should expose scrap components and fuel resource amounts when hero resources are emitted`() = runTest {
         // Given
         val hero = hero()
         val observeHero = mockk<ObserveHeroUseCase>()
         val observeHeroResources = mockk<ObserveHeroResourcesUseCase>()
 
-        every { observeHero() } returns flowOf(hero)
+        every { observeHero() } returns flowOf(Output.Success(hero))
         every { observeHeroResources() } returns flowOf(
-            listOf(
-                HeroResource(
-                    heroId = hero.id,
-                    resourceTypeId = ResourceType.WOOD.typeId,
-                    amount = 7,
-                    updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
+            Output.Success(
+                listOf(
+                    HeroResource(
+                        heroId = hero.id,
+                        resourceTypeId = ResourceType.SCRAP.typeId,
+                        amount = 7,
+                        updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
+                    ),
                 ),
             ),
         )
@@ -48,15 +51,15 @@ class HeroViewModelTest {
         // Then
         actual.resources shouldBe listOf(
             HeroResourceAmountUiModel(
-                resourceType = ResourceType.WOOD,
+                resourceType = ResourceType.SCRAP,
                 amount = 7,
             ),
             HeroResourceAmountUiModel(
-                resourceType = ResourceType.COAL,
+                resourceType = ResourceType.COMPONENTS,
                 amount = 0,
             ),
             HeroResourceAmountUiModel(
-                resourceType = ResourceType.STONE,
+                resourceType = ResourceType.FUEL,
                 amount = 0,
             ),
         )

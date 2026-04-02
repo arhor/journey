@@ -9,9 +9,9 @@ class ResourceTypeTest {
     fun `all should expose known resource types in display order`() {
         // Given
         val expected = listOf(
-            ResourceType.WOOD,
-            ResourceType.COAL,
-            ResourceType.STONE,
+            ResourceType.SCRAP,
+            ResourceType.COMPONENTS,
+            ResourceType.FUEL,
         )
 
         // When
@@ -24,10 +24,10 @@ class ResourceTypeTest {
     @Test
     fun `fromTypeId should resolve known resource types`() {
         // When
-        val actual = ResourceType.fromTypeId("coal")
+        val actual = ResourceType.fromTypeId("fuel")
 
         // Then
-        actual shouldBe ResourceType.COAL
+        actual shouldBe ResourceType.FUEL
     }
 
     @Test

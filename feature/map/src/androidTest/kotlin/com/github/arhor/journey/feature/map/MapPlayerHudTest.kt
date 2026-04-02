@@ -3,6 +3,7 @@ package com.github.arhor.journey.feature.map
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -58,15 +59,21 @@ class MapPlayerHudTest {
 
         // When
         val hud = composeRule.onNodeWithTag(MAP_HUD_TEST_TAG)
-        val woodAmount = composeRule.onNodeWithText("1.2K")
-        val coalAmount = composeRule.onNodeWithText("12K")
-        val stoneAmount = composeRule.onNodeWithText("1.3M")
+        val scrapAmount = composeRule.onNodeWithText("1.2K")
+        val componentsAmount = composeRule.onNodeWithText("12K")
+        val fuelAmount = composeRule.onNodeWithText("1.3M")
+        val scrapDescription = composeRule.onNodeWithContentDescription("Scrap: 1250")
+        val componentsDescription = composeRule.onNodeWithContentDescription("Components: 12300")
+        val fuelDescription = composeRule.onNodeWithContentDescription("Fuel: 1300000")
 
         // Then
         hud.assertIsDisplayed()
-        woodAmount.assertIsDisplayed()
-        coalAmount.assertIsDisplayed()
-        stoneAmount.assertIsDisplayed()
+        scrapAmount.assertIsDisplayed()
+        componentsAmount.assertIsDisplayed()
+        fuelAmount.assertIsDisplayed()
+        scrapDescription.assertIsDisplayed()
+        componentsDescription.assertIsDisplayed()
+        fuelDescription.assertIsDisplayed()
     }
 
     private fun contentState(): MapHudUiState.Content =
@@ -75,17 +82,17 @@ class MapPlayerHudTest {
             levelLabel = "Lv 7",
             resources = listOf(
                 MapHudResourceUiModel(
-                    resourceType = ResourceType.WOOD,
+                    resourceType = ResourceType.SCRAP,
                     amount = 1_250,
                     amountLabel = "1.2K",
                 ),
                 MapHudResourceUiModel(
-                    resourceType = ResourceType.COAL,
+                    resourceType = ResourceType.COMPONENTS,
                     amount = 12_300,
                     amountLabel = "12K",
                 ),
                 MapHudResourceUiModel(
-                    resourceType = ResourceType.STONE,
+                    resourceType = ResourceType.FUEL,
                     amount = 1_300_000,
                     amountLabel = "1.3M",
                 ),

@@ -34,10 +34,6 @@ internal val EMPTY_FOG_GEO_JSON_DATA = GeoJsonData.JsonString(
 fun FogOfWarOverlay(
     state: FogOfWarRenderState,
 ) {
-    if (!state.isOverlayEnabled) {
-        return
-    }
-
     for (spec in state.fogOfWarLayerSpecs()) {
         FogOfWarRendererAdapter(
             fogRenderData = spec.renderData,

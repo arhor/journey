@@ -35,9 +35,9 @@ fun resourceTypeLabel(resourceType: ResourceType): String =
 @StringRes
 fun resourceTypeLabelRes(resourceType: ResourceType): Int =
     when (resourceType) {
-        ResourceType.WOOD -> R.string.core_ui_resource_wood
-        ResourceType.COAL -> R.string.core_ui_resource_coal
-        ResourceType.STONE -> R.string.core_ui_resource_stone
+        ResourceType.SCRAP -> R.string.core_ui_resource_scrap
+        ResourceType.COMPONENTS -> R.string.core_ui_resource_components
+        ResourceType.FUEL -> R.string.core_ui_resource_fuel
     }
 
 @Composable

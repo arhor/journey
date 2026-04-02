@@ -1,9 +1,11 @@
 package com.github.arhor.journey.feature.map
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroResource
 import com.github.arhor.journey.domain.model.Progression
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourcesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroUseCase
 import io.kotest.matchers.shouldBe
@@ -34,20 +36,22 @@ class MapHudViewModelTest {
             val observeHeroResources = mockk<ObserveHeroResourcesUseCase>()
             val hero = hero()
 
-            every { observeHero() } returns flowOf(hero)
+            every { observeHero() } returns flowOf(Output.Success(hero))
             every { observeHeroResources() } returns flowOf(
-                listOf(
-                    HeroResource(
-                        heroId = hero.id,
-                        resourceTypeId = ResourceType.WOOD.typeId,
-                        amount = 1_250,
-                        updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
-                    ),
-                    HeroResource(
-                        heroId = hero.id,
-                        resourceTypeId = ResourceType.STONE.typeId,
-                        amount = 1_300_000,
-                        updatedAt = Instant.parse("2026-03-01T12:05:00Z"),
+                Output.Success(
+                    listOf(
+                        HeroResource(
+                            heroId = hero.id,
+                            resourceTypeId = ResourceType.SCRAP.typeId,
+                            amount = 1_250,
+                            updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
+                        ),
+                        HeroResource(
+                            heroId = hero.id,
+                            resourceTypeId = ResourceType.FUEL.typeId,
+                            amount = 1_300_000,
+                            updatedAt = Instant.parse("2026-03-01T12:05:00Z"),
+                        ),
                     ),
                 ),
             )
@@ -67,17 +71,17 @@ class MapHudViewModelTest {
                 levelLabel = "Lv 4",
                 resources = listOf(
                     MapHudResourceUiModel(
-                        resourceType = ResourceType.WOOD,
+                        resourceType = ResourceType.SCRAP,
                         amount = 1_250,
                         amountLabel = "1.2K",
                     ),
                     MapHudResourceUiModel(
-                        resourceType = ResourceType.COAL,
+                        resourceType = ResourceType.COMPONENTS,
                         amount = 0,
                         amountLabel = "0",
                     ),
                     MapHudResourceUiModel(
-                        resourceType = ResourceType.STONE,
+                        resourceType = ResourceType.FUEL,
                         amount = 1_300_000,
                         amountLabel = "1.3M",
                     ),
@@ -97,10 +101,15 @@ class MapHudViewModelTest {
             val observeHero = mockk<ObserveHeroUseCase>()
             val observeHeroResources = mockk<ObserveHeroResourcesUseCase>()
 
-            every { observeHero() } returns flow {
-                throw IllegalStateException("Hero stream crashed.")
-            }
-            every { observeHeroResources() } returns flowOf(emptyList())
+            every { observeHero() } returns flowOf(
+                Output.Failure(
+                    UseCaseError.Unexpected(
+                        operation = "observe hero",
+                        cause = IllegalStateException("Hero stream crashed."),
+                    ),
+                ),
+            )
+            every { observeHeroResources() } returns flowOf(Output.Success(emptyList()))
             val viewModel = MapHudViewModel(
                 observeHero = observeHero,
                 observeHeroResources = observeHeroResources,

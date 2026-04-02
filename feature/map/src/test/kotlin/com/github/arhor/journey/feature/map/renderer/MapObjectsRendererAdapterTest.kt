@@ -4,6 +4,7 @@ import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
+import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -93,7 +94,7 @@ class MapObjectsRendererAdapterTest {
         // Given
         val objectUiModel = mapObject(
             id = "spawn-1",
-            title = "wood",
+            title = "Scrap",
             description = null,
             latitude = 50.45,
             longitude = 30.52,
@@ -101,15 +102,40 @@ class MapObjectsRendererAdapterTest {
             isDiscovered = false,
             kind = MapObjectKind.ResourceSpawn,
             isHiddenByFog = true,
-            resourceType = ResourceType.WOOD,
+            resourceType = ResourceType.SCRAP,
         )
 
         // When
         val actual = objectUiModel.toFeatureProperties()
 
         // Then
-        actual[PROPERTY_OBJECT_RESOURCE_TYPE_ID]?.jsonPrimitive?.contentOrNull shouldBe "wood"
+        actual[PROPERTY_OBJECT_RESOURCE_TYPE_ID]?.jsonPrimitive?.contentOrNull shouldBe "scrap"
         actual[PROPERTY_OBJECT_IS_HIDDEN_BY_FOG]?.jsonPrimitive?.contentOrNull shouldBe "true"
+    }
+
+    @Test
+    fun `toFeatureProperties should include watchtower marker metadata when object is a watchtower`() {
+        // Given
+        val objectUiModel = mapObject(
+            id = "watchtower-1",
+            title = "Old Town Spire",
+            description = "Dormant",
+            latitude = 51.1093,
+            longitude = 17.0326,
+            radiusMeters = 150,
+            isDiscovered = true,
+            kind = MapObjectKind.Watchtower,
+            watchtowerMarkerState = WatchtowerMarkerState.CLAIMABLE,
+            watchtowerLevel = 1,
+        )
+
+        // When
+        val actual = objectUiModel.toFeatureProperties()
+
+        // Then
+        actual[PROPERTY_OBJECT_WATCHTOWER_STATE]?.jsonPrimitive?.contentOrNull shouldBe
+            WatchtowerMarkerState.CLAIMABLE.name
+        actual[PROPERTY_OBJECT_WATCHTOWER_LEVEL]?.jsonPrimitive?.contentOrNull shouldBe "1"
     }
 
     @Test
@@ -177,6 +203,8 @@ class MapObjectsRendererAdapterTest {
         kind: MapObjectKind,
         isHiddenByFog: Boolean = false,
         resourceType: ResourceType? = null,
+        watchtowerMarkerState: WatchtowerMarkerState? = null,
+        watchtowerLevel: Int? = null,
     ): MapObjectUiModel = MapObjectUiModel(
         id = id,
         kind = kind,
@@ -187,6 +215,8 @@ class MapObjectsRendererAdapterTest {
         isDiscovered = isDiscovered,
         isHiddenByFog = isHiddenByFog,
         resourceType = resourceType,
+        watchtowerMarkerState = watchtowerMarkerState,
+        watchtowerLevel = watchtowerLevel,
     )
 
     private fun featureWithObjectId(objectId: String?): Feature<Point, kotlinx.serialization.json.JsonObject?> = Feature(

@@ -40,3 +40,7 @@ interface DomainError {
     val cause: Throwable?
         get() = null
 }
+
+fun DomainError.resolveMessage(
+    fallback: String,
+): String = message ?: cause?.message ?: fallback

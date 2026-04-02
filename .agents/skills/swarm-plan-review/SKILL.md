@@ -1,12 +1,12 @@
 ---
-name: collective-plan-review
+name: swarm-plan-review
 description: >-
   Automatically use this skill whenever the user asks for a repository-specific investigation, design proposal,
-  or implementation plan that is more than a trivial one-step answer. Draft the plan, run a collective review swarm,
+  or implementation plan that is more than a trivial one-step answer. Draft the plan, run a swarm review,
   and refine it before any code changes begin. Do not use for direct implementation tasks or trivial plans.
 ---
 
-# Collective Plan Review
+# Swarm Plan Review
 
 This skill is for planning work, not coding work.
 
@@ -18,7 +18,7 @@ Use it by default when the user wants Codex to:
 - have that plan reviewed by several specialist subagents,
 - refine the plan before any code changes begin.
 
-The user does not need to ask for collective review explicitly. If the task is a real planning request, this review
+The user does not need to ask for swarm review explicitly. If the task is a real planning request, this review
 workflow should happen automatically.
 
 Do **not** use this skill for:
@@ -27,7 +27,7 @@ Do **not** use this skill for:
 - tiny edits that do not need a real plan,
 - generic brainstorming detached from the current repository,
 - quick rough outlines when the user explicitly says to skip review,
-- post-change code review of a working tree. Use the implementation collective-code-review skill for that.
+- post-change code review of a working tree. Use the implementation `swarm-code-review` skill for that.
 
 ## Operating mode
 
@@ -64,6 +64,9 @@ Create a first-pass implementation plan using the template in `assets/plan-templ
 
 The draft should be concrete. It must name likely files, modules, interfaces, data flows, tests, risks, and validation
 steps whenever the repository evidence supports that level of specificity.
+
+The draft must also carry an explicit implementation handoff contract using the structure from
+`assets/plan-template.md` so a later plan acceptance can reconstruct execution intent safely.
 
 ### 3) Run the review swarm
 
@@ -116,10 +119,22 @@ Return a planning package with these sections:
 2. **Revised plan**
 3. **Review ledger**
 4. **Open questions / assumptions**
-5. **Suggested next prompt for implementation**
+5. **Implementation handoff**
+6. **Suggested next prompt for implementation**
 
 The **Review ledger** must be concise and structured. Use the template from `assets/plan-review-ledger-template.md` if
 helpful.
+
+The **Implementation handoff** section must be concise and structured. It must include:
+
+- `plan_status`: `implementation-ready` or `non-implementation`
+- `recommended_skills`: the repo skill or skills that should be used when execution starts
+- `review_policy`: whether `swarm-code-review` should run by default or be skipped because the user asked to skip review
+- `acceptance_behavior`: whether a plain acceptance of the plan should start implementation or stop at investigation
+
+When `plan_status` is `implementation-ready`, state explicitly that a plain acceptance of the plan should execute it
+using the inferred skills from that handoff plus the original request context. When `plan_status` is
+`non-implementation`, state explicitly that acceptance alone must not start coding.
 
 ## Quality bar
 
@@ -129,7 +144,8 @@ A good final plan:
 - names concrete touch points,
 - includes validation and rollback/migration thinking when relevant,
 - surfaces uncertainty honestly,
-- is shaped so an implementation agent could execute it with minimal ambiguity.
+- is shaped so an implementation agent could execute it with minimal ambiguity,
+- makes the implementation handoff explicit enough that a plain plan acceptance can start the right work safely.
 
 ## Subagent prompting guidance
 
@@ -149,4 +165,5 @@ This skill is complete only when:
 - the review swarm ran,
 - the plan was refined,
 - every reasonable reviewer point has an explicit disposition,
-- the final answer clearly separates the revised plan from the review feedback.
+- the final answer clearly separates the revised plan from the review feedback,
+- the final output includes the required implementation handoff contract.

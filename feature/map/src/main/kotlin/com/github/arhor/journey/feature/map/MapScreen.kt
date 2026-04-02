@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -32,13 +31,11 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.fow.ui.FogOfWarOverlay
-import com.github.arhor.journey.feature.map.fow.model.renderState
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
-import com.github.arhor.journey.feature.map.renderer.TilesGridRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -259,7 +256,7 @@ internal fun MapContent(
                     zoomRange = CAMERA_ZOOM_BOUNDS,
                     styleState = styleState,
                     options = MapOptions(
-                        renderOptions = state.debug.renderMode.toRenderOptions(),
+                        renderOptions = RenderOptions.Standard,
                         gestureOptions = GestureOptions.Standard,
                         ornamentOptions = OrnamentOptions.AllDisabled,
                     ),
@@ -284,45 +281,13 @@ internal fun MapContent(
                         )
                     }
 
-                    FogOfWarOverlay(state = state.fogOfWar.renderState)
-
-                    if (
-                        state.debug.isTilesGridOverlayEnabled &&
-                        !state.fogOfWar.isSuppressedByVisibleTileLimit
-                    ) {
-                        TilesGridRendererAdapter(
-                            tileRange = state.fogOfWar.visibleTileRange,
-                        )
-                    }
+                    FogOfWarOverlay(state = state.fogOfWar.toRenderState())
 
                     MapObjectsRendererAdapter(
                         objects = state.visibleObjects,
                         onObjectTapped = onObjectTapped,
                     )
                 }
-            }
-        }
-
-        if (BuildConfig.DEBUG) {
-            MapDebugInfoOverlay(
-                state = state,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 110.dp, end = 16.dp),
-            )
-
-            FloatingActionButton(
-                onClick = {
-                    dispatch(MapIntent.DebugControlsClicked)
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 88.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.BugReport,
-                    contentDescription = stringResource(R.string.map_debug_button_content_description),
-                )
             }
         }
 
@@ -366,13 +331,6 @@ internal fun MapContent(
             )
         }
 
-        if (BuildConfig.DEBUG && state.debug.isSheetVisible) {
-            MapDebugControlsSheet(
-                state = state,
-                dispatch = dispatch,
-            )
-        }
-
         MapPlayerHud(
             state = hudState,
             onHeroClick = onOpenHero,
@@ -380,6 +338,15 @@ internal fun MapContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(16.dp),
+        )
+    }
+
+    state.selectedWatchtower?.let { selectedWatchtower ->
+        WatchtowerBottomSheet(
+            state = selectedWatchtower,
+            onDismiss = { dispatch(MapIntent.DismissWatchtowerSheet) },
+            onClaim = { dispatch(MapIntent.ClaimSelectedWatchtower) },
+            onUpgrade = { dispatch(MapIntent.UpgradeSelectedWatchtower) },
         )
     }
 }
@@ -475,9 +442,3 @@ private data class CameraSettledSnapshot(
     val origin: CameraUpdateOrigin,
     val isCameraMoving: Boolean,
 )
-
-private fun MapRenderMode.toRenderOptions(): RenderOptions =
-    when (this) {
-        MapRenderMode.Standard -> RenderOptions.Standard
-        MapRenderMode.Debug -> RenderOptions.Debug
-    }

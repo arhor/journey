@@ -49,6 +49,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.hilt.android.testing)
     androidTestImplementation(libs.kotest.assertions.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)

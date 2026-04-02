@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.exploration
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.di.AppCoroutineScope
 import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.internal.revealTilesAround
@@ -9,9 +10,11 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
+import com.github.arhor.journey.domain.usecase.DiscoverWatchtowersByClearedTilesUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +34,7 @@ class ExplorationTrackingRuntime @Inject constructor(
     @AppCoroutineScope private val appScope: CoroutineScope,
     private val userLocationSource: UserLocationSource,
     private val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
+    private val discoverWatchtowersByClearedTiles: DiscoverWatchtowersByClearedTilesUseCase,
     private val collectNearbyResourceSpawns: CollectNearbyResourceSpawnsUseCase,
     private val configHolder: ExplorationTileRuntimeConfigHolder,
 ) {
@@ -169,7 +173,19 @@ class ExplorationTrackingRuntime @Inject constructor(
             return
         }
 
-        revealExplorationTilesAtLocation(update.location)
+        val newlyClearedTiles = when (val result = revealExplorationTilesAtLocation(update.location)) {
+            is Output.Success -> result.value
+            is Output.Failure -> {
+                lastRevealedTiles = revealTiles
+                return
+            }
+        }
+        if (newlyClearedTiles.isNotEmpty()) {
+            when (discoverWatchtowersByClearedTiles(newlyClearedTiles)) {
+                is Output.Success -> Unit
+                is Output.Failure -> Unit
+            }
+        }
         lastRevealedTiles = revealTiles
     }
 
@@ -179,10 +195,20 @@ class ExplorationTrackingRuntime @Inject constructor(
             return
         }
 
-        runCatching {
-            collectNearbyResourceSpawns(location)
-        }.onSuccess {
-            lastNearbyCollectionBucket = bucket
+        try {
+            when (collectNearbyResourceSpawns(location)) {
+                is Output.Success -> {
+                    lastNearbyCollectionBucket = bucket
+                }
+
+                is Output.Failure -> {
+                    lastNearbyCollectionBucket = bucket
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            // Keep nearby collection best-effort without swallowing structured cancellation.
         }
     }
 

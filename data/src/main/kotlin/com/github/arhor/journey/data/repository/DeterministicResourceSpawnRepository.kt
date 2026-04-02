@@ -29,8 +29,6 @@ private const val CELL_PADDING_FRACTION = 0.18
 private const val HASH_FRACTION_GRANULARITY = 10_000.0
 private const val METERS_PER_LATITUDE_DEGREE = 111_320.0
 
-private val RESOURCE_TYPE_IDS = ResourceType.entries.map { it.typeId }
-
 @Singleton
 class DeterministicResourceSpawnRepository @Inject constructor() : ResourceSpawnRepository {
 
@@ -101,10 +99,10 @@ class DeterministicResourceSpawnRepository @Inject constructor() : ResourceSpawn
         slot: Int,
     ): ResourceSpawn {
         val daySeed = day.toEpochDay()
-        val resourceTypeId = RESOURCE_TYPE_IDS[
-            stableIndex("type:$GENERATOR_VERSION:$daySeed:$cellX:$cellY:$slot", RESOURCE_TYPE_IDS.size)
+        val resourceType = ResourceType.generationOrderedEntries[
+            stableIndex("type:$GENERATOR_VERSION:$daySeed:$cellX:$cellY:$slot", ResourceType.generationOrderedEntries.size)
         ]
-        val seedPrefix = "$GENERATOR_VERSION:$daySeed:$cellX:$cellY:$slot:$resourceTypeId"
+        val seedPrefix = "$GENERATOR_VERSION:$daySeed:$cellX:$cellY:$slot:${resourceType.generationTypeId}"
         val cellSouth = cellY * CELL_SIZE_DEGREES
         val cellWest = cellX * CELL_SIZE_DEGREES
         val innerFraction = 1.0 - (CELL_PADDING_FRACTION * 2.0)
@@ -123,9 +121,9 @@ class DeterministicResourceSpawnRepository @Inject constructor() : ResourceSpawn
                 cellX = cellX,
                 cellY = cellY,
                 slot = slot,
-                resourceTypeId = resourceTypeId,
+                resourceTypeId = resourceType.typeId,
             ),
-            typeId = resourceTypeId,
+            typeId = resourceType.typeId,
             position = GeoPoint(
                 lat = latitude,
                 lon = longitude,
