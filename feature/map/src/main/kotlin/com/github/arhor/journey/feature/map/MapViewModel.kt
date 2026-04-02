@@ -6,9 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.ResourceType
+import com.github.arhor.journey.core.common.combine as combineOutputs
 import com.github.arhor.journey.core.common.fold
+import com.github.arhor.journey.core.common.map
+import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.internal.tileAt
+import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
@@ -115,29 +119,34 @@ class MapViewModel @Inject constructor(
         fogOfWarControllerFactory.create(viewModelScope)
     }
 
-    private val initialTileRuntimeConfig = getExplorationTileRuntimeConfig()
+    private val initialTileRuntimeConfig = getExplorationTileRuntimeConfig().fold(
+        onSuccess = { it },
+        onFailure = { ExplorationTileRuntimeConfig() },
+    )
     private val _state = MutableStateFlow(State())
     private val trackingSession = observeExplorationTrackingSession()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = ExplorationTrackingSession(),
+            initialValue = Output.Success(ExplorationTrackingSession()),
         )
     private val watchtowerResourceAmounts = observeWatchtowerResourceAmounts()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = mapOf(
-                ResourceType.SCRAP.typeId to 0,
-                ResourceType.COMPONENTS.typeId to 0,
-                ResourceType.FUEL.typeId to 0,
+            initialValue = Output.Success(
+                mapOf(
+                    ResourceType.SCRAP.typeId to 0,
+                    ResourceType.COMPONENTS.typeId to 0,
+                    ResourceType.FUEL.typeId to 0,
+                ),
             ),
         )
     private val visibleWatchtowerData = observeVisibleWatchtowerData()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.Eagerly,
-            initialValue = VisibleWatchtowerData(),
+            initialValue = Output.Success(VisibleWatchtowerData()),
         )
     private var cachedVisibleObjects: List<MapObjectUiModel> = emptyList()
 
@@ -153,9 +162,9 @@ class MapViewModel @Inject constructor(
                 UiStateInputs(
                     state = state,
                     fogOfWar = fogOfWar,
-                    trackingSession = session,
+                    trackingSessionOutput = session,
                     mapStyleOutput = mapStyleOutput,
-                    pointsOfInterest = pointsOfInterest,
+                    pointsOfInterestOutput = pointsOfInterest,
                 )
             },
             watchtowerResourceAmounts,
@@ -163,12 +172,12 @@ class MapViewModel @Inject constructor(
         ) { inputs, watchtowerResourceAmounts, visibleWorldObjects ->
             intoUiState(
                 state = inputs.state,
-                trackingSession = inputs.trackingSession,
+                trackingSessionOutput = inputs.trackingSessionOutput,
                 mapStyleOutput = inputs.mapStyleOutput,
-                pointsOfInterest = inputs.pointsOfInterest,
+                pointsOfInterestOutput = inputs.pointsOfInterestOutput,
                 fogOfWar = inputs.fogOfWar,
-                visibleWorldObjects = visibleWorldObjects,
-                watchtowerResourceAmounts = watchtowerResourceAmounts,
+                visibleWorldObjectsOutput = visibleWorldObjects,
+                watchtowerResourceAmountsOutput = watchtowerResourceAmounts,
             )
         }
             .catch {
@@ -180,81 +189,99 @@ class MapViewModel @Inject constructor(
             }
             .distinctUntilChanged()
 
-    private fun observeVisibleWorldObjects(): Flow<VisibleWorldObjects> =
+    private fun observeVisibleWorldObjects(): Flow<Output<VisibleWorldObjects, DomainError>> =
         combine(
             observePointOfInterestObjects(),
             observeVisibleResourceSpawnObjects(),
             visibleWatchtowerData,
         ) { pointOfInterestObjects, resourceSpawnObjects, watchtowerData ->
-            VisibleWorldObjects(
-                objects = pointOfInterestObjects + resourceSpawnObjects + watchtowerData.objects,
-                watchtowers = watchtowerData.watchtowers,
-            )
-        }
-            .distinctUntilChanged()
-
-    private fun observePointOfInterestObjects(): Flow<List<MapObjectUiModel>> =
-        combine(
-            observePointsOfInterest(),
-            observeExplorationProgress(),
-        ) { pointsOfInterest, explorationProgress ->
-            val discoveredPoiIds = explorationProgress.discovered
-                .mapTo(mutableSetOf()) { it.poiId }
-
-            pointsOfInterest.map { pointOfInterest ->
-                pointOfInterest.toUiModel(isDiscovered = pointOfInterest.id in discoveredPoiIds)
-            }
-        }
-            .distinctUntilChanged()
-
-    private fun observeVisibleResourceSpawnObjects(): Flow<List<MapObjectUiModel>> =
-        combine(
-            observeResourceDerivedData(),
-            observeFogVisibilitySnapshot(),
-        ) { resourceDerivedData, fogVisibility ->
-            val canonicalZoom = fogVisibility.canonicalZoom
-                .takeIf { it > 0 }
-                ?: initialTileRuntimeConfig.canonicalZoom
-
-            val visibilityTileMask = fogVisibility.visibilityTileMask
-
-            resourceDerivedData.resourceSpawns.map { resourceSpawn ->
-                resourceSpawn.toUiModel(
-                    isHiddenByFog = resourceSpawn.isHiddenByFog(
-                        canonicalZoom = canonicalZoom,
-                        visibilityTileMask = visibilityTileMask,
-                    ),
+            combineOutputs(
+                combineOutputs(pointOfInterestObjects, resourceSpawnObjects),
+                watchtowerData,
+            ) { (pointOfInterestObjectsValue, resourceSpawnObjectsValue), watchtowerDataValue ->
+                VisibleWorldObjects(
+                    objects = pointOfInterestObjectsValue + resourceSpawnObjectsValue + watchtowerDataValue.objects,
+                    watchtowers = watchtowerDataValue.watchtowers,
                 )
             }
         }
             .distinctUntilChanged()
 
-    private fun observeVisibleWatchtowerData(): Flow<VisibleWatchtowerData> =
+    private fun observePointOfInterestObjects(): Flow<Output<List<MapObjectUiModel>, DomainError>> =
+        combine(
+            observePointsOfInterest(),
+            observeExplorationProgress(),
+        ) { pointsOfInterestOutput, explorationProgressOutput ->
+            combineOutputs(pointsOfInterestOutput, explorationProgressOutput) { pointsOfInterest, explorationProgress ->
+                val discoveredPoiIds = explorationProgress.discovered
+                    .mapTo(mutableSetOf()) { it.poiId }
+
+                pointsOfInterest.map { pointOfInterest ->
+                    pointOfInterest.toUiModel(isDiscovered = pointOfInterest.id in discoveredPoiIds)
+                }
+            }
+        }
+            .distinctUntilChanged()
+
+    private fun observeVisibleResourceSpawnObjects(): Flow<Output<List<MapObjectUiModel>, DomainError>> =
+        combine(
+            observeResourceDerivedData(),
+            observeFogVisibilitySnapshot(),
+        ) { resourceDerivedDataOutput, fogVisibility ->
+            resourceDerivedDataOutput.map { resourceDerivedData ->
+                val canonicalZoom = fogVisibility.canonicalZoom
+                    .takeIf { it > 0 }
+                    ?: initialTileRuntimeConfig.canonicalZoom
+
+                val visibilityTileMask = fogVisibility.visibilityTileMask
+
+                resourceDerivedData.resourceSpawns.map { resourceSpawn ->
+                    resourceSpawn.toUiModel(
+                        isHiddenByFog = resourceSpawn.isHiddenByFog(
+                            canonicalZoom = canonicalZoom,
+                            visibilityTileMask = visibilityTileMask,
+                        ),
+                    )
+                }
+            }
+        }
+            .distinctUntilChanged()
+
+    private fun observeVisibleWatchtowerData(): Flow<Output<VisibleWatchtowerData, DomainError>> =
         combine(
             _state.map { it.visibleBounds }.distinctUntilChanged(),
-            trackingSession.map { it.lastKnownLocation }.distinctUntilChanged(),
+            trackingSession,
             watchtowerResourceAmounts,
-        ) { visibleBounds, actorLocation, resourceAmounts ->
-            Triple(visibleBounds, actorLocation, resourceAmounts)
+        ) { visibleBounds, trackingSessionOutput, resourceAmountsOutput ->
+            Triple(visibleBounds, trackingSessionOutput, resourceAmountsOutput)
         }
-            .flatMapLatest { (visibleBounds, actorLocation, resourceAmounts) ->
+            .flatMapLatest { (visibleBounds, trackingSessionOutput, resourceAmountsOutput) ->
                 visibleBounds
                     ?.let { bounds ->
-                        observeVisibleWatchtowers(bounds).map { watchtowers ->
-                            val decoratedWatchtowers = watchtowers.map { watchtower ->
-                                watchtower.withInteractionContext(
-                                    actorLocation = actorLocation,
-                                    resourceAmounts = resourceAmounts,
+                        val interactionContext = when (val result = combineOutputs(trackingSessionOutput, resourceAmountsOutput)) {
+                            is Output.Success -> result.value
+                            is Output.Failure -> return@flatMapLatest flowOf(Output.Failure(result.error))
+                        }
+
+                        observeVisibleWatchtowers(bounds).map { watchtowersOutput ->
+                            watchtowersOutput.map { watchtowers ->
+                                val trackingSessionValue = interactionContext.first
+                                val resourceAmounts = interactionContext.second
+                                val decoratedWatchtowers = watchtowers.map { watchtower ->
+                                    watchtower.withInteractionContext(
+                                        actorLocation = trackingSessionValue.lastKnownLocation,
+                                        resourceAmounts = resourceAmounts,
+                                    )
+                                }
+
+                                VisibleWatchtowerData(
+                                    watchtowers = decoratedWatchtowers,
+                                    objects = decoratedWatchtowers.map { it.toUiModel() },
                                 )
                             }
-
-                            VisibleWatchtowerData(
-                                watchtowers = decoratedWatchtowers,
-                                objects = decoratedWatchtowers.map { it.toUiModel() },
-                            )
                         }
                     }
-                    ?: flowOf(VisibleWatchtowerData())
+                    ?: flowOf(Output.Success(VisibleWatchtowerData()))
             }
             .distinctUntilChanged()
 
@@ -268,31 +295,38 @@ class MapViewModel @Inject constructor(
             }
             .distinctUntilChanged()
 
-    private fun observeResourceDerivedData(): Flow<ResourceDerivedData> =
+    private fun observeResourceDerivedData(): Flow<Output<ResourceDerivedData, DomainError>> =
         _state
             .map { state -> state.resourceQueryBounds }
             .distinctUntilChanged()
             .flatMapLatest { queryBounds ->
                 observeVisibleResourceSpawns(queryBounds)
-                    .map { resourceSpawns ->
-                        ResourceDerivedData(
-                            queryBounds = queryBounds,
-                            resourceSpawns = resourceSpawns,
-                        )
+                    .map { resourceSpawnsOutput ->
+                        resourceSpawnsOutput.map { resourceSpawns ->
+                            ResourceDerivedData(
+                                queryBounds = queryBounds,
+                                resourceSpawns = resourceSpawns,
+                            )
+                        }
                     }
             }
 
-    private fun observeWatchtowerResourceAmounts(): Flow<Map<String, Int>> =
+    private fun observeWatchtowerResourceAmounts(): Flow<Output<Map<String, Int>, DomainError>> =
         combine(
             observeHeroResourceAmount(ResourceType.SCRAP.typeId),
             observeHeroResourceAmount(ResourceType.COMPONENTS.typeId),
             observeHeroResourceAmount(ResourceType.FUEL.typeId),
-        ) { scrap, components, fuel ->
-            mapOf(
-                ResourceType.SCRAP.typeId to scrap,
-                ResourceType.COMPONENTS.typeId to components,
-                ResourceType.FUEL.typeId to fuel,
-            )
+        ) { scrapOutput, componentsOutput, fuelOutput ->
+            combineOutputs(
+                combineOutputs(scrapOutput, componentsOutput),
+                fuelOutput,
+            ) { (scrap, components), fuel ->
+                mapOf(
+                    ResourceType.SCRAP.typeId to scrap,
+                    ResourceType.COMPONENTS.typeId to components,
+                    ResourceType.FUEL.typeId to fuel,
+                )
+            }
         }.distinctUntilChanged()
 
     override suspend fun handleIntent(intent: MapIntent) {
@@ -316,9 +350,9 @@ class MapViewModel @Inject constructor(
     }
     private fun observeVisibleResourceSpawns(
         queryBounds: GeoBounds?,
-    ): Flow<List<ResourceSpawn>> = queryBounds
+    ): Flow<Output<List<ResourceSpawn>, DomainError>> = queryBounds
         ?.let(observeCollectibleResourceSpawns::invoke)
-        ?: flowOf(emptyList())
+        ?: flowOf(Output.Success(emptyList()))
 
     private suspend fun onMapOpened() {
         startTrackingSessionIfNeeded()
@@ -345,13 +379,54 @@ class MapViewModel @Inject constructor(
 
     private fun intoUiState(
         state: State,
-        trackingSession: ExplorationTrackingSession,
+        trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
         mapStyleOutput: Output<MapStyle?, DomainError>,
-        pointsOfInterest: List<PointOfInterest>,
+        pointsOfInterestOutput: Output<List<PointOfInterest>, DomainError>,
         fogOfWar: FogOfWarUiState,
-        visibleWorldObjects: VisibleWorldObjects,
-        watchtowerResourceAmounts: Map<String, Int>,
+        visibleWorldObjectsOutput: Output<VisibleWorldObjects, DomainError>,
+        watchtowerResourceAmountsOutput: Output<Map<String, Int>, DomainError>,
     ): MapUiState = if (state.failureMessage == null) {
+        val trackingSession = when (trackingSessionOutput) {
+            is Output.Success -> trackingSessionOutput.value
+            is Output.Failure -> {
+                return MapUiState.Failure(
+                    errorMessage = trackingSessionOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
+                )
+            }
+        }
+        val selectedMapStyle = when (mapStyleOutput) {
+            is Output.Success -> mapStyleOutput.value
+            is Output.Failure -> {
+                return MapUiState.Failure(
+                    errorMessage = mapStyleOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
+                )
+            }
+        }
+        val pointsOfInterest = when (pointsOfInterestOutput) {
+            is Output.Success -> pointsOfInterestOutput.value
+            is Output.Failure -> {
+                return MapUiState.Failure(
+                    errorMessage = pointsOfInterestOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
+                )
+            }
+        }
+        val visibleWorldObjects = when (visibleWorldObjectsOutput) {
+            is Output.Success -> visibleWorldObjectsOutput.value
+            is Output.Failure -> {
+                return MapUiState.Failure(
+                    errorMessage = visibleWorldObjectsOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
+                )
+            }
+        }
+        val watchtowerResourceAmounts = when (watchtowerResourceAmountsOutput) {
+            is Output.Success -> watchtowerResourceAmountsOutput.value
+            is Output.Failure -> {
+                return MapUiState.Failure(
+                    errorMessage = watchtowerResourceAmountsOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
+                )
+            }
+        }
+
         val resolvedVisibleObjects = reuseVisibleObjects(visibleWorldObjects.objects)
         val selectedWatchtower = state.selectedWatchtowerId
             ?.let { selectedWatchtowerId ->
@@ -367,47 +442,35 @@ class MapViewModel @Inject constructor(
                     )
                     ?.toSheetUiState(watchtowerResourceAmounts)
             }
+        val userLocation = trackingSession.lastKnownLocation?.toLatLng()
+        val isCameraFollowingUserLocation = state.isFollowingUserLocation && userLocation != null
+        val resolvedCameraPosition = if (isCameraFollowingUserLocation) {
+            userLocation.toCameraPosition(
+                zoom = state.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
+            )
+        } else {
+            state.cameraPosition
+        }
+            ?: userLocation?.toCameraPosition()
+            ?: pointsOfInterest.defaultCameraPosition()
+        val resolvedCameraUpdateOrigin = if (isCameraFollowingUserLocation) {
+            CameraUpdateOrigin.PROGRAMMATIC
+        } else {
+            state.cameraUpdateOrigin
+        }
 
-        mapStyleOutput.fold(
-            onSuccess = {
-                val userLocation = trackingSession.lastKnownLocation?.toLatLng()
-                val isCameraFollowingUserLocation = state.isFollowingUserLocation && userLocation != null
-                val resolvedCameraPosition = if (isCameraFollowingUserLocation) {
-                    userLocation.toCameraPosition(
-                        zoom = state.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
-                    )
-                } else {
-                    state.cameraPosition
-                }
-                    ?: userLocation?.toCameraPosition()
-                    ?: pointsOfInterest.defaultCameraPosition()
-                val resolvedCameraUpdateOrigin = if (isCameraFollowingUserLocation) {
-                    CameraUpdateOrigin.PROGRAMMATIC
-                } else {
-                    state.cameraUpdateOrigin
-                }
-
-                MapUiState.Content(
-                    cameraPosition = resolvedCameraPosition,
-                    cameraUpdateOrigin = resolvedCameraUpdateOrigin,
-                    recenterRequestToken = state.recenterRequestToken,
-                    userLocation = userLocation,
-                    isExplorationTrackingActive = trackingSession.isActive,
-                    explorationTrackingCadence = trackingSession.cadence,
-                    explorationTrackingStatus = trackingSession.status,
-                    selectedStyle = it,
-                    visibleObjects = resolvedVisibleObjects,
-                    selectedWatchtower = selectedWatchtower,
-                    fogOfWar = fogOfWar,
-                )
-            },
-            onFailure = {
-                MapUiState.Failure(
-                    errorMessage = it.message
-                        ?: it.cause?.message
-                        ?: SETTINGS_LOADING_FAILED_MESSAGE,
-                )
-            },
+        MapUiState.Content(
+            cameraPosition = resolvedCameraPosition,
+            cameraUpdateOrigin = resolvedCameraUpdateOrigin,
+            recenterRequestToken = state.recenterRequestToken,
+            userLocation = userLocation,
+            isExplorationTrackingActive = trackingSession.isActive,
+            explorationTrackingCadence = trackingSession.cadence,
+            explorationTrackingStatus = trackingSession.status,
+            selectedStyle = selectedMapStyle,
+            visibleObjects = resolvedVisibleObjects,
+            selectedWatchtower = selectedWatchtower,
+            fogOfWar = fogOfWar,
         )
     } else {
         MapUiState.Failure(errorMessage = state.failureMessage)
@@ -438,7 +501,8 @@ class MapViewModel @Inject constructor(
             startTrackingSessionIfNeeded()
 
             if (wasAwaitingLocationPermissionResult) {
-                trackingSession.value.lastKnownLocation
+                currentTrackingSession()
+                    ?.lastKnownLocation
                     ?.toLatLng()
                     ?.toCameraPosition(
                         zoom = (uiState.value as? MapUiState.Content)
@@ -601,10 +665,17 @@ class MapViewModel @Inject constructor(
             )
 
             val selectedWatchtowerSnapshot = if (parsedId.kind == MapObjectKind.Watchtower) {
-                getWatchtower(parsedId.rawId)
-                    ?: visibleWatchtowerData.value.watchtowers.firstOrNull { watchtower ->
-                        watchtower.id == parsedId.rawId
+                when (val result = getWatchtower(parsedId.rawId)) {
+                    is Output.Success -> result.value
+                    is Output.Failure -> {
+                        (visibleWatchtowerData.value as? Output.Success)
+                            ?.value
+                            ?.watchtowers
+                            ?.firstOrNull { watchtower ->
+                                watchtower.id == parsedId.rawId
+                            }
                     }
+                }
             } else {
                 null
             }
@@ -628,8 +699,19 @@ class MapViewModel @Inject constructor(
 
             if (parsedId.kind == MapObjectKind.PointOfInterest) {
                 val poiId = parsedId.rawId.toLongOrNull() ?: return
-                discoverPointOfInterest(poiId)
-                emitEffect(MapEffect.OpenObjectDetails(parsedId.rawId))
+                when (val result = discoverPointOfInterest(poiId)) {
+                    is Output.Success -> {
+                        emitEffect(MapEffect.OpenObjectDetails(parsedId.rawId))
+                    }
+
+                    is Output.Failure -> {
+                        emitEffect(
+                            MapEffect.ShowMessage(
+                                result.error.resolveMessage(OBJECT_DISCOVERY_FAILED_MESSAGE),
+                            ),
+                        )
+                    }
+                }
             }
         } catch (e: Throwable) {
             emitEffect(MapEffect.ShowMessage(e.message ?: OBJECT_DISCOVERY_FAILED_MESSAGE))
@@ -638,7 +720,7 @@ class MapViewModel @Inject constructor(
 
     private suspend fun onClaimSelectedWatchtower() {
         val selectedWatchtowerId = _state.value.selectedWatchtowerId ?: return
-        val actorLocation = trackingSession.value.lastKnownLocation
+        val actorLocation = currentTrackingSession()?.lastKnownLocation
             ?: return emitEffect(MapEffect.ShowMessage(CURRENT_LOCATION_UNAVAILABLE_MESSAGE))
 
         when (val result = claimWatchtower(selectedWatchtowerId, actorLocation)) {
@@ -668,13 +750,21 @@ class MapViewModel @Inject constructor(
                 is ClaimWatchtowerError.InsufficientResources -> {
                     emitEffect(MapEffect.ShowMessage(costRequirementMessage(error.resourceTypeId)))
                 }
+
+                is ClaimWatchtowerError.Unexpected -> {
+                    emitEffect(
+                        MapEffect.ShowMessage(
+                            error.resolveMessage(WATCHTOWER_CLAIM_FAILED_MESSAGE),
+                        ),
+                    )
+                }
             }
         }
     }
 
     private suspend fun onUpgradeSelectedWatchtower() {
         val selectedWatchtowerId = _state.value.selectedWatchtowerId ?: return
-        val actorLocation = trackingSession.value.lastKnownLocation
+        val actorLocation = currentTrackingSession()?.lastKnownLocation
             ?: return emitEffect(MapEffect.ShowMessage(CURRENT_LOCATION_UNAVAILABLE_MESSAGE))
 
         when (val result = upgradeWatchtower(selectedWatchtowerId, actorLocation)) {
@@ -708,12 +798,23 @@ class MapViewModel @Inject constructor(
                 is UpgradeWatchtowerError.InsufficientResources -> {
                     emitEffect(MapEffect.ShowMessage(costRequirementMessage(error.resourceTypeId)))
                 }
+
+                is UpgradeWatchtowerError.Unexpected -> {
+                    emitEffect(
+                        MapEffect.ShowMessage(
+                            error.resolveMessage(WATCHTOWER_UPGRADE_FAILED_MESSAGE),
+                        ),
+                    )
+                }
             }
         }
     }
 
     private suspend fun refreshSelectedWatchtowerSnapshot(id: String) {
-        val snapshot = getWatchtower(id)
+        val snapshot = when (val result = getWatchtower(id)) {
+            is Output.Success -> result.value
+            is Output.Failure -> return
+        }
         _state.update { state ->
             if (state.selectedWatchtowerId == id) {
                 state.copy(selectedWatchtowerSnapshot = snapshot)
@@ -896,6 +997,12 @@ class MapViewModel @Inject constructor(
         rawId: String,
     ): String = "${kind.idPrefix}$MAP_OBJECT_ID_SEPARATOR$rawId"
 
+    private fun currentTrackingSession(): ExplorationTrackingSession? =
+        when (val result = trackingSession.value) {
+            is Output.Success -> result.value
+            is Output.Failure -> null
+        }
+
     private fun costRequirementMessage(resourceTypeId: String?): String {
         val fallbackTypeId = resourceTypeId ?: "materials"
         val resourceLabel = ResourceType.fromTypeId(fallbackTypeId)?.displayName ?: fallbackTypeId
@@ -937,9 +1044,9 @@ class MapViewModel @Inject constructor(
     private data class UiStateInputs(
         val state: State,
         val fogOfWar: FogOfWarUiState,
-        val trackingSession: ExplorationTrackingSession,
+        val trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
         val mapStyleOutput: Output<MapStyle?, DomainError>,
-        val pointsOfInterest: List<PointOfInterest>,
+        val pointsOfInterestOutput: Output<List<PointOfInterest>, DomainError>,
     )
 
     @Immutable
@@ -1027,6 +1134,7 @@ class MapViewModel @Inject constructor(
         const val TRACKING_START_FAILED_MESSAGE =
             "Failed to start exploration tracking."
         const val WATCHTOWER_CLAIMED_MESSAGE = "Watchtower claimed."
+        const val WATCHTOWER_CLAIM_FAILED_MESSAGE = "Failed to claim watchtower."
         const val WATCHTOWER_ALREADY_CLAIMED_MESSAGE = "Watchtower is already claimed."
         const val WATCHTOWER_NOT_DISCOVERED_MESSAGE = "Discover the watchtower before claiming it."
         const val WATCHTOWER_NOT_FOUND_MESSAGE = "Watchtower is no longer available."
@@ -1034,6 +1142,7 @@ class MapViewModel @Inject constructor(
         const val WATCHTOWER_NOT_CLAIMED_MESSAGE = "Claim the watchtower before upgrading it."
         const val WATCHTOWER_MAX_LEVEL_MESSAGE = "Watchtower is already at maximum level."
         const val WATCHTOWER_UPGRADED_MESSAGE_PREFIX = "Watchtower upgraded to level "
+        const val WATCHTOWER_UPGRADE_FAILED_MESSAGE = "Failed to upgrade watchtower."
         const val WATCHTOWER_MOVE_CLOSER_MESSAGE = "Move closer to interact."
         const val MAP_OBJECT_ID_SEPARATOR = ":"
     }

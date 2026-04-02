@@ -5,6 +5,7 @@ import com.github.arhor.journey.domain.model.CollectedResourceSpawnReward
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
 import com.github.arhor.journey.domain.model.error.CollectResourceSpawnError
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
 import kotlinx.coroutines.CancellationException
@@ -21,37 +22,40 @@ class CollectNearbyResourceSpawnsUseCase @Inject constructor(
     private val collectResourceSpawn: CollectResourceSpawnUseCase,
     private val clock: Clock,
 ) {
-    suspend operator fun invoke(location: GeoPoint): List<Output<CollectedResourceSpawnReward, CollectResourceSpawnError>> {
-        val collectedAt = clock.instant()
-        val hero = heroRepository.getCurrentHero()
-        val nearbySpawns = resourceSpawnRepository.getActiveSpawns(
-            ResourceSpawnQuery(
-                at = collectedAt,
-                center = location,
-                radiusMeters = NEARBY_RESOURCE_SPAWN_SCAN_RADIUS_METERS,
-            ),
-        )
+    suspend operator fun invoke(
+        location: GeoPoint,
+    ): Output<List<Output<CollectedResourceSpawnReward, CollectResourceSpawnError>>, UseCaseError> =
+        runSuspendingUseCaseCatching("collect nearby resource spawns") {
+            val collectedAt = clock.instant()
+            val hero = heroRepository.getCurrentHero()
+            val nearbySpawns = resourceSpawnRepository.getActiveSpawns(
+                ResourceSpawnQuery(
+                    at = collectedAt,
+                    center = location,
+                    radiusMeters = NEARBY_RESOURCE_SPAWN_SCAN_RADIUS_METERS,
+                ),
+            )
 
-        return nearbySpawns.map { spawn ->
-            try {
-                collectResourceSpawn.collectSpawn(
-                    heroId = hero.id,
-                    spawn = spawn,
-                    collectorLocation = location,
-                    collectedAt = collectedAt,
-                )
-            } catch (e: Throwable) {
-                if (e is CancellationException) {
-                    throw e
+            nearbySpawns.map { spawn ->
+                try {
+                    collectResourceSpawn.collectSpawn(
+                        heroId = hero.id,
+                        spawn = spawn,
+                        collectorLocation = location,
+                        collectedAt = collectedAt,
+                    )
+                } catch (exception: Throwable) {
+                    if (exception is CancellationException) {
+                        throw exception
+                    }
+
+                    Output.Failure(
+                        CollectResourceSpawnError.Unexpected(
+                            spawnId = spawn.id,
+                            cause = exception,
+                        ),
+                    )
                 }
-
-                Output.Failure(
-                    CollectResourceSpawnError.Unexpected(
-                        spawnId = spawn.id,
-                        cause = e,
-                    ),
-                )
             }
         }
-    }
 }

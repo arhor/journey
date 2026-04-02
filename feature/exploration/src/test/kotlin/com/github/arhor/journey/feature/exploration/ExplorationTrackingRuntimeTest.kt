@@ -36,7 +36,9 @@ class ExplorationTrackingRuntimeTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     private fun discoverWatchtowersUseCase(): DiscoverWatchtowersByClearedTilesUseCase =
-        mockk(relaxed = true)
+        mockk<DiscoverWatchtowersByClearedTilesUseCase>().also { useCase ->
+            coEvery { useCase.invoke(any()) } returns Output.Success(emptySet())
+        }
 
     @Test
     fun `startIfNeeded should reveal exploration tiles once for repeated updates in the same tile cluster`() = runTest {
@@ -53,8 +55,8 @@ class ExplorationTrackingRuntimeTest {
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns emptyList()
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -109,7 +111,7 @@ class ExplorationTrackingRuntimeTest {
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns emptyList()
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.setCadence(ExplorationTrackingCadence.FOREGROUND)
@@ -140,8 +142,8 @@ class ExplorationTrackingRuntimeTest {
             configHolder = configHolder,
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns emptyList()
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -173,8 +175,8 @@ class ExplorationTrackingRuntimeTest {
             configHolder = configHolder,
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns emptyList()
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -209,8 +211,8 @@ class ExplorationTrackingRuntimeTest {
         )
         val firstLocation = GeoPoint(lat = 40.7128, lon = -74.0060)
         val secondLocation = GeoPoint(lat = 40.7134, lon = -74.0066)
-        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns emptySet()
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns emptyList()
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -234,16 +236,18 @@ class ExplorationTrackingRuntimeTest {
         // Given
         val userLocationSource = FakeUserLocationSource()
         val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
-            revealExplorationTilesAtLocation = mockk(relaxed = true),
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
             discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns emptyList()
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -266,19 +270,25 @@ class ExplorationTrackingRuntimeTest {
         // Given
         val userLocationSource = FakeUserLocationSource()
         val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
-            revealExplorationTilesAtLocation = mockk(relaxed = true),
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
             discoverWatchtowersByClearedTiles = discoverWatchtowersUseCase(),
             collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
+        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
 
         coEvery {
             collectNearbyResourceSpawns.invoke(location)
-        } returns listOf(Output.Failure(CollectResourceSpawnError.AlreadyCollected("spawn-1")))
+        } returns Output.Success(
+            listOf(
+                Output.Failure(CollectResourceSpawnError.AlreadyCollected("spawn-1")),
+            ),
+        )
 
         // When
         runtime.startIfNeeded()
@@ -335,19 +345,21 @@ class ExplorationTrackingRuntimeTest {
         val userLocationSource = FakeUserLocationSource()
         val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
         val discoverWatchtowersByClearedTiles = mockk<DiscoverWatchtowersByClearedTilesUseCase>()
+        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
             discoverWatchtowersByClearedTiles = discoverWatchtowersByClearedTiles,
-            collectNearbyResourceSpawns = mockk(relaxed = true),
+            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
         val clearedTiles = setOf(MapTile(zoom = 16, x = 12_345, y = 54_321))
 
-        coEvery { revealExplorationTilesAtLocation.invoke(location) } returns clearedTiles
-        coEvery { discoverWatchtowersByClearedTiles.invoke(clearedTiles) } returns setOf("watchtower-1")
+        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
+        coEvery { revealExplorationTilesAtLocation.invoke(location) } returns Output.Success(clearedTiles)
+        coEvery { discoverWatchtowersByClearedTiles.invoke(clearedTiles) } returns Output.Success(setOf("watchtower-1"))
 
         // When
         runtime.startIfNeeded()

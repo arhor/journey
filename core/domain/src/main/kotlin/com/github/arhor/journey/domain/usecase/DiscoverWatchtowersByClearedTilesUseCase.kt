@@ -1,7 +1,9 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.internal.tileAt
 import com.github.arhor.journey.domain.model.MapTile
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
 import java.time.Clock
 import javax.inject.Inject
@@ -15,26 +17,33 @@ class DiscoverWatchtowersByClearedTilesUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(
         newlyClearedTiles: Set<MapTile>,
-    ): Set<String> {
+    ): Output<Set<String>, UseCaseError> {
         if (newlyClearedTiles.isEmpty()) {
-            return emptySet()
+            return Output.Success(emptySet())
         }
 
-        val discoveredAt = clock.instant()
-        val canonicalZoom = getExplorationTileRuntimeConfig().canonicalZoom
-
-        return buildSet {
-            repository.getIntersectingTiles(newlyClearedTiles).forEach { record ->
-                if (record.state != null) {
-                    return@forEach
+        return runSuspendingUseCaseCatching("discover watchtowers by cleared tiles") {
+            val discoveredAt = clock.instant()
+            val config = when (val result = getExplorationTileRuntimeConfig()) {
+                is Output.Success -> result.value
+                is Output.Failure -> {
+                    throw result.error.asThrowable("Failed to load exploration tile runtime config.")
                 }
+            }
 
-                val watchtowerTile = tileAt(
-                    point = record.definition.location,
-                    zoom = canonicalZoom,
-                )
-                if (watchtowerTile in newlyClearedTiles && repository.markDiscovered(record.definition.id, discoveredAt)) {
-                    add(record.definition.id)
+            buildSet {
+                repository.getIntersectingTiles(newlyClearedTiles).forEach { record ->
+                    if (record.state != null) {
+                        return@forEach
+                    }
+
+                    val watchtowerTile = tileAt(
+                        point = record.definition.location,
+                        zoom = config.canonicalZoom,
+                    )
+                    if (watchtowerTile in newlyClearedTiles && repository.markDiscovered(record.definition.id, discoveredAt)) {
+                        add(record.definition.id)
+                    }
                 }
             }
         }

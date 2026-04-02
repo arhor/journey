@@ -1,5 +1,7 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import java.time.Clock
@@ -15,14 +17,15 @@ class RecordCollectedResourceSpawnUseCase @Inject constructor(
     suspend operator fun invoke(
         spawnId: String,
         resourceTypeId: String,
-    ): Boolean {
-        val hero = heroRepository.getCurrentHero()
+    ): Output<Boolean, UseCaseError> =
+        runSuspendingUseCaseCatching("record collected resource spawn") {
+            val hero = heroRepository.getCurrentHero()
 
-        return collectedResourceSpawnRepository.markCollected(
-            heroId = hero.id,
-            spawnId = spawnId,
-            resourceTypeId = resourceTypeId,
-            collectedAt = clock.instant(),
-        )
-    }
+            collectedResourceSpawnRepository.markCollected(
+                heroId = hero.id,
+                spawnId = spawnId,
+                resourceTypeId = resourceTypeId,
+                collectedAt = clock.instant(),
+            )
+        }
 }

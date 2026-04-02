@@ -72,7 +72,7 @@ class WatchtowerUseCaseTest {
         val actual = subject(newlyClearedTiles)
 
         // Then
-        actual shouldBe setOf("watchtower:v1:15:17635:10747")
+        actual shouldBe Output.Success(setOf("watchtower:v1:15:17635:10747"))
         repository.markedDiscoveredIds shouldBe listOf("watchtower:v1:15:17635:10747")
     }
 

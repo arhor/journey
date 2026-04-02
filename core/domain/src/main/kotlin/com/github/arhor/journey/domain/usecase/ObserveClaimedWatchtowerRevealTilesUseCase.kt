@@ -1,10 +1,12 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.internal.WatchtowerBalance
 import com.github.arhor.journey.domain.internal.expandedByMeters
 import com.github.arhor.journey.domain.internal.revealTilesAround
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.WatchtowerRevealSnapshot
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -18,7 +20,7 @@ class ObserveClaimedWatchtowerRevealTilesUseCase @Inject constructor(
     operator fun invoke(
         bounds: GeoBounds,
         canonicalZoom: Int,
-    ): Flow<WatchtowerRevealSnapshot> =
+    ): Flow<Output<WatchtowerRevealSnapshot, UseCaseError>> =
         repository.observeInBounds(bounds.expandedByMeters(WatchtowerBalance.MAX_REVEAL_RADIUS_METERS))
             .map { records ->
                 val tiles = buildSet {
@@ -40,4 +42,5 @@ class ObserveClaimedWatchtowerRevealTilesUseCase @Inject constructor(
 
                 WatchtowerRevealSnapshot(tiles = tiles)
             }
+            .toUseCaseOutputFlow("observe claimed watchtower reveal tiles")
 }

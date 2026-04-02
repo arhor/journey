@@ -28,6 +28,7 @@ import com.github.arhor.journey.domain.model.WatchtowerState
 import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
@@ -73,6 +74,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -2624,38 +2626,47 @@ class MapViewModelTest {
         )
         val trackingSessionFlow = MutableStateFlow(trackingSession)
 
-        every { observePointsOfInterest.invoke() } returns MutableStateFlow(pointsOfInterest)
-        every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(resourceSpawns)
-        every { observeExplorationProgress.invoke() } returns MutableStateFlow(explorationProgress)
+        every { observePointsOfInterest.invoke() } returns MutableStateFlow(Output.Success(pointsOfInterest))
+        every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(Output.Success(resourceSpawns))
+        every { observeExplorationProgress.invoke() } returns MutableStateFlow(Output.Success(explorationProgress))
         every { observeExploredTiles.invoke(any()) } answers {
-            observeExploredTilesFlowFactory?.invoke(arg(0))
-                ?: MutableStateFlow(exploredTiles)
+            observeExploredTilesFlowFactory?.invoke(arg(0))?.map { Output.Success(it) }
+                ?: MutableStateFlow(Output.Success(exploredTiles))
         }
-        every { observeClaimedWatchtowerRevealTiles.invoke(any(), any()) } returns MutableStateFlow(watchtowerRevealSnapshot)
+        every { observeClaimedWatchtowerRevealTiles.invoke(any(), any()) } returns MutableStateFlow(Output.Success(watchtowerRevealSnapshot))
         every { observeVisibleWatchtowers.invoke(any()) } answers {
-            observeVisibleWatchtowersFlowFactory?.invoke(arg(0))
-                ?: MutableStateFlow(watchtowers)
+            observeVisibleWatchtowersFlowFactory?.invoke(arg(0))?.map { Output.Success(it) }
+                ?: MutableStateFlow(Output.Success(watchtowers))
         }
         every { observeHeroResourceAmount.invoke(any()) } answers {
-            MutableStateFlow(resourceAmountsByType[arg(0)] ?: 0)
+            MutableStateFlow(Output.Success(resourceAmountsByType[arg(0)] ?: 0))
         }
         every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
             mapStyleOutput ?: Output.Success(mapStyle),
         )
         coEvery { getWatchtower.invoke(any()) } answers {
             watchtowers.firstOrNull { it.id == arg(0) }
+                ?.let { Output.Success(it) }
+                ?: Output.Failure(
+                    UseCaseError.NotFound(
+                        subject = "Watchtower",
+                        identifier = arg<String>(0),
+                    ),
+                )
         }
-        every { getExplorationTileRuntimeConfig.invoke() } returns tileRuntimeConfig
-        every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(tileRuntimeConfig)
-        every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow
+        every { getExplorationTileRuntimeConfig.invoke() } returns Output.Success(tileRuntimeConfig)
+        every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(Output.Success(tileRuntimeConfig))
+        every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow.map { Output.Success(it) }
         every { mapTilePrewarmer.prewarm(any()) } returns Job()
         coEvery { getExploredTiles.invoke(any()) } coAnswers {
-            getExploredTilesOverride?.invoke(arg(0))
-                ?: observeExploredTilesFlowFactory?.invoke(arg(0))?.first()
-                ?: exploredTiles
+            Output.Success(
+                getExploredTilesOverride?.invoke(arg(0))
+                    ?: observeExploredTilesFlowFactory?.invoke(arg(0))?.first()
+                    ?: exploredTiles,
+            )
         }
 
-        coEvery { discoverPointOfInterest.invoke(any()) } just runs
+        coEvery { discoverPointOfInterest.invoke(any()) } returns Output.Success(Unit)
         coEvery { claimWatchtower.invoke(any(), any()) } returns claimWatchtowerResult
         coEvery { upgradeWatchtower.invoke(any(), any()) } returns upgradeWatchtowerResult
         coEvery { startTrackingSession.invoke() } returns startTrackingResult

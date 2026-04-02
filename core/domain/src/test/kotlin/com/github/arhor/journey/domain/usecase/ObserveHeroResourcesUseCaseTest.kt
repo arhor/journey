@@ -1,5 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroResource
@@ -41,7 +42,7 @@ class ObserveHeroResourcesUseCaseTest {
         val actual = subject().first()
 
         // Then
-        actual shouldBe expected
+        actual shouldBe Output.Success(expected)
         resourcesRepository.lastObservedHeroId shouldBe hero.id
     }
 

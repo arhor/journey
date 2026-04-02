@@ -66,7 +66,7 @@ class CollectNearbyResourceSpawnsUseCaseTest {
         val actual = subject(location)
 
         // Then
-        actual shouldBe listOf(expectedSuccess, expectedFailure)
+        actual shouldBe Output.Success(listOf(expectedSuccess, expectedFailure))
     }
 
     @Test
@@ -110,14 +110,16 @@ class CollectNearbyResourceSpawnsUseCaseTest {
         val actual = subject(location)
 
         // Then
-        actual shouldBe listOf(
-            Output.Failure(
-                CollectResourceSpawnError.Unexpected(
-                    spawnId = firstSpawn.id,
-                    cause = exception,
+        actual shouldBe Output.Success(
+            listOf(
+                Output.Failure(
+                    CollectResourceSpawnError.Unexpected(
+                        spawnId = firstSpawn.id,
+                        cause = exception,
+                    ),
                 ),
+                expectedSuccess,
             ),
-            expectedSuccess,
         )
         coVerify(exactly = 1) { collectResourceSpawn.collectSpawn(hero.id, secondSpawn, location, now) }
     }

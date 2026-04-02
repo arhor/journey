@@ -107,7 +107,11 @@ Shared UI placement:
 
 - Repository interfaces live in `:core:domain`; implementations live in `:data`.
 - Room entities, DAOs, and mappers stay in `:data`.
-- Use the existing typed `Output<T, E : DomainError>` pattern for recoverable domain/data flows that already model success/failure explicitly.
+- Use the existing typed `Output<T, E : DomainError>` pattern as a strict use-case boundary contract.
+- Every use case class must return `Output` for one-shot operations or `Flow`/`StateFlow` of `Output` for observable streams.
+- Do not expose raw values, nullable results, or bare `Unit` from use case APIs, even when the current implementation looks infallible.
+- Convert repository exceptions and missing-data cases into typed `Output.Failure(...)` values at the use case boundary.
+- UI and runtime callers must unwrap and handle both `Output.Success` and `Output.Failure` explicitly; do not ignore failures or rely on thrown exceptions for normal control flow.
 
 ## Build, Test, and Development Commands
 Use the Gradle wrapper from repo root. JDK 17 is required; CI uses Temurin 17.

@@ -28,4 +28,10 @@ sealed interface UpgradeWatchtowerError : DomainError {
         val requiredAmount: Int,
         val availableAmount: Int,
     ) : UpgradeWatchtowerError
+
+    data class Unexpected(
+        override val cause: Throwable,
+    ) : UpgradeWatchtowerError {
+        override val message: String? = cause.message
+    }
 }

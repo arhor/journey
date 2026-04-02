@@ -12,6 +12,7 @@ import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
+import kotlinx.coroutines.CancellationException
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -29,7 +30,7 @@ class ClaimWatchtowerUseCase @Inject constructor(
     suspend operator fun invoke(
         id: String,
         actorLocation: GeoPoint,
-    ): Output<WatchtowerState, ClaimWatchtowerError> {
+    ): Output<WatchtowerState, ClaimWatchtowerError> = try {
         val existing = watchtowerRepository.getById(id)
             ?: return Output.Failure(ClaimWatchtowerError.NotFound(id))
         val state = existing.state
@@ -52,14 +53,24 @@ class ClaimWatchtowerUseCase @Inject constructor(
         val hero = heroRepository.getCurrentHero()
         val now = clock.instant()
         val claimCost = WatchtowerBalance.claimCost
+        val config = when (val result = getExplorationTileRuntimeConfig()) {
+            is Output.Success -> result.value
+            is Output.Failure -> {
+                return Output.Failure(
+                    ClaimWatchtowerError.Unexpected(
+                        result.error.asThrowable("Failed to load exploration tile runtime config."),
+                    ),
+                )
+            }
+        }
 
-        val result = transactionRunner.runInTransaction {
+        transactionRunner.runInTransaction {
             val freshRecord = watchtowerRepository.getById(id)
-                ?: return@runInTransaction Output.Failure(ClaimWatchtowerError.NotFound(id))
+                ?: abortTransaction(ClaimWatchtowerError.NotFound(id))
             val freshState = freshRecord.state
-                ?: return@runInTransaction Output.Failure(ClaimWatchtowerError.NotDiscovered(id))
+                ?: abortTransaction(ClaimWatchtowerError.NotDiscovered(id))
             if (freshState.claimedAt != null) {
-                return@runInTransaction Output.Failure(ClaimWatchtowerError.AlreadyClaimed(id))
+                abortTransaction(ClaimWatchtowerError.AlreadyClaimed(id))
             }
 
             val spent = heroInventoryRepository.spendAmount(
@@ -69,7 +80,7 @@ class ClaimWatchtowerUseCase @Inject constructor(
                 updatedAt = now,
             )
             if (spent == null) {
-                return@runInTransaction Output.Failure(
+                abortTransaction(
                     ClaimWatchtowerError.InsufficientResources(
                         watchtowerId = id,
                         resourceTypeId = claimCost.resourceTypeId,
@@ -83,7 +94,7 @@ class ClaimWatchtowerUseCase @Inject constructor(
             }
 
             if (!watchtowerRepository.markClaimed(id = id, claimedAt = now, level = 1, updatedAt = now)) {
-                return@runInTransaction Output.Failure(ClaimWatchtowerError.AlreadyClaimed(id))
+                abortTransaction(ClaimWatchtowerError.AlreadyClaimed(id))
             }
 
             val claimedState = freshState.copy(
@@ -91,8 +102,6 @@ class ClaimWatchtowerUseCase @Inject constructor(
                 level = 1,
                 updatedAt = now,
             )
-
-            val config = getExplorationTileRuntimeConfig()
             val revealedTiles = revealTilesAround(
                 point = freshRecord.definition.location,
                 radiusMeters = WatchtowerBalance.revealRadiusMetersForLevel(level = 1),
@@ -106,8 +115,15 @@ class ClaimWatchtowerUseCase @Inject constructor(
 
             Output.Success(claimedState)
         }
+    } catch (exception: TransactionAbortException) {
+        @Suppress("UNCHECKED_CAST")
+        Output.Failure(exception.error as ClaimWatchtowerError)
+    } catch (exception: Throwable) {
+        if (exception is CancellationException) {
+            throw exception
+        }
 
-        return result
+        Output.Failure(ClaimWatchtowerError.Unexpected(exception))
     }
 
     private suspend fun revealDormantWatchtowers(

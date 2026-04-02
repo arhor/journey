@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.hero
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.internal.ProgressionPolicy
 import com.github.arhor.journey.domain.model.Hero
@@ -25,14 +26,16 @@ class HeroViewModelTest {
         val observeHero = mockk<ObserveHeroUseCase>()
         val observeHeroResources = mockk<ObserveHeroResourcesUseCase>()
 
-        every { observeHero() } returns flowOf(hero)
+        every { observeHero() } returns flowOf(Output.Success(hero))
         every { observeHeroResources() } returns flowOf(
-            listOf(
-                HeroResource(
-                    heroId = hero.id,
-                    resourceTypeId = ResourceType.SCRAP.typeId,
-                    amount = 7,
-                    updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
+            Output.Success(
+                listOf(
+                    HeroResource(
+                        heroId = hero.id,
+                        resourceTypeId = ResourceType.SCRAP.typeId,
+                        amount = 7,
+                        updatedAt = Instant.parse("2026-03-01T12:00:00Z"),
+                    ),
                 ),
             ),
         )

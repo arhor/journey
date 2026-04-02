@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.map.fow
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.ExplorationTileRange
@@ -161,16 +162,16 @@ class FogOfWarControllerTest {
         val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
         val observeClaimedWatchtowerRevealTiles = mockk<ObserveClaimedWatchtowerRevealTilesUseCase>()
         val getExploredTiles = mockk<GetExploredTilesUseCase>()
-        val configFlow = MutableStateFlow(ExplorationTileRuntimeConfig())
-        val trackingSessionFlow = MutableStateFlow(trackingSession)
-        val exploredTilesFlow = MutableStateFlow(exploredTiles)
-        val watchtowerRevealFlow = MutableStateFlow(watchtowerRevealSnapshot)
+        val configFlow = MutableStateFlow(Output.Success(ExplorationTileRuntimeConfig()))
+        val trackingSessionFlow = MutableStateFlow(Output.Success(trackingSession))
+        val exploredTilesFlow = MutableStateFlow(Output.Success(exploredTiles))
+        val watchtowerRevealFlow = MutableStateFlow(Output.Success(watchtowerRevealSnapshot))
 
         every { observeExplorationTileRuntimeConfig.invoke() } returns configFlow
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow
         every { observeExploredTiles.invoke(any()) } returns exploredTilesFlow
         every { observeClaimedWatchtowerRevealTiles.invoke(any(), any()) } returns watchtowerRevealFlow
-        coEvery { getExploredTiles.invoke(any()) } returns exploredTiles
+        coEvery { getExploredTiles.invoke(any()) } returns Output.Success(exploredTiles)
 
         return Fixture(
             controller = FogOfWarController(

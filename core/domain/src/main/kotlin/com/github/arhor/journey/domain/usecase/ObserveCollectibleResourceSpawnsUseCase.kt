@@ -1,8 +1,10 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
@@ -20,7 +22,7 @@ class ObserveCollectibleResourceSpawnsUseCase @Inject constructor(
     private val resourceSpawnRepository: ResourceSpawnRepository,
     private val clock: Clock,
 ) {
-    operator fun invoke(bounds: GeoBounds): Flow<List<ResourceSpawn>> =
+    operator fun invoke(bounds: GeoBounds): Flow<Output<List<ResourceSpawn>, UseCaseError>> =
         heroRepository.observeCurrentHero()
             .flatMapLatest { hero ->
                 combine(
@@ -38,4 +40,5 @@ class ObserveCollectibleResourceSpawnsUseCase @Inject constructor(
                     activeSpawns.filterNot { spawn -> spawn.id in collectedSpawnIds }
                 }
             }
+            .toUseCaseOutputFlow("observe collectible resource spawns")
 }

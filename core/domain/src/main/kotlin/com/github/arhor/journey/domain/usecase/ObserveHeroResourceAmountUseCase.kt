@@ -1,5 +1,7 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import kotlinx.coroutines.flow.Flow
@@ -12,7 +14,7 @@ class ObserveHeroResourceAmountUseCase @Inject constructor(
     private val heroRepository: HeroRepository,
     private val heroInventoryRepository: HeroInventoryRepository,
 ) {
-    operator fun invoke(resourceTypeId: String): Flow<Int> =
+    operator fun invoke(resourceTypeId: String): Flow<Output<Int, UseCaseError>> =
         heroRepository.observeCurrentHero()
             .flatMapLatest { hero ->
                 heroInventoryRepository.observeAmount(
@@ -20,4 +22,5 @@ class ObserveHeroResourceAmountUseCase @Inject constructor(
                     resourceTypeId = resourceTypeId,
                 )
             }
+            .toUseCaseOutputFlow("observe hero resource amount")
 }

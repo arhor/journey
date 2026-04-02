@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.usecase.AddPointOfInterestUseCase
@@ -98,20 +100,28 @@ class AddPoiViewModel @Inject constructor(
         _uiState.update { it.copy(isSaving = true) }
 
         viewModelScope.launch {
-            runCatching {
-                addPointOfInterest(
+            when (
+                val result = addPointOfInterest(
                     name = name,
                     description = currentState.description.trim().ifBlank { null },
                     category = currentState.selectedCategory,
                     location = GeoPoint(lat = latitude, lon = longitude),
                     radiusMeters = radiusMeters,
                 )
-            }.onSuccess {
-                emitEffect(AddPoiEffect.ShowMessage(ADD_POI_SUCCESS_MESSAGE))
-                emitEffect(AddPoiEffect.Saved)
-            }.onFailure { error ->
-                _uiState.update { it.copy(isSaving = false) }
-                emitEffect(AddPoiEffect.ShowMessage(error.message ?: ADD_POI_FAILED_MESSAGE))
+            ) {
+                is Output.Success -> {
+                    emitEffect(AddPoiEffect.ShowMessage(ADD_POI_SUCCESS_MESSAGE))
+                    emitEffect(AddPoiEffect.Saved)
+                }
+
+                is Output.Failure -> {
+                    _uiState.update { it.copy(isSaving = false) }
+                    emitEffect(
+                        AddPoiEffect.ShowMessage(
+                            result.error.resolveMessage(ADD_POI_FAILED_MESSAGE),
+                        ),
+                    )
+                }
             }
         }
     }

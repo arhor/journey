@@ -12,6 +12,7 @@ import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
+import kotlinx.coroutines.CancellationException
 import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
@@ -29,7 +30,7 @@ class UpgradeWatchtowerUseCase @Inject constructor(
     suspend operator fun invoke(
         id: String,
         actorLocation: GeoPoint,
-    ): Output<WatchtowerState, UpgradeWatchtowerError> {
+    ): Output<WatchtowerState, UpgradeWatchtowerError> = try {
         val existing = watchtowerRepository.getById(id)
             ?: return Output.Failure(UpgradeWatchtowerError.NotFound(id))
         val state = existing.state
@@ -55,16 +56,26 @@ class UpgradeWatchtowerUseCase @Inject constructor(
         val upgradeCost = requireNotNull(WatchtowerBalance.upgradeCostForLevel(nextLevel))
         val hero = heroRepository.getCurrentHero()
         val now = clock.instant()
+        val config = when (val result = getExplorationTileRuntimeConfig()) {
+            is Output.Success -> result.value
+            is Output.Failure -> {
+                return Output.Failure(
+                    UpgradeWatchtowerError.Unexpected(
+                        result.error.asThrowable("Failed to load exploration tile runtime config."),
+                    ),
+                )
+            }
+        }
 
-        val result = transactionRunner.runInTransaction {
+        transactionRunner.runInTransaction {
             val freshRecord = watchtowerRepository.getById(id)
-                ?: return@runInTransaction Output.Failure(UpgradeWatchtowerError.NotFound(id))
+                ?: abortTransaction(UpgradeWatchtowerError.NotFound(id))
             val freshState = freshRecord.state
             if (freshState?.claimedAt == null) {
-                return@runInTransaction Output.Failure(UpgradeWatchtowerError.NotClaimed(id))
+                abortTransaction(UpgradeWatchtowerError.NotClaimed(id))
             }
             if (freshState.level >= WatchtowerBalance.MAX_LEVEL) {
-                return@runInTransaction Output.Failure(UpgradeWatchtowerError.AlreadyAtMaxLevel(id))
+                abortTransaction(UpgradeWatchtowerError.AlreadyAtMaxLevel(id))
             }
 
             val spent = heroInventoryRepository.spendAmount(
@@ -74,7 +85,7 @@ class UpgradeWatchtowerUseCase @Inject constructor(
                 updatedAt = now,
             )
             if (spent == null) {
-                return@runInTransaction Output.Failure(
+                abortTransaction(
                     UpgradeWatchtowerError.InsufficientResources(
                         watchtowerId = id,
                         resourceTypeId = upgradeCost.resourceTypeId,
@@ -89,15 +100,13 @@ class UpgradeWatchtowerUseCase @Inject constructor(
 
             val upgradedLevel = freshState.level + 1
             if (!watchtowerRepository.setLevel(id = id, level = upgradedLevel, updatedAt = now)) {
-                return@runInTransaction Output.Failure(UpgradeWatchtowerError.AlreadyAtMaxLevel(id))
+                abortTransaction(UpgradeWatchtowerError.AlreadyAtMaxLevel(id))
             }
 
             val upgradedState = freshState.copy(
                 level = upgradedLevel,
                 updatedAt = now,
             )
-
-            val config = getExplorationTileRuntimeConfig()
             val revealedTiles = revealTilesAround(
                 point = freshRecord.definition.location,
                 radiusMeters = WatchtowerBalance.revealRadiusMetersForLevel(level = upgradedLevel),
@@ -111,8 +120,15 @@ class UpgradeWatchtowerUseCase @Inject constructor(
 
             Output.Success(upgradedState)
         }
+    } catch (exception: TransactionAbortException) {
+        @Suppress("UNCHECKED_CAST")
+        Output.Failure(exception.error as UpgradeWatchtowerError)
+    } catch (exception: Throwable) {
+        if (exception is CancellationException) {
+            throw exception
+        }
 
-        return result
+        Output.Failure(UpgradeWatchtowerError.Unexpected(exception))
     }
 
     private suspend fun revealDormantWatchtowers(

@@ -1,8 +1,10 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.internal.toWatchtower
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.Watchtower
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -15,7 +17,8 @@ class ObserveVisibleWatchtowersUseCase @Inject constructor(
 ) {
     operator fun invoke(
         bounds: GeoBounds,
-    ): Flow<List<Watchtower>> =
+    ): Flow<Output<List<Watchtower>, UseCaseError>> =
         repository.observeInBounds(bounds)
             .map { records -> records.mapNotNull { it.toWatchtower() } }
+            .toUseCaseOutputFlow("observe visible watchtowers")
 }

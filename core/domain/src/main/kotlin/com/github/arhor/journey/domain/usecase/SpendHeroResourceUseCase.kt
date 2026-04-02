@@ -5,6 +5,7 @@ import com.github.arhor.journey.domain.model.HeroResource
 import com.github.arhor.journey.domain.model.error.HeroResourcesError
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
+import kotlinx.coroutines.CancellationException
 import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,29 +20,43 @@ class SpendHeroResourceUseCase @Inject constructor(
         resourceTypeId: String,
         amount: Int = 1,
     ): Output<HeroResource, HeroResourcesError> {
-        require(amount > 0) { "Spent resource amount must be greater than zero." }
-
-        val hero = heroRepository.getCurrentHero()
-        val spentResource = heroInventoryRepository.spendAmount(
-            heroId = hero.id,
-            resourceTypeId = resourceTypeId,
-            amount = amount,
-            updatedAt = clock.instant(),
-        )
-
-        return if (spentResource != null) {
-            Output.Success(spentResource)
-        } else {
-            Output.Failure(
-                HeroResourcesError.InsufficientAmount(
-                    resourceTypeId = resourceTypeId,
-                    requestedAmount = amount,
-                    availableAmount = heroInventoryRepository.getAmount(
-                        heroId = hero.id,
-                        resourceTypeId = resourceTypeId,
-                    ),
+        if (amount <= 0) {
+            return Output.Failure(
+                HeroResourcesError.InvalidAmount(
+                    message = "Spent resource amount must be greater than zero.",
                 ),
             )
+        }
+
+        return try {
+            val hero = heroRepository.getCurrentHero()
+            val spentResource = heroInventoryRepository.spendAmount(
+                heroId = hero.id,
+                resourceTypeId = resourceTypeId,
+                amount = amount,
+                updatedAt = clock.instant(),
+            )
+
+            if (spentResource != null) {
+                Output.Success(spentResource)
+            } else {
+                Output.Failure(
+                    HeroResourcesError.InsufficientAmount(
+                        resourceTypeId = resourceTypeId,
+                        requestedAmount = amount,
+                        availableAmount = heroInventoryRepository.getAmount(
+                            heroId = hero.id,
+                            resourceTypeId = resourceTypeId,
+                        ),
+                    ),
+                )
+            }
+        } catch (exception: Throwable) {
+            if (exception is CancellationException) {
+                throw exception
+            }
+
+            Output.Failure(HeroResourcesError.Unexpected(exception))
         }
     }
 }

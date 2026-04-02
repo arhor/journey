@@ -1,5 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
@@ -19,13 +20,14 @@ class AddPointOfInterestUseCaseTest {
         val subject = AddPointOfInterestUseCase(repository = repository)
 
         // When
-        val id = subject(
+        val result = subject(
             name = "Custom point",
             description = "User created",
             category = PoiCategory.RESOURCE_NODE,
             location = GeoPoint(lat = 10.0, lon = 20.0),
             radiusMeters = 75,
         )
+        val id = (result as Output.Success).value
 
         // Then
         repository.savedPointOfInterest shouldBe PointOfInterest(

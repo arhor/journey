@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.exploration
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.di.AppCoroutineScope
 import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.internal.revealTilesAround
@@ -172,9 +173,18 @@ class ExplorationTrackingRuntime @Inject constructor(
             return
         }
 
-        val newlyClearedTiles = revealExplorationTilesAtLocation(update.location)
+        val newlyClearedTiles = when (val result = revealExplorationTilesAtLocation(update.location)) {
+            is Output.Success -> result.value
+            is Output.Failure -> {
+                lastRevealedTiles = revealTiles
+                return
+            }
+        }
         if (newlyClearedTiles.isNotEmpty()) {
-            discoverWatchtowersByClearedTiles(newlyClearedTiles)
+            when (discoverWatchtowersByClearedTiles(newlyClearedTiles)) {
+                is Output.Success -> Unit
+                is Output.Failure -> Unit
+            }
         }
         lastRevealedTiles = revealTiles
     }
@@ -186,8 +196,15 @@ class ExplorationTrackingRuntime @Inject constructor(
         }
 
         try {
-            collectNearbyResourceSpawns(location)
-            lastNearbyCollectionBucket = bucket
+            when (collectNearbyResourceSpawns(location)) {
+                is Output.Success -> {
+                    lastNearbyCollectionBucket = bucket
+                }
+
+                is Output.Failure -> {
+                    lastNearbyCollectionBucket = bucket
+                }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (_: Throwable) {

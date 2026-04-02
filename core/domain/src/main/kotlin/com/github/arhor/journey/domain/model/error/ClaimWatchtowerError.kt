@@ -28,4 +28,10 @@ sealed interface ClaimWatchtowerError : DomainError {
         val requiredAmount: Int,
         val availableAmount: Int,
     ) : ClaimWatchtowerError
+
+    data class Unexpected(
+        override val cause: Throwable,
+    ) : ClaimWatchtowerError {
+        override val message: String? = cause.message
+    }
 }

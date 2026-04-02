@@ -1,7 +1,10 @@
 package com.github.arhor.journey.feature.hero
 
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.common.combine as combineOutputs
+import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.common.ResourceType
+import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.internal.ProgressionPolicy
 import com.github.arhor.journey.domain.model.Hero
@@ -26,8 +29,17 @@ class HeroViewModel @Inject constructor(
 ) {
 
     override fun buildUiState(): Flow<HeroUiState> =
-        combine(observeCurrentHero(), observeHeroResources()) { hero, resources ->
-            intoUiState(hero = hero, resources = resources)
+        combine(observeCurrentHero(), observeHeroResources()) { heroOutput, resourcesOutput ->
+            combineOutputs(heroOutput, resourcesOutput).fold(
+                onSuccess = { (hero, resources) ->
+                    intoUiState(hero = hero, resources = resources)
+                },
+                onFailure = { error ->
+                    HeroUiState.Failure(
+                        errorMessage = error.resolveMessage(HERO_LOADING_FAILED_MESSAGE),
+                    )
+                },
+            )
         }
             .catch { emit(HeroUiState.Failure(errorMessage = it.message ?: HERO_LOADING_FAILED_MESSAGE)) }
             .distinctUntilChanged()
