@@ -54,7 +54,6 @@ import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
-import com.github.arhor.journey.feature.map.prewarm.MapTilePrewarmer
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -66,7 +65,6 @@ import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -1526,7 +1524,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should stop following updated user location when camera settles from a user gesture`() = runTest {
+    fun `dispatch should keep following updated user location when camera settles from a user gesture`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -1538,6 +1536,7 @@ class MapViewModelTest {
         val manualCameraPosition = CameraPositionState(
             target = LatLng(latitude = 40.7580, longitude = -73.9855),
             zoom = 15.0,
+            bearing = 45.0,
         )
 
         try {
@@ -1560,17 +1559,21 @@ class MapViewModelTest {
 
             // Then
             val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition == manualCameraPosition
+                it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
             }
-            actual.cameraPosition shouldBe manualCameraPosition
-            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
+            actual.cameraPosition shouldBe CameraPositionState(
+                target = LatLng(latitude = 40.7306, longitude = -73.9352),
+                zoom = 15.0,
+                bearing = 45.0,
+            )
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
     @Test
-    fun `dispatch should reenable follow mode and increment recenter token when location permission is granted after recenter click`() =
+    fun `dispatch should reset bearing and increment north reset token when location permission is granted after recenter click`() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -1584,6 +1587,7 @@ class MapViewModelTest {
             val manualCameraPosition = CameraPositionState(
                 target = LatLng(latitude = 40.7580, longitude = -73.9855),
                 zoom = 15.0,
+                bearing = 135.0,
             )
 
             try {
@@ -1601,12 +1605,13 @@ class MapViewModelTest {
                     lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
                 )
                 advanceUntilIdle()
-                fixture.viewModel.awaitContent { it.cameraPosition == manualCameraPosition }
-                fixture.viewModel.dispatch(
-                    MapIntent.MapViewportSizeChanged(
-                        viewportSize = MapViewportSize(widthPx = 1080, heightPx = 1920),
-                    ),
-                )
+                fixture.viewModel.awaitContent {
+                    it.cameraPosition == CameraPositionState(
+                        target = LatLng(latitude = 40.7306, longitude = -73.9352),
+                        zoom = 15.0,
+                        bearing = 135.0,
+                    )
+                }
 
                 // When
                 fixture.viewModel.dispatch(MapIntent.RecenterClicked)
@@ -1615,27 +1620,16 @@ class MapViewModelTest {
 
                 // Then
                 val actual = fixture.viewModel.awaitContent {
-                    it.recenterRequestToken == 1 &&
+                    it.northResetRequestToken == 1 &&
                         it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
                 }
-                actual.recenterRequestToken shouldBe 1
-                actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
+                actual.northResetRequestToken shouldBe 1
+                actual.cameraPosition shouldBe CameraPositionState(
+                    target = LatLng(latitude = 40.7306, longitude = -73.9352),
+                    zoom = 15.0,
+                    bearing = 0.0,
+                )
                 actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
-                verify(exactly = 1) {
-                    fixture.mapTilePrewarmer.prewarm(
-                        match { request ->
-                            request.style == fixture.mapStyle &&
-                                request.currentCamera == manualCameraPosition &&
-                                request.targetCamera == CameraPositionState(
-                                    target = LatLng(latitude = 40.7306, longitude = -73.9352),
-                                    zoom = manualCameraPosition.zoom,
-                                ) &&
-                                request.viewportSize == MapViewportSize(widthPx = 1080, heightPx = 1920) &&
-                                request.sampleCount == 4 &&
-                                request.burstLimit == 96
-                        },
-                    )
-                }
             } finally {
                 tearDownMainDispatcher(fixture.viewModel)
             }
@@ -2318,14 +2312,9 @@ class MapViewModelTest {
         val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
 
         try {
-            val initial = fixture.viewModel.awaitContent {
+            fixture.viewModel.awaitContent {
                 it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
             }
-            fixture.viewModel.dispatch(
-                MapIntent.MapViewportSizeChanged(
-                    viewportSize = MapViewportSize(widthPx = 1080, heightPx = 1920),
-                ),
-            )
 
             // When
             fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
@@ -2337,32 +2326,59 @@ class MapViewModelTest {
 
             // Then
             val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition?.target == tappedLocation
+                it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
             }
-            actual.cameraPosition?.target shouldBe tappedLocation
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
-            verify(exactly = 1) {
-                fixture.mapTilePrewarmer.prewarm(
-                    match { request ->
-                        request.style == fixture.mapStyle &&
-                            request.currentCamera == initial.cameraPosition &&
-                            request.targetCamera == CameraPositionState(
-                                target = tappedLocation,
-                                zoom = initial.cameraPosition.shouldNotBeNull().zoom,
-                            ) &&
-                            request.viewportSize == MapViewportSize(widthPx = 1080, heightPx = 1920) &&
-                            request.sampleCount == 1 &&
-                            request.burstLimit == 48
-                    },
-                )
-            }
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
     }
 
     @Test
-    fun `dispatch should mark camera as user controlled when gesture starts after programmatic move`() = runTest {
+    fun `dispatch should use tapped anchor for add poi and fall back to user location when missing`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+            ),
+        )
+        val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
+
+        try {
+            fixture.viewModel.awaitContent()
+            val firstEffect = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.AddPoiClicked)
+            advanceUntilIdle()
+
+            // Then
+            firstEffect.await() shouldBe MapEffect.OpenAddPoi(latitude = 40.7128, longitude = -74.006)
+
+            val secondEffect = async { fixture.viewModel.effects.first() }
+            runCurrent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
+            fixture.viewModel.dispatch(MapIntent.AddPoiClicked)
+            advanceUntilIdle()
+
+            // Then
+            secondEffect.await() shouldBe MapEffect.OpenAddPoi(
+                latitude = 40.7580,
+                longitude = -73.9855,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should preserve user location target when gesture starts after programmatic move`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -2375,6 +2391,7 @@ class MapViewModelTest {
         val gestureCameraPosition = CameraPositionState(
             target = LatLng(latitude = 40.7615, longitude = -73.9777),
             zoom = 15.5,
+            bearing = 30.0,
         )
 
         try {
@@ -2394,9 +2411,13 @@ class MapViewModelTest {
 
             // Then
             val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition == gestureCameraPosition
+                it.cameraUpdateOrigin == CameraUpdateOrigin.USER
             }
-            actual.cameraPosition shouldBe gestureCameraPosition
+            actual.cameraPosition shouldBe CameraPositionState(
+                target = LatLng(latitude = 40.7128, longitude = -74.006),
+                zoom = 15.5,
+                bearing = 30.0,
+            )
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.USER
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
@@ -2404,7 +2425,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should recenter camera and open object details when tapped object is present`() = runTest {
+    fun `dispatch should not recenter camera and should open object details when tapped object is present`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -2418,7 +2439,7 @@ class MapViewModelTest {
         )
 
         try {
-            fixture.viewModel.awaitContent()
+            val initial = fixture.viewModel.awaitContent()
             val effectDeferred = async { fixture.viewModel.effects.first() }
             runCurrent()
 
@@ -2429,19 +2450,20 @@ class MapViewModelTest {
                 ),
             )
             advanceUntilIdle()
-            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
-                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
-            )
-            advanceUntilIdle()
 
             // Then
             effectDeferred.await() shouldBe MapEffect.OpenObjectDetails(objectId = FIRST_POI_ID.toString())
             coVerify(exactly = 1) { fixture.discoverPointOfInterest.invoke(FIRST_POI_ID) }
+            fixture.viewModel.awaitContent().cameraPosition shouldBe initial.cameraPosition
 
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
+            )
+            advanceUntilIdle()
             val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition?.target == LatLng(latitude = 51.1, longitude = 17.03)
+                it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
             }
-            actual.cameraPosition?.target shouldBe LatLng(latitude = 51.1, longitude = 17.03)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
@@ -2449,7 +2471,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should recenter camera and not open POI details when tapped object is a resource spawn`() = runTest {
+    fun `dispatch should not recenter camera and should not open POI details when tapped object is a resource spawn`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -2478,7 +2500,7 @@ class MapViewModelTest {
         )
 
         try {
-            fixture.viewModel.awaitContent()
+            val initial = fixture.viewModel.awaitContent()
             fixture.viewModel.dispatch(
                 MapIntent.CameraViewportChanged(
                     visibleBounds = visibleBoundsInside(visibleRange),
@@ -2501,10 +2523,11 @@ class MapViewModelTest {
 
             // Then
             coVerify(exactly = 0) { fixture.discoverPointOfInterest.invoke(any()) }
+            fixture.viewModel.awaitContent().cameraPosition shouldBe initial.cameraPosition
             val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition?.target == LatLng(latitude = 51.2, longitude = 17.1)
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
             }
-            actual.cameraPosition?.target shouldBe LatLng(latitude = 51.2, longitude = 17.1)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
             actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
@@ -2550,7 +2573,6 @@ class MapViewModelTest {
         val viewModel: MapViewModel,
         val mapStyle: MapStyle,
         val trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>,
-        val mapTilePrewarmer: MapTilePrewarmer,
         val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
         val observeExploredTiles: ObserveExploredTilesUseCase,
         val observeVisibleWatchtowers: ObserveVisibleWatchtowersUseCase,
@@ -2617,7 +2639,6 @@ class MapViewModelTest {
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
-        val mapTilePrewarmer = mockk<MapTilePrewarmer>()
 
         val mapStyle = MapStyle.remote(
             id = "style-remote",
@@ -2657,7 +2678,6 @@ class MapViewModelTest {
         every { getExplorationTileRuntimeConfig.invoke() } returns Output.Success(tileRuntimeConfig)
         every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(Output.Success(tileRuntimeConfig))
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow.map { Output.Success(it) }
-        every { mapTilePrewarmer.prewarm(any()) } returns Job()
         coEvery { getExploredTiles.invoke(any()) } coAnswers {
             Output.Success(
                 getExploredTilesOverride?.invoke(arg(0))
@@ -2698,11 +2718,9 @@ class MapViewModelTest {
                 },
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
-                mapTilePrewarmer = mapTilePrewarmer,
             ),
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
-            mapTilePrewarmer = mapTilePrewarmer,
             observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
             observeExploredTiles = observeExploredTiles,
             observeVisibleWatchtowers = observeVisibleWatchtowers,

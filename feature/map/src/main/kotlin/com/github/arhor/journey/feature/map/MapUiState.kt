@@ -24,7 +24,7 @@ sealed interface MapUiState {
     data class Content(
         val cameraPosition: CameraPositionState?,
         val cameraUpdateOrigin: CameraUpdateOrigin,
-        val recenterRequestToken: Int,
+        val northResetRequestToken: Int,
         val userLocation: LatLng?,
         val isExplorationTrackingActive: Boolean,
         val explorationTrackingCadence: ExplorationTrackingCadence,

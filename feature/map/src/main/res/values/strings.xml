@@ -1,6 +1,6 @@
 <resources>
     <string name="map_add_poi_content_description">Add point of interest</string>
-    <string name="map_recenter_content_description">Center on my location</string>
+    <string name="map_recenter_content_description">Reset map to north up</string>
     <string name="map_hud_hero_content_description">Open hero screen, %1$s</string>
     <string name="map_hud_settings_content_description">Open settings</string>
     <string name="map_hud_resource_content_description">%1$s: %2$d</string>
