@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -59,14 +60,6 @@ fun WarningHudBanner(
                 .size(68.dp)
                 .align(Alignment.Center),
             tint = Accent
-        )
-    },
-    trailingDecoration: @Composable BoxScope.() -> Unit = {
-        DefaultHazardStripes(
-            modifier = Modifier
-                .width(120.dp)
-                .height(28.dp)
-                .align(Alignment.CenterEnd),
         )
     },
 ) {
@@ -131,18 +124,15 @@ fun WarningHudBanner(
                     subtitle()
                 }
             }
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Box(
-                modifier = Modifier
-                    .width(120.dp)
-                    .height(32.dp),
-                contentAlignment = Alignment.CenterEnd,
-            ) {
-                trailingDecoration()
-            }
         }
+        DefaultHazardStripes(
+            modifier = Modifier
+                .width(120.dp)
+                .height(28.dp)
+                .padding(5.dp)
+                .offset(x = (-15).dp, y = (-10).dp)
+                .align(Alignment.BottomEnd),
+        )
     }
 }
 
@@ -151,9 +141,9 @@ internal fun DefaultHazardStripes(
     modifier: Modifier = Modifier,
 ) {
     Canvas(modifier = modifier) {
-        val stripes = 5
-        val stripeWidth = size.width / 7.5f
-        val gap = stripeWidth * 0.22f
+        val stripes = 6
+        val stripeWidth = size.width / 4.5f
+        val gap = stripeWidth * -0.2f
 
         repeat(stripes) { index ->
             val left = index * (stripeWidth + gap)
@@ -278,10 +268,7 @@ private fun WarningHudBannerPreview() {
                 Text(
                     text = "HOSTILE ACTIVITY DETECTED",
                     color = MainText,
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp,
-                    ),
+                    style = MaterialTheme.typography.titleSmall,
                 )
             },
             subtitle = {
