@@ -205,18 +205,20 @@ private fun Modifier.panelTexture(): Modifier = drawWithCache {
 
 @Composable
 fun rememberSciFiPanelShape(
-    cornerCut: Dp = 12.dp,
-    leftInset: Dp = 10.dp,
-    notchDepth: Dp = 10.dp,
-    notchTopFraction: Float = 0.35f,
-    notchHeightFraction: Float = 0.30f,
-    notchSlant: Dp = 12.dp,
+    cornerCut: Dp = 9.dp,
+    leftInset1: Dp = 12.dp,
+    leftInset2: Dp = 9.dp,
+    notchDepth: Dp = 9.dp,
+    notchTopFraction: Float = 0.65f,
+    notchHeightFraction: Float = 0.20f,
+    notchSlant: Dp = 9.dp,
 ): Shape {
     val density = LocalDensity.current
 
-    return remember(density, cornerCut, leftInset, notchDepth, notchTopFraction, notchHeightFraction, notchSlant) {
+    return remember(density, cornerCut, leftInset1, leftInset2, notchDepth, notchTopFraction, notchHeightFraction, notchSlant) {
         val cutPx = with(density) { cornerCut.toPx() }
-        val insetPx = with(density) { leftInset.toPx() }
+        val inset1Px = with(density) { leftInset1.toPx() }
+        val inset2Px = with(density) { leftInset2.toPx() }
         val stepPx = with(density) { notchDepth.toPx() }
         val slantPx = with(density) { notchSlant.toPx() }
 
@@ -228,7 +230,7 @@ fun rememberSciFiPanelShape(
 
             // Drawing Clockwise
             // Top edge
-            moveTo(insetPx, 0f)
+            moveTo(inset1Px, 0f)
             lineTo(w - cutPx, 0f)
             // Top-right chamfer
             lineTo(w, cutPx)
@@ -237,15 +239,15 @@ fun rememberSciFiPanelShape(
             // Bottom-right chamfer
             lineTo(w - cutPx, h)
             // Bottom edge (ends at indented x)
-            lineTo(insetPx + stepPx, h)
+            lineTo(inset2Px + stepPx, h)
             // Bottom-left corner (viewed top-down: \) starts from inner vertical
             lineTo(stepPx, h - cutPx)
             // Notch vertical inner (all the way to top slant)
             lineTo(stepPx, nTop + slantPx)
             // Notch top slant (outward and up: \)
-            lineTo(0f, nTop)
+            lineTo(10f, nTop)
             // Left vertical top
-            lineTo(0f, cutPx)
+            lineTo(10f, cutPx)
             // Close connects back to (insetPx, 0f) with top-left chamfer (UP and RIGHT: /)
             close()
         }
