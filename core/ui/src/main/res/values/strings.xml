@@ -2,4 +2,7 @@
     <string name="core_ui_resource_scrap">Scrap</string>
     <string name="core_ui_resource_components">Components</string>
     <string name="core_ui_resource_fuel">Fuel</string>
+    <string name="core_ui_warning_title">WARNING</string>
+    <string name="core_ui_warning_headline">HOSTILE ACTIVITY DETECTED</string>
+    <string name="core_ui_warning_subtitle">Stay alert.</string>
 </resources>
