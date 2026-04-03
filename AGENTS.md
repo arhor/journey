@@ -52,6 +52,7 @@ Primary source locations:
 - Core UI: `core/ui/src/main/kotlin/com/github/arhor/journey/core/ui`
 - Features: `feature/<name>/src/main/kotlin/com/github/arhor/journey/feature/<name>`
 - Map fog of war: `feature/map/fog-of-war/src/main/kotlin/com/github/arhor/journey/feature/map/fow`
+- Godot mini-game assets: `app/src/main/assets/minigame.pck`
 - App resources: `app/src/main/res`
 
 Build configuration lives in:
@@ -82,6 +83,7 @@ Practical rules:
 - Treat `:app` as the composition root, not as the default place for new business logic.
 - Put app-wide wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
 - Keep feature-specific platform bindings inside the owning feature module when they are not truly app-wide.
+- `:app` packages the exported Godot mini-game bundle from `app/src/main/assets/minigame.pck` and owns the Android `GodotActivity` launch surface.
 - Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`; features own typed destinations and `*Graph(...)` builders.
 - Use typed navigation contracts with `@Serializable` destinations and `composable<T>` routes, matching existing feature modules.
 - `:feature:map` may start, stop, or observe exploration tracking sessions, but it must not own continuous location collection or the tile-reveal pipeline.
