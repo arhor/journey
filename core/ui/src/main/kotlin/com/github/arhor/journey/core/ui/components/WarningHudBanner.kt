@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,19 +29,19 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Shape
 
 internal val PanelBackgroundTop = Color(0xFF161411)
 internal val PanelBackgroundBottom = Color(0xFF0C0B0A)
 internal val OuterBorder = Color(0xFF6E5D44)
 internal val InnerBorder = Color(0xFFA8895B)
-internal val Accent = Color(0xFFD2A15E)
+val Accent = Color(0xFFD2A15E)
 internal val MainText = Color(0xFFE7E1D8)
 internal val SecondaryText = Color(0xFF8E877E)
 
@@ -51,10 +52,13 @@ fun WarningHudBanner(
     headline: @Composable () -> Unit,
     subtitle: (@Composable () -> Unit)? = null,
     icon: @Composable BoxScope.() -> Unit = {
-        WarningIcon(
+        Icon(
+            imageVector = JourneyIcons.WarningNew,
+            contentDescription = "Warning",
             modifier = Modifier
                 .size(68.dp)
                 .align(Alignment.Center),
+            tint = Accent
         )
     },
     trailingDecoration: @Composable BoxScope.() -> Unit = {
