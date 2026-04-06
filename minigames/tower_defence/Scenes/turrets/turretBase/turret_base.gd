@@ -98,13 +98,16 @@ func close_details_pane():
 	Globals.hud.open_details_pane = null
 
 func _on_collision_area_input_event(_viewport, event, _shape_idx):
-	if deployed and (event is InputEventScreenTouch and event.pressed):
+	if deployed and is_activate_event(event):
 		if is_instance_valid(Globals.hud.open_details_pane):
 			if Globals.hud.open_details_pane.turret == self:
 				close_details_pane()
 				return
 			Globals.hud.open_details_pane.turret.close_details_pane()
 		open_details_pane()
+
+func is_activate_event(event):
+	return (event is InputEventScreenTouch and event.pressed)
 
 func upgrade_turret():
 	turret_level += 1

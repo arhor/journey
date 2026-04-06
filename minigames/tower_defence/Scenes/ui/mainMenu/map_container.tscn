@@ -5,17 +5,20 @@
 
 [node name="MapContainer" type="PanelContainer"]
 custom_minimum_size = Vector2(120, 80)
+mouse_filter = 0
 script = ExtResource("1_yc64c")
 
 [node name="TextureRect" type="TextureRect" parent="."]
 texture_filter = 1
 layout_mode = 2
+mouse_filter = 2
 texture = ExtResource("1_6vcye")
 expand_mode = 5
 stretch_mode = 5
 
 [node name="Label" type="Label" parent="."]
 layout_mode = 2
+mouse_filter = 2
 size_flags_vertical = 8
 text = "Test map name"
 vertical_alignment = 2

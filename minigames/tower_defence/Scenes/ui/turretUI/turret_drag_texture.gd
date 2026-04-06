@@ -7,30 +7,29 @@ var grabbed_offset = Vector2()
 var initial_pos := position
 var placeholder = null
 var pointer_position := Vector2()
+var active_pointer_id = null
 
 func _ready():
+	initial_pos = position
 	Globals.goldChanged.connect(check_can_purchase)
 
 func _gui_input(event):
 	if not check_can_purchase(Globals.currentMap.gold):
 		return
-	if is_pointer_press_event(event):
+	if is_pointer_press_event(event) and active_pointer_id == null:
+		active_pointer_id = get_event_pointer_id(event)
 		pointer_position = get_event_position(event)
 		can_grab = true
 		grabbed_offset = position - pointer_position
 		if not placeholder:
 			visible = false
 			create_placeholder()
-	elif is_pointer_release_event(event):
-		pointer_position = get_event_position(event)
-		can_grab = false
-		if placeholder:
-			check_can_drop()
+		update_placeholder_position()
 
 func _process(_delta):
 	if can_grab:
 		if placeholder:
-			placeholder.position = pointer_position - get_viewport_rect().size / 2
+			update_placeholder_position()
 		else:
 			position = pointer_position + grabbed_offset
 
@@ -45,6 +44,7 @@ func check_can_drop():
 	position = initial_pos
 	can_grab = false
 	visible = true
+	active_pointer_id = null
 	if placeholder.can_place:
 		build()
 		placeholder = null
@@ -77,10 +77,14 @@ func check_can_purchase(newGold):
 		return false
 
 func _input(event):
-	if event is InputEventScreenDrag:
-		pointer_position = event.position
-	elif can_grab and (event is InputEventScreenTouch):
+	if not can_grab:
+		return
+	if is_pointer_move_event(event) and is_matching_active_pointer(event):
 		pointer_position = get_event_position(event)
+		update_placeholder_position()
+	elif is_pointer_release_event(event) and is_matching_active_pointer(event):
+		pointer_position = get_event_position(event)
+		check_can_drop()
 
 func is_pointer_press_event(event):
 	return (event is InputEventScreenTouch and event.pressed)
@@ -88,7 +92,22 @@ func is_pointer_press_event(event):
 func is_pointer_release_event(event):
 	return (event is InputEventScreenTouch and not event.pressed)
 
+func is_pointer_move_event(event):
+	return event is InputEventScreenDrag
+
+func is_matching_active_pointer(event):
+	return active_pointer_id != null and get_event_pointer_id(event) == active_pointer_id
+
+func get_event_pointer_id(event):
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		return event.index
+	return null
+
 func get_event_position(event):
 	if event is InputEventScreenTouch or event is InputEventScreenDrag:
 		return event.position
 	return pointer_position
+
+func update_placeholder_position():
+	if placeholder:
+		placeholder.global_position = get_viewport().get_canvas_transform().affine_inverse() * pointer_position
