@@ -8,6 +8,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun PoiDetailsRoute(
     onBack: () -> Unit,
+    onOpenMiniGame: () -> Unit,
     vm: PoiDetailsViewModel = hiltViewModel(),
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -15,5 +16,6 @@ fun PoiDetailsRoute(
     PoiDetailsScreen(
         state = state,
         onBack = onBack,
+        onOpenMiniGame = onOpenMiniGame,
     )
 }

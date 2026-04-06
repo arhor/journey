@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,6 +30,7 @@ import com.github.arhor.journey.core.ui.components.LoadingIndicator
 fun PoiDetailsScreen(
     state: PoiDetailsUiState,
     onBack: () -> Unit,
+    onOpenMiniGame: () -> Unit,
 ) {
     when (state) {
         PoiDetailsUiState.Loading -> LoadingIndicator()
@@ -36,6 +38,7 @@ fun PoiDetailsScreen(
         is PoiDetailsUiState.Content -> PoiDetailsContent(
             state = state,
             onBack = onBack,
+            onOpenMiniGame = onOpenMiniGame,
         )
     }
 }
@@ -45,6 +48,7 @@ fun PoiDetailsScreen(
 private fun PoiDetailsContent(
     state: PoiDetailsUiState.Content,
     onBack: () -> Unit,
+    onOpenMiniGame: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -76,6 +80,15 @@ private fun PoiDetailsContent(
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
+
+            Button(
+                onClick = onOpenMiniGame,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = stringResource(R.string.poi_details_open_mini_game_button),
+                )
+            }
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(

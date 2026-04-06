@@ -19,6 +19,7 @@ fun AppNavGraph(
     controller: NavHostController,
     innerPadding: PaddingValues,
     snackbarHostState: SnackbarHostState,
+    onOpenMiniGame: () -> Unit,
 ) {
     NavHost(
         navController = controller,
@@ -31,6 +32,7 @@ fun AppNavGraph(
             snackbarHostState = snackbarHostState,
             onOpenHero = { controller.navigateToTopLevel(HeroDestination) },
             onOpenSettings = { controller.navigateToTopLevel(SettingsDestination) },
+            onOpenMiniGame = onOpenMiniGame,
         )
         settingsGraph(snackbarHostState = snackbarHostState)
     }
