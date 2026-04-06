@@ -15,6 +15,8 @@ sealed interface MapHudUiState {
     data class Content(
         val heroInitial: String,
         val levelLabel: String,
+        val xpInLevel: Long,
+        val xpToNextLevel: Long,
         val resources: List<MapHudResourceUiModel>,
     ) : MapHudUiState
 }

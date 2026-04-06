@@ -7,6 +7,7 @@ import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroResource
+import com.github.arhor.journey.domain.internal.ProgressionPolicy
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourcesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,13 +24,17 @@ import kotlin.math.floor
 class MapHudViewModel @Inject constructor(
     observeHero: ObserveHeroUseCase,
     observeHeroResources: ObserveHeroResourcesUseCase,
+    private val progressionPolicy: ProgressionPolicy,
 ) : ViewModel() {
 
     val uiState: StateFlow<MapHudUiState> =
         combine(observeHero(), observeHeroResources()) { heroOutput, resourcesOutput ->
             combineOutputs(heroOutput, resourcesOutput).fold(
                 onSuccess = { (hero, resources) ->
-                    hero.toMapHudUiState(resources = resources)
+                    hero.toMapHudUiState(
+                        resources = resources,
+                        progressionPolicy = progressionPolicy,
+                    )
                 },
                 onFailure = {
                     MapHudUiState.Unavailable
@@ -44,7 +49,10 @@ class MapHudViewModel @Inject constructor(
             )
 }
 
-internal fun Hero.toMapHudUiState(resources: List<HeroResource>): MapHudUiState {
+internal fun Hero.toMapHudUiState(
+    resources: List<HeroResource>,
+    progressionPolicy: ProgressionPolicy,
+): MapHudUiState {
     val resourcesByType = resources.associate { resource ->
         resource.resourceTypeId to resource.amount
     }
@@ -52,6 +60,8 @@ internal fun Hero.toMapHudUiState(resources: List<HeroResource>): MapHudUiState 
     return MapHudUiState.Content(
         heroInitial = name.toHeroInitial(),
         levelLabel = "Lv ${progression.level}",
+        xpInLevel = progression.xpInLevel,
+        xpToNextLevel = progressionPolicy.xpToNextLevel(progression.level),
         resources = ResourceType.entries.map { resourceType ->
             val amount = resourcesByType[resourceType.typeId] ?: 0
 

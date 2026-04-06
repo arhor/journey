@@ -5,14 +5,18 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.view.MotionEvent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.WarningAmber
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,11 +27,17 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
@@ -348,33 +358,19 @@ internal fun MapContent(
             }
         }
 
-        FloatingActionButton(
-            onClick = {
-                dispatch(MapIntent.AddPoiClicked)
-            },
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.WarningAmber,
-                contentDescription = stringResource(R.string.map_add_poi_content_description),
-            )
-        }
-
-        FloatingActionButton(
-            onClick = {
-                dispatch(MapIntent.RecenterClicked)
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(horizontal = 16.dp, vertical = 24.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Filled.Explore,
-                contentDescription = stringResource(R.string.map_recenter_content_description),
-            )
-        }
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color(0x66000000),
+                            Color(0xCC000000),
+                        ),
+                    ),
+                ),
+        )
 
         if (
             state.cameraPosition == null &&
@@ -394,7 +390,37 @@ internal fun MapContent(
             onSettingsClick = onOpenSettings,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        )
+
+        MapHudActionButton(
+            contentDescription = stringResource(R.string.map_add_poi_content_description),
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = null,
+                    tint = Color(0xFF7A7F83),
+                )
+            },
+            onClick = { dispatch(MapIntent.AddPoiClicked) },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 26.dp),
+        )
+
+        MapHudActionButton(
+            contentDescription = stringResource(R.string.map_recenter_content_description),
+            icon = {
+                Icon(
+                    imageVector = Icons.Filled.Explore,
+                    contentDescription = null,
+                    tint = Color(0xFF7A7F83),
+                )
+            },
+            onClick = { dispatch(MapIntent.RecenterClicked) },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 26.dp),
         )
     }
 
@@ -504,6 +530,36 @@ private data class CameraSettledSnapshot(
     val origin: CameraUpdateOrigin,
     val isCameraMoving: Boolean,
 )
+
+@Composable
+private fun MapHudActionButton(
+    contentDescription: String,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val panelShape: Shape = RoundedCornerShape(18.dp)
+
+    Box(
+        modifier = modifier
+            .clip(panelShape)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xE11B242D), Color(0xE10A1015)),
+                ),
+            )
+            .border(1.dp, Color(0xFF556873), panelShape),
+    ) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .padding(10.dp)
+                .semantics { this.contentDescription = contentDescription },
+        ) {
+            icon()
+        }
+    }
+}
 
 internal data class HorizontalDragRotationUpdate(
     val bearing: Double? = null,
