@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.combine
 import com.github.arhor.journey.core.common.fold
+import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.domain.model.AppSettings
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.error.AppSettingsError
@@ -79,9 +80,7 @@ class SettingsViewModel @Inject constructor(
             },
             onFailure = {
                 SettingsUiState.Failure(
-                    errorMessage = it.message
-                        ?: it.cause?.message
-                        ?: SETTINGS_LOADING_FAILED_MESSAGE,
+                    errorMessage = it.resolveMessage(SETTINGS_LOADING_FAILED_MESSAGE),
                 )
             },
         )
@@ -93,13 +92,17 @@ class SettingsViewModel @Inject constructor(
         }
 
         _state.update { it.copy(isUpdating = true) }
-        try {
-            setDistanceUnit(intent.unit)
-        } catch (e: Throwable) {
-            emitEffect(SettingsEffect.Error(message = e.message ?: "Failed to update distance unit."))
-        } finally {
-            _state.update { it.copy(isUpdating = false) }
+        when (val result = setDistanceUnit(intent.unit)) {
+            is Output.Success -> Unit
+            is Output.Failure -> {
+                emitEffect(
+                    SettingsEffect.Error(
+                        message = result.error.resolveMessage("Failed to update distance unit."),
+                    ),
+                )
+            }
         }
+        _state.update { it.copy(isUpdating = false) }
     }
 
     private suspend fun onSelectMapStyle(intent: SettingsIntent.SelectMapStyle) {
@@ -108,13 +111,17 @@ class SettingsViewModel @Inject constructor(
         }
 
         _state.update { it.copy(isUpdating = true) }
-        try {
-            setMapStyle(intent.styleId)
-        } catch (e: Throwable) {
-            emitEffect(SettingsEffect.Error(message = e.message ?: "Failed to update map style."))
-        } finally {
-            _state.update { it.copy(isUpdating = false) }
+        when (val result = setMapStyle(intent.styleId)) {
+            is Output.Success -> Unit
+            is Output.Failure -> {
+                emitEffect(
+                    SettingsEffect.Error(
+                        message = result.error.resolveMessage("Failed to update map style."),
+                    ),
+                )
+            }
         }
+        _state.update { it.copy(isUpdating = false) }
     }
 
     private companion object {

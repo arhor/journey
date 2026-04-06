@@ -1,13 +1,16 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.TransactionRunner
+import com.github.arhor.journey.domain.model.CollectedResourceSpawnReward
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.ResourceSpawn
-import com.github.arhor.journey.domain.model.ResourceSpawnCollectionResult
+import com.github.arhor.journey.domain.model.error.CollectResourceSpawnError
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
+import kotlinx.coroutines.CancellationException
 import java.time.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,7 +27,7 @@ class CollectResourceSpawnUseCase @Inject constructor(
     suspend operator fun invoke(
         spawnId: String,
         collectorLocation: GeoPoint,
-    ): ResourceSpawnCollectionResult {
+    ): Output<CollectedResourceSpawnReward, CollectResourceSpawnError> {
         val collectedAt = clock.instant()
 
         return try {
@@ -32,7 +35,7 @@ class CollectResourceSpawnUseCase @Inject constructor(
             val spawn = resourceSpawnRepository.getActiveSpawn(
                 spawnId = spawnId,
                 at = collectedAt,
-            ) ?: return ResourceSpawnCollectionResult.NotFound(spawnId)
+            ) ?: return Output.Failure(CollectResourceSpawnError.NotFound(spawnId))
 
             collectSpawn(
                 heroId = hero.id,
@@ -41,10 +44,11 @@ class CollectResourceSpawnUseCase @Inject constructor(
                 collectedAt = collectedAt,
             )
         } catch (e: Throwable) {
-            ResourceSpawnCollectionResult.Failed(
-                spawnId = spawnId,
-                message = e.message,
-            )
+            if (e is CancellationException) {
+                throw e
+            }
+
+            Output.Failure(CollectResourceSpawnError.Unexpected(spawnId = spawnId, cause = e))
         }
     }
 
@@ -53,13 +57,15 @@ class CollectResourceSpawnUseCase @Inject constructor(
         spawn: ResourceSpawn,
         collectorLocation: GeoPoint,
         collectedAt: java.time.Instant,
-    ): ResourceSpawnCollectionResult {
+    ): Output<CollectedResourceSpawnReward, CollectResourceSpawnError> {
         val distanceMeters = collectorLocation.distanceTo(spawn.position)
         if (distanceMeters > spawn.collectionRadiusMeters) {
-            return ResourceSpawnCollectionResult.NotCloseEnough(
-                spawnId = spawn.id,
-                distanceMeters = distanceMeters,
-                collectionRadiusMeters = spawn.collectionRadiusMeters,
+            return Output.Failure(
+                CollectResourceSpawnError.NotCloseEnough(
+                    spawnId = spawn.id,
+                    distanceMeters = distanceMeters,
+                    collectionRadiusMeters = spawn.collectionRadiusMeters,
+                ),
             )
         }
 
@@ -72,7 +78,7 @@ class CollectResourceSpawnUseCase @Inject constructor(
             )
 
             if (!collectedMarkerInserted) {
-                ResourceSpawnCollectionResult.AlreadyCollected(spawn.id)
+                Output.Failure(CollectResourceSpawnError.AlreadyCollected(spawn.id))
             } else {
                 heroInventoryRepository.addAmount(
                     heroId = heroId,
@@ -81,10 +87,12 @@ class CollectResourceSpawnUseCase @Inject constructor(
                     updatedAt = collectedAt,
                 )
 
-                ResourceSpawnCollectionResult.Collected(
-                    spawnId = spawn.id,
-                    resourceTypeId = spawn.typeId,
-                    amountAwarded = 1,
+                Output.Success(
+                    CollectedResourceSpawnReward(
+                        spawnId = spawn.id,
+                        resourceTypeId = spawn.typeId,
+                        amountAwarded = 1,
+                    ),
                 )
             }
         }

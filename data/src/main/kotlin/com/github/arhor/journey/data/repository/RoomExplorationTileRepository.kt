@@ -54,15 +54,22 @@ class RoomExplorationTileRepository @Inject constructor(
             maxY = range.maxY,
         ).toLongArray()
 
-    override suspend fun markExplored(tiles: Collection<MapTile>) {
+    override suspend fun markExplored(tiles: Collection<MapTile>): Set<MapTile> {
         if (tiles.isEmpty()) {
-            return
+            return emptySet()
         }
-        dao.insert(
-            entities = tiles
-                .sorted()
-                .map { it.toEntity() }
+        val sortedTiles = tiles.sorted()
+        val insertedRows = dao.insert(
+            entities = sortedTiles.map { it.toEntity() },
         )
+
+        return buildSet {
+            insertedRows.forEachIndexed { index, rowId ->
+                if (rowId != -1L) {
+                    add(sortedTiles[index])
+                }
+            }
+        }
     }
 
     override suspend fun clear() {

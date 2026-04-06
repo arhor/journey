@@ -14,7 +14,7 @@ interface ExplorationTileRepository {
 
     suspend fun getPackedExploredTiles(range: ExplorationTileRange): LongArray
 
-    suspend fun markExplored(tiles: Collection<MapTile>)
+    suspend fun markExplored(tiles: Collection<MapTile>): Set<MapTile>
 
     suspend fun clear()
 }

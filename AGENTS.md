@@ -6,6 +6,25 @@ If you add or remove modules, move source sets, change architecture conventions,
 update toolchain requirements, or change recommended build/test commands,
 update `AGENTS.md` in the same change.
 
+## Accepted-Plan Handoff
+When the user affirms the immediately preceding `<proposed_plan>` with a short acceptance such as `yes`,
+`implement it`, or `proceed`, treat that as authorization to execute the accepted plan rather than as a new
+one-line request.
+
+For accepted-plan execution:
+
+- Use the implementation handoff contract fields `plan_status`, `recommended_skills`, `review_policy`, and
+  `acceptance_behavior` as the source of truth for whether execution should start and which skills should activate.
+- Reconstruct the implementation task from the accepted plan plus the original user request.
+- Re-infer applicable implementation skills from that reconstructed task instead of relying on the literal
+  acceptance message.
+- Do not model this as carrying skills across turns. Treat it as rebuilding the current implementation context.
+- Auto-apply `implement-compose-feature` when the accepted plan is implementation-ready and clearly describes Android
+  Jetpack Compose feature work.
+- Auto-apply `swarm-code-review` for non-trivial code changes unless the user explicitly asked to skip review.
+- If the plan handoff marks the plan as non-implementation or investigation-only, do not start coding from acceptance
+  alone.
+
 ## Project Structure & Module Organization
 This repository is a multi-module Android app built with Kotlin, Jetpack Compose, Hilt, Room, and DataStore.
 
@@ -90,7 +109,11 @@ Shared UI placement:
 
 - Repository interfaces live in `:core:domain`; implementations live in `:data`.
 - Room entities, DAOs, and mappers stay in `:data`.
-- Use the existing typed `Output<T, E : DomainError>` pattern for recoverable domain/data flows that already model success/failure explicitly.
+- Use the existing typed `Output<T, E : DomainError>` pattern as a strict use-case boundary contract.
+- Every use case class must return `Output` for one-shot operations or `Flow`/`StateFlow` of `Output` for observable streams.
+- Do not expose raw values, nullable results, or bare `Unit` from use case APIs, even when the current implementation looks infallible.
+- Convert repository exceptions and missing-data cases into typed `Output.Failure(...)` values at the use case boundary.
+- UI and runtime callers must unwrap and handle both `Output.Success` and `Output.Failure` explicitly; do not ignore failures or rely on thrown exceptions for normal control flow.
 
 ## Build, Test, and Development Commands
 Use the Gradle wrapper from repo root. JDK 17 is required; CI uses Temurin 17.

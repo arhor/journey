@@ -2,14 +2,19 @@ package com.github.arhor.journey.feature.map.fow
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import com.github.arhor.journey.core.common.DomainError
+import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.combine as combineOutputs
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.revealTilesAround
 import com.github.arhor.journey.domain.model.ExplorationTileRange
-import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
+import com.github.arhor.journey.domain.model.GeoBounds
+import com.github.arhor.journey.domain.model.MapTile
+import com.github.arhor.journey.domain.model.WatchtowerRevealSnapshot
 import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveClaimedWatchtowerRevealTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
@@ -31,6 +36,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -45,6 +51,7 @@ class FogOfWarController @AssistedInject constructor(
     private val observeExplorationTileRuntimeConfig: ObserveExplorationTileRuntimeConfigUseCase,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val observeExploredTiles: ObserveExploredTilesUseCase,
+    private val observeClaimedWatchtowerRevealTiles: ObserveClaimedWatchtowerRevealTilesUseCase,
     private val getExploredTiles: GetExploredTilesUseCase,
     private val renderDataFactory: FowRenderDataFactory,
     private val fogOfWarCalculator: FogOfWarCalculator,
@@ -74,25 +81,33 @@ class FogOfWarController @AssistedInject constructor(
             combine(
                 observeExplorationTileRuntimeConfig(),
                 observeExplorationTrackingSession(),
-            ) { config, session ->
-                VisibilityStateSnapshot(
-                    canonicalZoom = config.canonicalZoom,
-                    visibilityTileMask = session.toVisibilityTileMask(
+            ) { configOutput, sessionOutput ->
+                combineOutputs(configOutput, sessionOutput) { config, session ->
+                    VisibilityStateSnapshot(
                         canonicalZoom = config.canonicalZoom,
-                        revealRadiusMeters = config.revealRadiusMeters,
-                    ),
-                )
+                        liveVisibilityTileMask = session.toVisibilityTileMask(
+                            canonicalZoom = config.canonicalZoom,
+                            revealRadiusMeters = config.revealRadiusMeters,
+                        ),
+                    )
+                }
             }
                 .distinctUntilChanged()
-                .collectLatest { snapshot ->
+                .collectLatest { snapshotOutput ->
+                    if (snapshotOutput !is Output.Success) {
+                        return@collectLatest
+                    }
+
+                    val snapshot = snapshotOutput.value
                     val currentState = _state.value
                     val zoomChanged = currentState.canonicalZoom != snapshot.canonicalZoom
-                    val visibilityMaskChanged = currentState.visibilityTileMask != snapshot.visibilityTileMask
+                    val visibilityMaskChanged =
+                        currentState.liveVisibilityTileMask != snapshot.liveVisibilityTileMask
 
                     _state.update { current ->
                         current.copy(
                             canonicalZoom = snapshot.canonicalZoom,
-                            visibilityTileMask = snapshot.visibilityTileMask,
+                            liveVisibilityTileMask = snapshot.liveVisibilityTileMask,
                         )
                     }
 
@@ -114,57 +129,51 @@ class FogOfWarController @AssistedInject constructor(
         }
     }
 
-    fun setOverlayEnabled(isEnabled: Boolean) {
-        if (_state.value.isOverlayEnabled == isEnabled) {
-            return
-        }
-
-        _state.update {
-            it.copy(isOverlayEnabled = isEnabled)
-        }
-    }
-
     fun updateViewport(visibleBounds: GeoBounds) {
         updateFogViewport(visibleBounds = visibleBounds)
     }
 
     private fun observeFogExploredTiles(
         fogTileRange: ExplorationTileRange?,
-    ): Flow<Set<MapTile>> = fogTileRange
+    ): Flow<Output<Set<MapTile>, DomainError>> = fogTileRange
         ?.let(observeExploredTiles::invoke)
-        ?: flowOf(emptySet())
+        ?: flowOf(Output.Success(emptySet()))
+
+    private fun observePersistentWatchtowerReveal(
+        buffer: FogBufferRegion,
+        canonicalZoom: Int,
+    ): Flow<Output<WatchtowerRevealSnapshot, DomainError>> = observeClaimedWatchtowerRevealTiles(
+        bounds = buffer.bufferedBounds,
+        canonicalZoom = canonicalZoom,
+    )
 
     private suspend fun prepareFogBufferData(
         buffer: FogBufferRegion,
         exploredTiles: Set<MapTile>,
-        visibilityTileMask: Set<MapTile>,
+        persistentRevealSnapshot: WatchtowerRevealSnapshot,
+        liveVisibilityTileMask: Set<MapTile>,
     ): PreparedFogBuffer {
+        val persistentVisibilityTileMask = persistentRevealSnapshot.tiles
+        val clearedTiles = mergeTileMasks(exploredTiles, persistentVisibilityTileMask)
+        val visibilityTileMask = mergeTileMasks(liveVisibilityTileMask, persistentVisibilityTileMask)
+
         // Fog geometry is CPU-bound; keep it off the main dispatcher.
         return withContext(Dispatchers.Default) {
             val coroutineContext = currentCoroutineContext()
-            val diagnosticsEnabled = BuildConfig.DEBUG
             val fogRanges = fogOfWarCalculator.calculateUnexploredFogRanges(
                 tileRange = buffer.bufferedTileRange,
-                exploredTiles = exploredTiles,
+                exploredTiles = clearedTiles,
             )
 
             coroutineContext.ensureActive()
 
-            val renderOutput = if (diagnosticsEnabled) {
-                renderDataFactory.createDetailed(fogRanges = fogRanges)
-            } else {
-                null
-            }
-
-            coroutineContext.ensureActive()
-
-            val renderData = renderOutput?.renderData
-                ?: renderDataFactory.create(fogRanges = fogRanges)
+            val renderData = renderDataFactory.createDetailed(fogRanges = fogRanges)
+                ?.renderData
 
             coroutineContext.ensureActive()
             val hiddenExploredRenderData = createHiddenExploredRenderData(
                 buffer = buffer,
-                exploredTiles = exploredTiles,
+                clearedTiles = clearedTiles,
                 visibilityTileMask = visibilityTileMask,
             )
 
@@ -173,6 +182,9 @@ class FogOfWarController @AssistedInject constructor(
             PreparedFogBuffer(
                 data = DisplayedFogData(
                     exploredTiles = exploredTiles,
+                    clearedTiles = clearedTiles,
+                    persistentVisibilityTileMask = persistentVisibilityTileMask,
+                    persistentVisibilityRevision = persistentRevealSnapshot.revision,
                     fogRanges = fogRanges,
                     renderData = renderData,
                     hiddenExploredRenderData = hiddenExploredRenderData,
@@ -184,13 +196,13 @@ class FogOfWarController @AssistedInject constructor(
 
     private fun createHiddenExploredRenderData(
         buffer: FogBufferRegion,
-        exploredTiles: Set<MapTile>,
+        clearedTiles: Set<MapTile>,
         visibilityTileMask: Set<MapTile>,
     ): FogOfWarRenderData? {
         val hiddenExploredTiles = if (visibilityTileMask.isEmpty()) {
-            exploredTiles
+            clearedTiles
         } else {
-            exploredTiles.filterTo(mutableSetOf()) { it !in visibilityTileMask }
+            clearedTiles.filterTo(mutableSetOf()) { it !in visibilityTileMask }
         }
         val hiddenExploredRanges = fogOfWarCalculator.calculateExploredTileRanges(
             tileRange = buffer.bufferedTileRange,
@@ -204,7 +216,7 @@ class FogOfWarController @AssistedInject constructor(
         val currentState = _state.value
         val displayedFogBuffer = currentState.displayedFogBuffer ?: return
         val displayedFogData = currentState.displayedFogData ?: return
-        val visibilityTileMask = currentState.visibilityTileMask
+        val visibilityTileMask = combinedVisibilityTileMask(currentState)
 
         if (displayedFogData.visibilityTileMask == visibilityTileMask) {
             return
@@ -216,7 +228,7 @@ class FogOfWarController @AssistedInject constructor(
                 val hiddenExploredRenderData = withContext(Dispatchers.Default) {
                     createHiddenExploredRenderData(
                         buffer = displayedFogBuffer,
-                        exploredTiles = displayedFogData.exploredTiles,
+                        clearedTiles = displayedFogData.clearedTiles,
                         visibilityTileMask = visibilityTileMask,
                     )
                 }
@@ -228,7 +240,8 @@ class FogOfWarController @AssistedInject constructor(
                         current.displayedFogBuffer != displayedFogBuffer ||
                         currentDisplayedFogData == null ||
                         currentDisplayedFogData.exploredTiles != displayedFogData.exploredTiles ||
-                        current.visibilityTileMask != visibilityTileMask
+                        currentDisplayedFogData.persistentVisibilityRevision != displayedFogData.persistentVisibilityRevision ||
+                        combinedVisibilityTileMask(current) != visibilityTileMask
                     ) {
                         current
                     } else {
@@ -244,7 +257,7 @@ class FogOfWarController @AssistedInject constructor(
                 displayedVisibilityRefreshJob = null
 
                 val latestState = _state.value
-                if (latestState.displayedFogData?.visibilityTileMask != latestState.visibilityTileMask) {
+                if (latestState.displayedFogData?.visibilityTileMask != combinedVisibilityTileMask(latestState)) {
                     refreshDisplayedVisibilityData()
                 }
             }
@@ -259,16 +272,17 @@ class FogOfWarController @AssistedInject constructor(
         }
 
         val displayedFogData = currentState.displayedFogData ?: return
-        if (displayedFogData.visibilityTileMask != currentState.visibilityTileMask) {
+        if (displayedFogData.visibilityTileMask != combinedVisibilityTileMask(currentState)) {
             refreshDisplayedVisibilityData()
         }
     }
 
     private fun buildUiState(state: State): FogOfWarUiState {
         val displayedFogData = state.displayedFogData
+        val visibilityTileMask = combinedVisibilityTileMask(state)
         val visibleExploredTileCount = state.visibleTileRange?.let { visibleRange ->
-            displayedFogData?.exploredTiles?.count { tile ->
-                visibleRange.contains(tile) && tile in state.visibilityTileMask
+            displayedFogData?.clearedTiles?.count { tile ->
+                visibleRange.contains(tile) && tile in visibilityTileMask
             }
         } ?: 0
         val fallbackFogTileRange = state.displayedFogBuffer
@@ -277,32 +291,19 @@ class FogOfWarController @AssistedInject constructor(
         val fogRanges = displayedFogData?.fogRanges
             ?: fallbackFogTileRange?.let(::listOf)
             ?: emptyList()
-        val activeRenderData = if (!state.isOverlayEnabled) {
-            null
-        } else {
-            displayedFogData?.renderData
-                ?: fallbackFogTileRange?.let(renderDataFactory::createFullRange)
-        }
+        val activeRenderData = displayedFogData?.renderData
+            ?: fallbackFogTileRange?.let(renderDataFactory::createFullRange)
 
         return FogOfWarUiState(
-            isOverlayEnabled = state.isOverlayEnabled,
             canonicalZoom = state.canonicalZoom,
             visibleBounds = state.visibleBounds,
             triggerBounds = state.displayedFogBuffer?.triggerBounds,
             bufferedBounds = state.displayedFogBuffer?.bufferedBounds,
             visibleTileRange = state.visibleTileRange,
             fogRanges = fogRanges,
-            hiddenExploredRenderData = if (state.isOverlayEnabled) {
-                displayedFogData?.hiddenExploredRenderData
-            } else {
-                null
-            },
+            hiddenExploredRenderData = displayedFogData?.hiddenExploredRenderData,
             activeRenderData = activeRenderData,
-            handoffRenderData = if (state.isOverlayEnabled) {
-                state.pendingHandoffRenderData
-            } else {
-                null
-            },
+            handoffRenderData = state.pendingHandoffRenderData,
             visibleTileCount = state.visibleTileCount,
             visibleExploredTileCount = visibleExploredTileCount,
             isSuppressedByVisibleTileLimit = state.isFogSuppressedByVisibleTileLimit,
@@ -313,7 +314,7 @@ class FogOfWarController @AssistedInject constructor(
     private fun buildVisibilityState(state: State): FogOfWarVisibilityState =
         FogOfWarVisibilityState(
             canonicalZoom = state.canonicalZoom,
-            visibilityTileMask = state.visibilityTileMask,
+            visibilityTileMask = combinedVisibilityTileMask(state),
         )
 
     private fun updateFogViewport(
@@ -381,6 +382,8 @@ class FogOfWarController @AssistedInject constructor(
                 displayedFogBuffer = null,
                 pendingFogBuffer = null,
                 displayedFogData = null,
+                persistentVisibilityTileMask = emptySet(),
+                persistentVisibilityRevision = 0,
                 pendingHandoffRenderData = null,
                 isFogRecomputationInProgress = false,
             )
@@ -420,6 +423,8 @@ class FogOfWarController @AssistedInject constructor(
                 displayedFogBuffer = buffer,
                 pendingFogBuffer = null,
                 displayedFogData = null,
+                persistentVisibilityTileMask = emptySet(),
+                persistentVisibilityRevision = 0,
                 pendingHandoffRenderData = null,
                 isFogRecomputationInProgress = false,
             )
@@ -462,23 +467,37 @@ class FogOfWarController @AssistedInject constructor(
         }
 
         pendingFogProcessingJob = scope.launch {
+            var pausedAfterDependencyFailure = false
             try {
                 while (true) {
                     val buffer = latestPendingFogBuffer ?: break
                     latestPendingFogBuffer = null
-                    val exploredTiles = getExploredTiles(buffer.bufferedTileRange)
-                    val visibilityTileMask = _state.value.visibilityTileMask
+                    val exploredTiles = when (val result = getExploredTiles(buffer.bufferedTileRange)) {
+                        is Output.Success -> result.value
+                        is Output.Failure -> {
+                            latestPendingFogBuffer = buffer
+                            pausedAfterDependencyFailure = true
+                            break
+                        }
+                    }
                     val preparedFogBuffer = preparePendingFogBuffer(
                         buffer = buffer,
                         exploredTiles = exploredTiles,
-                        visibilityTileMask = visibilityTileMask,
-                    ) ?: continue
+                    ) ?: run {
+                        latestPendingFogBuffer = buffer
+                        pausedAfterDependencyFailure = true
+                        break
+                    }
 
                     if (swapPreparedPendingFogBuffer(buffer, preparedFogBuffer)) {
                         ensureDisplayedVisibilityDataUpToDate(buffer)
                         startObservingDisplayedFogBuffer(
                             buffer = buffer,
                             seedExploredTiles = preparedFogBuffer.data.exploredTiles,
+                            seedPersistentRevealSnapshot = WatchtowerRevealSnapshot(
+                                tiles = preparedFogBuffer.data.persistentVisibilityTileMask,
+                                revision = preparedFogBuffer.data.persistentVisibilityRevision,
+                            ),
                         )
 
                         _state.value.visibleBounds?.takeIf(buffer::shouldRecompute)?.let(::updateFogViewport)
@@ -487,7 +506,10 @@ class FogOfWarController @AssistedInject constructor(
             } finally {
                 pendingFogProcessingJob = null
 
-                if (latestPendingFogBuffer != null && _state.value.pendingFogBuffer != null) {
+                if (!pausedAfterDependencyFailure &&
+                    latestPendingFogBuffer != null &&
+                    _state.value.pendingFogBuffer != null
+                ) {
                     ensurePendingFogProcessorRunning()
                 }
             }
@@ -497,12 +519,19 @@ class FogOfWarController @AssistedInject constructor(
     private suspend fun preparePendingFogBuffer(
         buffer: FogBufferRegion,
         exploredTiles: Set<MapTile>,
-        visibilityTileMask: Set<MapTile>,
     ): PreparedFogBuffer? = try {
+        val persistentRevealSnapshot = when (val result = observePersistentWatchtowerReveal(
+            buffer = buffer,
+            canonicalZoom = _state.value.canonicalZoom,
+        ).first()) {
+            is Output.Success -> result.value
+            is Output.Failure -> return null
+        }
         prepareFogBufferData(
             buffer = buffer,
             exploredTiles = exploredTiles,
-            visibilityTileMask = visibilityTileMask,
+            persistentRevealSnapshot = persistentRevealSnapshot,
+            liveVisibilityTileMask = _state.value.liveVisibilityTileMask,
         )
     } catch (exception: CancellationException) {
         throw exception
@@ -523,6 +552,8 @@ class FogOfWarController @AssistedInject constructor(
                     displayedFogBuffer = buffer,
                     pendingFogBuffer = null,
                     displayedFogData = preparedFogBuffer.data,
+                    persistentVisibilityTileMask = preparedFogBuffer.data.persistentVisibilityTileMask,
+                    persistentVisibilityRevision = preparedFogBuffer.data.persistentVisibilityRevision,
                     pendingHandoffRenderData = null,
                     isFogRecomputationInProgress = false,
                 )
@@ -535,26 +566,52 @@ class FogOfWarController @AssistedInject constructor(
     private fun startObservingDisplayedFogBuffer(
         buffer: FogBufferRegion,
         seedExploredTiles: Set<MapTile>? = null,
+        seedPersistentRevealSnapshot: WatchtowerRevealSnapshot? = null,
     ) {
         displayedFogObservationJob?.cancel()
         displayedFogObservationJob = scope.launch {
-            var shouldSkipSeed = seedExploredTiles != null
+            var shouldSkipSeed = seedExploredTiles != null && seedPersistentRevealSnapshot != null
 
-            observeFogExploredTiles(buffer.bufferedTileRange)
+            combine(
+                observeFogExploredTiles(buffer.bufferedTileRange),
+                observePersistentWatchtowerReveal(
+                    buffer = buffer,
+                    canonicalZoom = _state.value.canonicalZoom,
+                ),
+            ) { exploredTilesOutput, persistentRevealSnapshotOutput ->
+                combineOutputs(exploredTilesOutput, persistentRevealSnapshotOutput) {
+                        exploredTiles,
+                        persistentRevealSnapshot,
+                    ->
+                    ObservedFogBufferSnapshot(
+                        exploredTiles = exploredTiles,
+                        persistentRevealSnapshot = persistentRevealSnapshot,
+                    )
+                }
+            }
                 .distinctUntilChanged()
-                .collectLatest { exploredTiles ->
-                    if (shouldSkipSeed && exploredTiles == seedExploredTiles) {
+                .collectLatest { snapshotOutput ->
+                    if (snapshotOutput !is Output.Success) {
+                        return@collectLatest
+                    }
+
+                    val snapshot = snapshotOutput.value
+                    if (
+                        shouldSkipSeed &&
+                        snapshot.exploredTiles == seedExploredTiles &&
+                        snapshot.persistentRevealSnapshot == seedPersistentRevealSnapshot
+                    ) {
                         shouldSkipSeed = false
                         return@collectLatest
                     }
 
                     shouldSkipSeed = false
-                    val visibilityTileMask = _state.value.visibilityTileMask
                     val preparedFogBuffer = try {
                         prepareFogBufferData(
                             buffer = buffer,
-                            exploredTiles = exploredTiles,
-                            visibilityTileMask = visibilityTileMask,
+                            exploredTiles = snapshot.exploredTiles,
+                            persistentRevealSnapshot = snapshot.persistentRevealSnapshot,
+                            liveVisibilityTileMask = _state.value.liveVisibilityTileMask,
                         )
                     } catch (exception: CancellationException) {
                         throw exception
@@ -564,7 +621,11 @@ class FogOfWarController @AssistedInject constructor(
                         if (current.displayedFogBuffer != buffer || current.isFogSuppressedByVisibleTileLimit) {
                             current
                         } else {
-                            current.copy(displayedFogData = preparedFogBuffer.data)
+                            current.copy(
+                                displayedFogData = preparedFogBuffer.data,
+                                persistentVisibilityTileMask = preparedFogBuffer.data.persistentVisibilityTileMask,
+                                persistentVisibilityRevision = preparedFogBuffer.data.persistentVisibilityRevision,
+                            )
                         }
                     }
 
@@ -575,9 +636,10 @@ class FogOfWarController @AssistedInject constructor(
 
     @Immutable
     private data class State(
-        val isOverlayEnabled: Boolean = true,
         val canonicalZoom: Int = CANONICAL_ZOOM,
-        val visibilityTileMask: Set<MapTile> = emptySet(),
+        val liveVisibilityTileMask: Set<MapTile> = emptySet(),
+        val persistentVisibilityTileMask: Set<MapTile> = emptySet(),
+        val persistentVisibilityRevision: Int = 0,
         val visibleBounds: GeoBounds? = null,
         val visibleTileRange: ExplorationTileRange? = null,
         val displayedFogBuffer: FogBufferRegion? = null,
@@ -592,6 +654,9 @@ class FogOfWarController @AssistedInject constructor(
     @Immutable
     private data class DisplayedFogData(
         val exploredTiles: Set<MapTile>,
+        val clearedTiles: Set<MapTile>,
+        val persistentVisibilityTileMask: Set<MapTile>,
+        val persistentVisibilityRevision: Int,
         val fogRanges: List<ExplorationTileRange>,
         val renderData: FogOfWarRenderData?,
         val hiddenExploredRenderData: FogOfWarRenderData?,
@@ -606,8 +671,31 @@ class FogOfWarController @AssistedInject constructor(
     @Immutable
     private data class VisibilityStateSnapshot(
         val canonicalZoom: Int,
-        val visibilityTileMask: Set<MapTile>,
+        val liveVisibilityTileMask: Set<MapTile>,
     )
+
+    @Immutable
+    private data class ObservedFogBufferSnapshot(
+        val exploredTiles: Set<MapTile>,
+        val persistentRevealSnapshot: WatchtowerRevealSnapshot,
+    )
+
+    private fun combinedVisibilityTileMask(state: State): Set<MapTile> = mergeTileMasks(
+        first = state.liveVisibilityTileMask,
+        second = state.persistentVisibilityTileMask,
+    )
+
+    private fun mergeTileMasks(
+        first: Set<MapTile>,
+        second: Set<MapTile>,
+    ): Set<MapTile> = when {
+        first.isEmpty() -> second
+        second.isEmpty() -> first
+        else -> buildSet(first.size + second.size) {
+            addAll(first)
+            addAll(second)
+        }
+    }
 
     private fun ExplorationTrackingSession.toVisibilityTileMask(
         canonicalZoom: Int,

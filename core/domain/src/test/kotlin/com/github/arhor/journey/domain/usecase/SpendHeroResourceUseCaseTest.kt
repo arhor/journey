@@ -100,6 +100,8 @@ class SpendHeroResourceUseCaseTest {
             when (val result = spendResult) {
                 is Output.Failure -> when (val error = result.error) {
                     is HeroResourcesError.InsufficientAmount -> error.availableAmount
+                    is HeroResourcesError.InvalidAmount -> 0
+                    is HeroResourcesError.Unexpected -> 0
                 }
                 is Output.Success -> result.value.amount
             }

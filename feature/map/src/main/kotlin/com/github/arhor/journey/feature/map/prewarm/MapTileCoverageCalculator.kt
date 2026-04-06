@@ -190,6 +190,7 @@ class MapTileCoverageCalculator @Inject constructor() {
     ): CameraPositionState = CameraPositionState(
         target = from.target.lerp(to.target, fraction),
         zoom = from.zoom + (to.zoom - from.zoom) * fraction,
+        bearing = from.bearing + (to.bearing - from.bearing) * fraction,
     )
 
     private fun transformBounds(

@@ -107,22 +107,42 @@ class RoomExplorationTileRepositoryTest {
         // Given
         val dao = FakeExplorationTileDao(observedItems = emptyList())
         val subject = RoomExplorationTileRepository(dao = dao)
-
-        // When
-        subject.markExplored(
-            tiles = setOf(
-                MapTile(zoom = 16, x = 3, y = 2),
-                MapTile(zoom = 16, x = 1, y = 2),
-                MapTile(zoom = 16, x = 2, y = 1),
-            ),
+        val tiles = setOf(
+            MapTile(zoom = 16, x = 3, y = 2),
+            MapTile(zoom = 16, x = 1, y = 2),
+            MapTile(zoom = 16, x = 2, y = 1),
         )
 
+        // When
+        val actual = subject.markExplored(tiles = tiles)
+
         // Then
+        actual shouldBe tiles
         dao.insertedEntities shouldContainExactly listOf(
             ExploredTileEntity(zoom = 16, x = 1, y = 2),
             ExploredTileEntity(zoom = 16, x = 2, y = 1),
             ExploredTileEntity(zoom = 16, x = 3, y = 2),
         )
+    }
+
+    @Test
+    fun `markExplored should return only newly inserted tiles when dao ignores duplicates`() = runTest {
+        // Given
+        val dao = FakeExplorationTileDao(
+            observedItems = emptyList(),
+            insertResultIds = listOf(-1L, 1L),
+        )
+        val subject = RoomExplorationTileRepository(dao = dao)
+        val duplicateTile = MapTile(zoom = 16, x = 1, y = 2)
+        val newTile = MapTile(zoom = 16, x = 2, y = 3)
+
+        // When
+        val actual = subject.markExplored(
+            tiles = setOf(duplicateTile, newTile),
+        )
+
+        // Then
+        actual shouldBe setOf(newTile)
     }
 
     @Test
@@ -143,6 +163,7 @@ class RoomExplorationTileRepositoryTest {
         private val packedByCoordinates: Long? = null,
         private val packedByRange: List<Long> = emptyList(),
         private val observedPackedItems: List<Long> = emptyList(),
+        private val insertResultIds: List<Long>? = null,
     ) : ExplorationTileDao {
         val insertedEntities = mutableListOf<ExploredTileEntity>()
         var clearCalls: Int = 0
@@ -191,7 +212,7 @@ class RoomExplorationTileRepositoryTest {
 
         override suspend fun insert(entities: List<ExploredTileEntity>): List<Long> {
             insertedEntities += entities
-            return List(entities.size) { 1L }
+            return insertResultIds ?: List(entities.size) { 1L }
         }
 
         override suspend fun clear() {

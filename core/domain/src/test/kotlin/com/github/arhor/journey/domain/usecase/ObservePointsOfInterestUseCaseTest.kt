@@ -1,8 +1,10 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +37,7 @@ class ObservePointsOfInterestUseCaseTest {
         val actual = subject().first()
 
         // Then
-        actual shouldBe expected
+        actual shouldBe Output.Success(expected)
     }
 
     @Test
@@ -48,10 +50,15 @@ class ObservePointsOfInterestUseCaseTest {
         val subject = ObservePointsOfInterestUseCase(repository = repository)
 
         // When
-        val result = runCatching { subject().first() }
+        val actual = subject().first()
 
         // Then
-        result.exceptionOrNull() shouldBe expectedError
+        actual shouldBe Output.Failure(
+            UseCaseError.Unexpected(
+                operation = "observe points of interest",
+                cause = expectedError,
+            ),
+        )
     }
 
     private class FakePointOfInterestRepository(

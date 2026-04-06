@@ -1,20 +1,23 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.TransactionRunner
 import com.github.arhor.journey.domain.model.CollectedResourceSpawn
+import com.github.arhor.journey.domain.model.CollectedResourceSpawnReward
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroResource
 import com.github.arhor.journey.domain.model.Progression
 import com.github.arhor.journey.domain.model.ResourceSpawn
-import com.github.arhor.journey.domain.model.ResourceSpawnCollectionResult
+import com.github.arhor.journey.domain.model.error.CollectResourceSpawnError
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -39,9 +42,9 @@ class CollectResourceSpawnUseCaseTest {
             isTransactionOpen = { transactionRunner.isInTransaction },
         )
         val spawn = resourceSpawn(
-            id = "resource-spawn:v1:20527:10:20:0:wood",
+            id = "resource-spawn:v1:20527:10:20:0:scrap",
             position = GeoPoint(lat = 49.0000, lon = 24.0000),
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
             radiusMeters = 25.0,
         )
         val subject = CollectResourceSpawnUseCase(
@@ -60,16 +63,18 @@ class CollectResourceSpawnUseCaseTest {
         )
 
         // Then
-        actual shouldBe ResourceSpawnCollectionResult.Collected(
-            spawnId = spawn.id,
-            resourceTypeId = "wood",
-            amountAwarded = 1,
+        actual shouldBe Output.Success(
+            CollectedResourceSpawnReward(
+                spawnId = spawn.id,
+                resourceTypeId = "scrap",
+                amountAwarded = 1,
+            ),
         )
         collectedRepository.markedCollectedSpawns.map { it.spawnId } shouldContainExactly listOf(spawn.id)
         inventoryRepository.addedResources shouldContainExactly listOf(
             HeroResource(
                 heroId = hero.id,
-                resourceTypeId = "wood",
+                resourceTypeId = "scrap",
                 amount = 1,
                 updatedAt = now,
             ),
@@ -84,12 +89,12 @@ class CollectResourceSpawnUseCaseTest {
         // Given
         val now = Instant.parse("2026-03-19T10:00:00Z")
         val hero = hero()
-        val spawnId = "resource-spawn:v1:20527:10:20:0:wood"
+        val spawnId = "resource-spawn:v1:20527:10:20:0:scrap"
         val collectedRepository = FakeCollectedResourceSpawnRepository(
             initialClaims = listOf(
                 CollectedResourceSpawn(
                     heroId = hero.id,
-                    typeId = "wood",
+                    typeId = "scrap",
                     spawnId = spawnId,
                     collectedAt = now.minusSeconds(60),
                 ),
@@ -104,7 +109,7 @@ class CollectResourceSpawnUseCaseTest {
                 resourceSpawn(
                     id = spawnId,
                     position = GeoPoint(lat = 49.0000, lon = 24.0000),
-                    resourceTypeId = "wood",
+                    resourceTypeId = "scrap",
                     radiusMeters = 25.0,
                 ),
             ),
@@ -119,7 +124,7 @@ class CollectResourceSpawnUseCaseTest {
         )
 
         // Then
-        actual shouldBe ResourceSpawnCollectionResult.AlreadyCollected(spawnId)
+        actual shouldBe Output.Failure(CollectResourceSpawnError.AlreadyCollected(spawnId))
         inventoryRepository.addedResources shouldBe emptyList()
     }
 
@@ -129,9 +134,9 @@ class CollectResourceSpawnUseCaseTest {
         val now = Instant.parse("2026-03-19T10:00:00Z")
         val transactionRunner = RecordingTransactionRunner()
         val spawn = resourceSpawn(
-            id = "resource-spawn:v1:20527:10:20:0:stone",
+            id = "resource-spawn:v1:20527:10:20:0:components",
             position = GeoPoint(lat = 49.0000, lon = 24.0000),
-            resourceTypeId = "stone",
+            resourceTypeId = "components",
             radiusMeters = 10.0,
         )
         val subject = CollectResourceSpawnUseCase(
@@ -150,10 +155,11 @@ class CollectResourceSpawnUseCaseTest {
         )
 
         // Then
-        actual as ResourceSpawnCollectionResult.NotCloseEnough
-        actual.spawnId shouldBe spawn.id
-        actual.collectionRadiusMeters shouldBe 10.0
-        (actual.distanceMeters > actual.collectionRadiusMeters) shouldBe true
+        actual as Output.Failure
+        val error = actual.error as CollectResourceSpawnError.NotCloseEnough
+        error.spawnId shouldBe spawn.id
+        error.collectionRadiusMeters shouldBe 10.0
+        (error.distanceMeters > error.collectionRadiusMeters) shouldBe true
         transactionRunner.runCount shouldBe 0
     }
 
@@ -176,7 +182,75 @@ class CollectResourceSpawnUseCaseTest {
         )
 
         // Then
-        actual shouldBe ResourceSpawnCollectionResult.NotFound("missing-spawn")
+        actual shouldBe Output.Failure(CollectResourceSpawnError.NotFound("missing-spawn"))
+    }
+
+    @Test
+    fun `invoke should return unexpected failure when transaction throws`() = runTest {
+        // Given
+        val exception = IllegalStateException("Transaction failed.")
+        val spawn = resourceSpawn(
+            id = "resource-spawn:v1:20527:10:20:2:fuel",
+            position = GeoPoint(lat = 49.0000, lon = 24.0000),
+            resourceTypeId = "fuel",
+            radiusMeters = 25.0,
+        )
+        val subject = CollectResourceSpawnUseCase(
+            heroRepository = FakeHeroRepository(hero()),
+            heroInventoryRepository = FakeHeroInventoryRepository(),
+            collectedResourceSpawnRepository = FakeCollectedResourceSpawnRepository(),
+            resourceSpawnRepository = FakeResourceSpawnRepository(spawn),
+            transactionRunner = FailingTransactionRunner(exception),
+            clock = Clock.fixed(Instant.parse("2026-03-19T10:00:00Z"), ZoneOffset.UTC),
+        )
+
+        // When
+        val actual = subject(
+            spawnId = spawn.id,
+            collectorLocation = GeoPoint(lat = 49.0000, lon = 24.0000),
+        )
+
+        // Then
+        actual shouldBe Output.Failure(
+            CollectResourceSpawnError.Unexpected(
+                spawnId = spawn.id,
+                cause = exception,
+            ),
+        )
+    }
+
+    @Test
+    fun `invoke should rethrow cancellation when transaction is cancelled`() = runTest {
+        // Given
+        val cancellation = CancellationException("Collection was cancelled.")
+        val spawn = resourceSpawn(
+            id = "resource-spawn:v1:20527:10:20:3:components",
+            position = GeoPoint(lat = 49.0000, lon = 24.0000),
+            resourceTypeId = "components",
+            radiusMeters = 25.0,
+        )
+        val subject = CollectResourceSpawnUseCase(
+            heroRepository = FakeHeroRepository(hero()),
+            heroInventoryRepository = FakeHeroInventoryRepository(),
+            collectedResourceSpawnRepository = FakeCollectedResourceSpawnRepository(),
+            resourceSpawnRepository = FakeResourceSpawnRepository(spawn),
+            transactionRunner = FailingTransactionRunner(cancellation),
+            clock = Clock.fixed(Instant.parse("2026-03-19T10:00:00Z"), ZoneOffset.UTC),
+        )
+
+        // When
+        val actual = try {
+            subject(
+                spawnId = spawn.id,
+                collectorLocation = GeoPoint(lat = 49.0000, lon = 24.0000),
+            )
+            null
+        } catch (error: CancellationException) {
+            error
+        }
+
+        // Then
+        actual shouldBe cancellation
     }
 
     @Test
@@ -196,9 +270,9 @@ class CollectResourceSpawnUseCaseTest {
             collectedResourceSpawnRepository = collectedRepository,
             resourceSpawnRepository = FakeResourceSpawnRepository(
                 resourceSpawn(
-                    id = "resource-spawn:v1:20527:10:20:1:coal",
+                    id = "resource-spawn:v1:20527:10:20:1:fuel",
                     position = GeoPoint(lat = 49.0000, lon = 24.0000),
-                    resourceTypeId = "coal",
+                    resourceTypeId = "fuel",
                     radiusMeters = 25.0,
                 ),
             ),
@@ -208,7 +282,7 @@ class CollectResourceSpawnUseCaseTest {
 
         // When
         subject(
-            spawnId = "resource-spawn:v1:20527:10:20:1:coal",
+            spawnId = "resource-spawn:v1:20527:10:20:1:fuel",
             collectorLocation = GeoPoint(lat = 49.0000, lon = 24.0000),
         )
 
@@ -381,5 +455,11 @@ class CollectResourceSpawnUseCaseTest {
                 isInTransaction = false
             }
         }
+    }
+
+    private class FailingTransactionRunner(
+        private val error: Throwable,
+    ) : TransactionRunner {
+        override suspend fun <T> runInTransaction(block: suspend () -> T): T = throw error
     }
 }

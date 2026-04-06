@@ -27,19 +27,19 @@ class RoomHeroResourcesRepositoryTest {
             initialEntities = listOf(
                 HeroResourceEntity(
                     heroId = "player",
-                    typeId = "stone",
+                    typeId = "components",
                     amount = 0,
                     updatedAt = updatedAt,
                 ),
                 HeroResourceEntity(
                     heroId = "player",
-                    typeId = "wood",
+                    typeId = "scrap",
                     amount = 2,
                     updatedAt = updatedAt,
                 ),
                 HeroResourceEntity(
                     heroId = "other",
-                    typeId = "wood",
+                    typeId = "scrap",
                     amount = 7,
                     updatedAt = updatedAt,
                 ),
@@ -57,7 +57,7 @@ class RoomHeroResourcesRepositoryTest {
         actual shouldBe listOf(
             HeroResource(
                 heroId = "player",
-                resourceTypeId = "wood",
+                resourceTypeId = "scrap",
                 amount = 2,
                 updatedAt = updatedAt,
             ),
@@ -67,7 +67,7 @@ class RoomHeroResourcesRepositoryTest {
     @Test
     fun `observeAmount should emit updated amount when repository adds more resources`() = runTest {
         // Given
-        val resourceTypeId = "wood"
+        val resourceTypeId = "scrap"
         val initialUpdatedAt = Instant.parse("2026-03-10T08:00:00Z")
         val nextUpdatedAt = Instant.parse("2026-03-10T08:05:00Z")
         val dao = FakeHeroResourceDao(

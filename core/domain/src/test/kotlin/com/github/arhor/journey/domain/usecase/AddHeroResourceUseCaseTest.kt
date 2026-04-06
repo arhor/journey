@@ -1,9 +1,11 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroEnergy
 import com.github.arhor.journey.domain.model.HeroResource
 import com.github.arhor.journey.domain.model.Progression
+import com.github.arhor.journey.domain.model.error.HeroResourcesError
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import io.kotest.matchers.shouldBe
@@ -26,7 +28,7 @@ class AddHeroResourceUseCaseTest {
         val repository = FakeHeroResourcesRepository(
             addResult = HeroResource(
                 heroId = hero.id,
-                resourceTypeId = "wood",
+                resourceTypeId = "scrap",
                 amount = 4,
                 updatedAt = now,
             ),
@@ -39,16 +41,46 @@ class AddHeroResourceUseCaseTest {
 
         // When
         val actual = subject(
-            resourceTypeId = "wood",
+            resourceTypeId = "scrap",
             amount = 3,
         )
 
         // Then
-        actual shouldBe repository.addResult
+        actual shouldBe Output.Success(repository.addResult)
         repository.lastAddHeroId shouldBe hero.id
-        repository.lastAddResourceTypeId shouldBe "wood"
+        repository.lastAddResourceTypeId shouldBe "scrap"
         repository.lastAddAmount shouldBe 3
         repository.lastAddUpdatedAt shouldBe now
+    }
+
+    @Test
+    fun `invoke should return invalid amount failure when amount is not positive`() = runTest {
+        // Given
+        val subject = AddHeroResourceUseCase(
+            heroRepository = FakeHeroRepository(hero(id = "player")),
+            heroInventoryRepository = FakeHeroResourcesRepository(
+                addResult = HeroResource(
+                    heroId = "player",
+                    resourceTypeId = "scrap",
+                    amount = 1,
+                    updatedAt = Instant.parse("2026-03-12T09:00:00Z"),
+                ),
+            ),
+            clock = Clock.fixed(Instant.parse("2026-03-12T09:00:00Z"), ZoneOffset.UTC),
+        )
+
+        // When
+        val actual = subject(
+            resourceTypeId = "scrap",
+            amount = 0,
+        )
+
+        // Then
+        actual shouldBe Output.Failure(
+            HeroResourcesError.InvalidAmount(
+                message = "Added resource amount must be greater than zero.",
+            ),
+        )
     }
 
     private fun hero(id: String): Hero =

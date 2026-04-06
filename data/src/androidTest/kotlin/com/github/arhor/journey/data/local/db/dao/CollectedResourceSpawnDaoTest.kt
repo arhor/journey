@@ -71,7 +71,7 @@ class CollectedResourceSpawnDaoTest {
         val firstClaim = CollectedResourceSpawnEntity(
             heroId = "player",
             spawnId = "spawn-1",
-            typeId = "wood",
+            typeId = "scrap",
             collectedAt = Instant.ofEpochMilli(1_700_000_100_000L),
         )
 

@@ -4,6 +4,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.domain.usecase.GetPointOfInterestUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,28 +22,39 @@ class PoiDetailsViewModel @Inject constructor(
 
     val uiState = flow {
         val poiId = destination.poiId.toLongOrNull()
-        val poi = if (poiId != null) {
-            getPointOfInterest(poiId)
-        } else {
-            null
-        }
-        emit(
-            if (poi == null) {
+        if (poiId == null) {
+            emit(
                 PoiDetailsUiState.Failure(
                     errorMessage = POI_NOT_FOUND_MESSAGE,
-                )
-            } else {
-                PoiDetailsUiState.Content(
-                    id = poi.id.toString(),
-                    name = poi.name,
-                    description = poi.description,
-                    category = poi.category.name.replace('_', ' '),
-                    latitude = poi.location.lat,
-                    longitude = poi.location.lon,
-                    radiusMeters = poi.radiusMeters,
+                ),
+            )
+            return@flow
+        }
+
+        when (val result = getPointOfInterest(poiId)) {
+            is Output.Success -> {
+                val poi = result.value
+                emit(
+                    PoiDetailsUiState.Content(
+                        id = poi.id.toString(),
+                        name = poi.name,
+                        description = poi.description,
+                        category = poi.category.name.replace('_', ' '),
+                        latitude = poi.location.lat,
+                        longitude = poi.location.lon,
+                        radiusMeters = poi.radiusMeters,
+                    ),
                 )
             }
-        )
+
+            is Output.Failure -> {
+                emit(
+                    PoiDetailsUiState.Failure(
+                        errorMessage = result.error.resolveMessage(POI_NOT_FOUND_MESSAGE),
+                    ),
+                )
+            }
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),

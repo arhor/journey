@@ -4,13 +4,14 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.view.MotionEvent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -22,9 +23,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
@@ -32,13 +35,11 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.fow.ui.FogOfWarOverlay
-import com.github.arhor.journey.feature.map.fow.model.renderState
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
-import com.github.arhor.journey.feature.map.renderer.TilesGridRendererAdapter
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -111,6 +112,9 @@ internal fun MapContent(
             dispatch(MapIntent.ObjectTapped(objectId))
         }
     }
+    val dragRotationTracker = remember {
+        HorizontalDragRotationTracker()
+    }
 
     LaunchedEffect(
         state.cameraPosition,
@@ -132,7 +136,8 @@ internal fun MapContent(
         if (
             current.target.latitude != cameraPosition.target.latitude ||
             current.target.longitude != cameraPosition.target.longitude ||
-            current.zoom != cameraPosition.zoom
+            current.zoom != cameraPosition.zoom ||
+            current.bearing != cameraPosition.bearing
         ) {
             cameraState.position = current.copy(
                 target = Position(
@@ -140,6 +145,7 @@ internal fun MapContent(
                     longitude = cameraPosition.target.longitude,
                 ),
                 zoom = cameraPosition.zoom,
+                bearing = cameraPosition.bearing,
             )
         }
     }
@@ -207,8 +213,8 @@ internal fun MapContent(
             }
     }
 
-    LaunchedEffect(state.recenterRequestToken) {
-        if (state.recenterRequestToken <= 0) {
+    LaunchedEffect(state.northResetRequestToken) {
+        if (state.northResetRequestToken <= 0) {
             return@LaunchedEffect
         }
 
@@ -230,12 +236,53 @@ internal fun MapContent(
                     longitude = location.longitude,
                 ),
                 zoom = state.cameraPosition?.zoom ?: cameraState.position.zoom,
+                bearing = DEFAULT_CAMERA_BEARING,
             ),
-            duration = USER_LOCATION_RECENTER_ANIMATION_DURATION,
+            duration = NORTH_RESET_ANIMATION_DURATION,
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag(MAP_ROTATION_OVERLAY_TEST_TAG)
+            .motionEventSpy { motionEvent ->
+                val currentPosition = cameraState.position
+                val update = dragRotationTracker.onMotionEvent(
+                    action = motionEvent.actionMasked,
+                    x = motionEvent.x,
+                    y = motionEvent.y,
+                    pointerCount = motionEvent.pointerCount,
+                    currentBearing = currentPosition.bearing,
+                )
+
+                if (update.didStartInteraction || update.bearing != null) {
+                    dispatch(
+                        MapIntent.CameraGestureStarted(
+                            position = currentPosition.copy(
+                                bearing = update.bearing ?: currentPosition.bearing,
+                            ).toCameraPositionState(),
+                        ),
+                    )
+                }
+
+                if (update.bearing != null) {
+                    cameraState.position = currentPosition.copy(
+                        target = currentPosition.target,
+                        bearing = update.bearing,
+                    )
+                }
+
+                if (update.didEndInteraction) {
+                    dispatch(
+                        MapIntent.CameraSettled(
+                            position = cameraState.position.toCameraPositionState(),
+                            origin = CameraUpdateOrigin.USER,
+                        ),
+                    )
+                }
+            },
+    ) {
         state.selectedStyle?.let { style ->
             key(style) {
                 MaplibreMap(
@@ -259,8 +306,15 @@ internal fun MapContent(
                     zoomRange = CAMERA_ZOOM_BOUNDS,
                     styleState = styleState,
                     options = MapOptions(
-                        renderOptions = state.debug.renderMode.toRenderOptions(),
-                        gestureOptions = GestureOptions.Standard,
+                        renderOptions = RenderOptions.Standard,
+                        gestureOptions = GestureOptions(
+                            isRotateEnabled = false,
+                            isScrollEnabled = false,
+                            isTiltEnabled = false,
+                            isZoomEnabled = true,
+                            isDoubleTapEnabled = true,
+                            isQuickZoomEnabled = true,
+                        ),
                         ornamentOptions = OrnamentOptions.AllDisabled,
                     ),
                     onMapClick = { position, _ ->
@@ -284,45 +338,13 @@ internal fun MapContent(
                         )
                     }
 
-                    FogOfWarOverlay(state = state.fogOfWar.renderState)
-
-                    if (
-                        state.debug.isTilesGridOverlayEnabled &&
-                        !state.fogOfWar.isSuppressedByVisibleTileLimit
-                    ) {
-                        TilesGridRendererAdapter(
-                            tileRange = state.fogOfWar.visibleTileRange,
-                        )
-                    }
+                    FogOfWarOverlay(state = state.fogOfWar.toRenderState())
 
                     MapObjectsRendererAdapter(
                         objects = state.visibleObjects,
                         onObjectTapped = onObjectTapped,
                     )
                 }
-            }
-        }
-
-        if (BuildConfig.DEBUG) {
-            MapDebugInfoOverlay(
-                state = state,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 110.dp, end = 16.dp),
-            )
-
-            FloatingActionButton(
-                onClick = {
-                    dispatch(MapIntent.DebugControlsClicked)
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 88.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.BugReport,
-                    contentDescription = stringResource(R.string.map_debug_button_content_description),
-                )
             }
         }
 
@@ -335,7 +357,7 @@ internal fun MapContent(
                 .padding(horizontal = 16.dp, vertical = 24.dp),
         ) {
             Icon(
-                imageVector = Icons.Filled.Add,
+                imageVector = Icons.Filled.WarningAmber,
                 contentDescription = stringResource(R.string.map_add_poi_content_description),
             )
         }
@@ -349,7 +371,7 @@ internal fun MapContent(
                 .padding(horizontal = 16.dp, vertical = 24.dp),
         ) {
             Icon(
-                imageVector = Icons.Filled.MyLocation,
+                imageVector = Icons.Filled.Explore,
                 contentDescription = stringResource(R.string.map_recenter_content_description),
             )
         }
@@ -366,13 +388,6 @@ internal fun MapContent(
             )
         }
 
-        if (BuildConfig.DEBUG && state.debug.isSheetVisible) {
-            MapDebugControlsSheet(
-                state = state,
-                dispatch = dispatch,
-            )
-        }
-
         MapPlayerHud(
             state = hudState,
             onHeroClick = onOpenHero,
@@ -382,9 +397,20 @@ internal fun MapContent(
                 .padding(16.dp),
         )
     }
+
+    state.selectedWatchtower?.let { selectedWatchtower ->
+        WatchtowerBottomSheet(
+            state = selectedWatchtower,
+            onDismiss = { dispatch(MapIntent.DismissWatchtowerSheet) },
+            onClaim = { dispatch(MapIntent.ClaimSelectedWatchtower) },
+            onUpgrade = { dispatch(MapIntent.UpgradeSelectedWatchtower) },
+        )
+    }
 }
 
 private const val CAMERA_SETTLE_DEBOUNCE_MS = 100L
+internal const val MAP_ROTATION_OVERLAY_TEST_TAG = "map_rotation_overlay"
+
 private const val USER_LOCATION_PUCK_ID_PREFIX = "user-location"
 private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
 private const val CAMERA_SETTLE_ZOOM_THRESHOLD = 0.01
@@ -392,7 +418,8 @@ private const val CAMERA_SETTLE_BEARING_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 private val USER_LOCATION_TIMEOUT = 5.seconds
-private val USER_LOCATION_RECENTER_ANIMATION_DURATION = 600.milliseconds
+private const val DEFAULT_CAMERA_BEARING = 0.0
+private val NORTH_RESET_ANIMATION_DURATION = 600.milliseconds
 private val CAMERA_ZOOM_BOUNDS = 14f..20f
 
 @SuppressLint("MissingPermission")
@@ -453,6 +480,7 @@ private fun CameraPosition.toCameraPositionState(): CameraPositionState =
             longitude = target.longitude,
         ),
         zoom = zoom,
+        bearing = bearing,
     )
 
 private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosition(
@@ -461,6 +489,7 @@ private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosit
         longitude = target.longitude,
     ),
     zoom = zoom,
+    bearing = bearing,
 )
 
 private fun CameraMoveReason.toCameraUpdateOrigin(): CameraUpdateOrigin =
@@ -476,8 +505,101 @@ private data class CameraSettledSnapshot(
     val isCameraMoving: Boolean,
 )
 
-private fun MapRenderMode.toRenderOptions(): RenderOptions =
-    when (this) {
-        MapRenderMode.Standard -> RenderOptions.Standard
-        MapRenderMode.Debug -> RenderOptions.Debug
+internal data class HorizontalDragRotationUpdate(
+    val bearing: Double? = null,
+    val didStartInteraction: Boolean = false,
+    val didEndInteraction: Boolean = false,
+)
+
+internal class HorizontalDragRotationTracker(
+    private val dragThresholdPx: Float = 12f,
+    private val degreesPerPixel: Double = 0.12,
+) {
+    private var activePointerCount: Int = 0
+    private var lastX: Float? = null
+    private var lastY: Float? = null
+    private var totalDx = 0f
+    private var totalDy = 0f
+    private var isRotating = false
+
+    fun onMotionEvent(
+        action: Int,
+        x: Float,
+        y: Float,
+        pointerCount: Int,
+        currentBearing: Double,
+    ): HorizontalDragRotationUpdate = when (action) {
+        MotionEvent.ACTION_DOWN -> {
+            activePointerCount = pointerCount
+            lastX = x
+            lastY = y
+            totalDx = 0f
+            totalDy = 0f
+            isRotating = false
+            HorizontalDragRotationUpdate()
+        }
+
+        MotionEvent.ACTION_POINTER_DOWN -> {
+            activePointerCount = pointerCount
+            endInteraction()
+        }
+
+        MotionEvent.ACTION_MOVE -> {
+            if (pointerCount != 1 || activePointerCount != 1) {
+                activePointerCount = pointerCount
+                return endInteraction()
+            }
+
+            val previousX = lastX ?: x
+            val previousY = lastY ?: y
+            val deltaX = x - previousX
+            val deltaY = y - previousY
+            lastX = x
+            lastY = y
+            totalDx += deltaX
+            totalDy += deltaY
+
+            if (!isRotating) {
+                val exceedsThreshold = abs(totalDx) >= dragThresholdPx
+                val isHorizontal = abs(totalDx) > abs(totalDy)
+                if (!exceedsThreshold || !isHorizontal) {
+                    return HorizontalDragRotationUpdate()
+                }
+                isRotating = true
+            }
+
+            HorizontalDragRotationUpdate(
+                bearing = normalizeBearing(currentBearing + deltaX * degreesPerPixel),
+                didStartInteraction = isRotating && abs(totalDx) - abs(deltaX) < dragThresholdPx,
+            )
+        }
+
+        MotionEvent.ACTION_POINTER_UP,
+        MotionEvent.ACTION_UP,
+        MotionEvent.ACTION_CANCEL -> {
+            activePointerCount = maxOf(0, pointerCount - 1)
+            endInteraction()
+        }
+
+        else -> HorizontalDragRotationUpdate()
     }
+
+    private fun endInteraction(): HorizontalDragRotationUpdate {
+        val didEndInteraction = isRotating
+        lastX = null
+        lastY = null
+        totalDx = 0f
+        totalDy = 0f
+        isRotating = false
+        return HorizontalDragRotationUpdate(didEndInteraction = didEndInteraction)
+    }
+}
+
+internal fun normalizeBearing(bearing: Double): Double {
+    val normalized = bearing % 360.0
+    return if (normalized < 0.0) {
+        normalized + 360.0
+    } else {
+        normalized
+    }
+}

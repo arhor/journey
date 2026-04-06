@@ -24,14 +24,14 @@ sealed interface MapUiState {
     data class Content(
         val cameraPosition: CameraPositionState?,
         val cameraUpdateOrigin: CameraUpdateOrigin,
-        val recenterRequestToken: Int,
+        val northResetRequestToken: Int,
         val userLocation: LatLng?,
         val isExplorationTrackingActive: Boolean,
         val explorationTrackingCadence: ExplorationTrackingCadence,
         val explorationTrackingStatus: ExplorationTrackingStatus,
         val selectedStyle: MapStyle?,
         val visibleObjects: List<MapObjectUiModel>,
+        val selectedWatchtower: WatchtowerSheetUiState?,
         val fogOfWar: FogOfWarUiState,
-        val debug: MapDebugUiState,
     ) : MapUiState
 }

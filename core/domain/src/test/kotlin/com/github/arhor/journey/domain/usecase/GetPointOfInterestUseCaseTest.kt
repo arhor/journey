@@ -1,5 +1,6 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
@@ -31,7 +32,7 @@ class GetPointOfInterestUseCaseTest {
         val actual = subject(poiId)
 
         // Then
-        actual shouldBe expected
+        actual shouldBe Output.Success(expected)
         repository.requestedId shouldBe poiId
     }
 

@@ -1,7 +1,9 @@
 package com.github.arhor.journey.domain.usecase
 
+import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationProgress
+import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.ExplorationRepository
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.flow.Flow
@@ -26,9 +28,10 @@ class DiscoverPointOfInterestUseCaseTest {
         )
 
         // When
-        subject(poiId)
+        val actual = subject(poiId)
 
         // Then
+        actual shouldBe Output.Success(Unit)
         repository.discoveries shouldBe listOf(DiscoveredPoi(poiId = poiId, discoveredAt = now))
     }
 
@@ -44,10 +47,15 @@ class DiscoverPointOfInterestUseCaseTest {
         )
 
         // When
-        val result = runCatching { subject(poiId) }
+        val actual = subject(poiId)
 
         // Then
-        result.exceptionOrNull() shouldBe expectedError
+        actual shouldBe Output.Failure(
+            UseCaseError.Unexpected(
+                operation = "discover point of interest",
+                cause = expectedError,
+            ),
+        )
     }
 
     private class FakeExplorationRepository(
