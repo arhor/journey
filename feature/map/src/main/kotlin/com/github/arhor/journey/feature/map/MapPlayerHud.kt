@@ -1,6 +1,5 @@
 package com.github.arhor.journey.feature.map
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +13,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudQueue
@@ -22,17 +21,20 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -40,12 +42,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.arhor.journey.core.common.ResourceType
-import com.github.arhor.journey.core.ui.components.Accent
 import com.github.arhor.journey.core.ui.components.ResourceTypeIcon
-import com.github.arhor.journey.core.ui.components.rememberSciFiPanelShape
 import com.github.arhor.journey.core.ui.components.resourceTypeLabel
 
 internal const val MAP_HUD_TEST_TAG = "mapHud"
@@ -58,9 +59,9 @@ private val HudStroke = Color(0xFF4E5D68)
 private val HudInnerStroke = Color(0xFF8AA0AC)
 private val HudText = Color(0xFFF3F6F7)
 private val HudMutedText = Color(0xFFAAB5BA)
-private val HudBadge = Color(0xFF0F1720)
 private val HudGlow = Color(0xFF59A4D7)
 private val HudWarning = Color(0xFFE0A66A)
+private val HudAccent = Color(0xFF65696C)
 
 @Composable
 internal fun MapPlayerHud(
@@ -77,46 +78,14 @@ internal fun MapPlayerHud(
             .testTag(MAP_HUD_TEST_TAG),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        HudPanel(shape = rememberSciFiPanelShape()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HeroHudButton(
-                    heroInitial = displayState.heroInitial,
-                    levelLabel = displayState.levelLabel,
-                    onClick = onHeroClick,
-                )
-                HeroXpBlock(
-                    xpInLevel = displayState.xpInLevel,
-                    xpToNextLevel = displayState.xpToNextLevel,
-                    modifier = Modifier.weight(1f),
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    displayState.resources.forEach { resource ->
-                        ResourceAmountChip(state = resource)
-                    }
-                    IconButton(
-                        onClick = onSettingsClick,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .testTag(MAP_HUD_SETTINGS_BUTTON_TEST_TAG),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = stringResource(R.string.map_hud_settings_content_description),
-                            tint = HudText,
-                        )
-                    }
-                }
-            }
-        }
+        TopStatusPanel(
+            levelLabel = displayState.levelLabel,
+            xpInLevel = displayState.xpInLevel,
+            xpToNextLevel = displayState.xpToNextLevel,
+            resources = displayState.resources,
+            onHeroClick = onHeroClick,
+            onSettingsClick = onSettingsClick,
+        )
 
         HudInfoCard(
             title = stringResource(R.string.map_hud_weather_title),
@@ -136,52 +105,171 @@ internal fun MapPlayerHud(
 }
 
 @Composable
-private fun HeroHudButton(
-    heroInitial: String,
-    levelLabel: String,
-    onClick: () -> Unit,
-) {
-    val contentDescriptionText = stringResource(R.string.map_hud_hero_content_description, levelLabel)
+fun rememberHeroButtonShape(
+    cornerCut: Dp = 9.dp,
+    leftInset1: Dp = 12.dp,
+    leftInset2: Dp = 9.dp,
+    notchDepth: Dp = 9.dp,
+    notchTopFraction: Float = 0.65f,
+    notchHeightFraction: Float = 0.20f,
+    notchSlant: Dp = 9.dp,
+): Shape {
+    val density = LocalDensity.current
 
-    TextButton(
-        onClick = onClick,
-        modifier = Modifier
-            .heightIn(min = 48.dp)
-            .semantics { contentDescription = contentDescriptionText }
-            .testTag(MAP_HUD_HERO_BUTTON_TEST_TAG),
-        contentPadding = PaddingValues(0.dp),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Surface(
-                modifier = Modifier.size(42.dp),
-                shape = CircleShape,
-                color = HudBadge,
-                border = BorderStroke(1.dp, HudStroke),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = heroInitial,
-                        color = HudText,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-            Text(
-                text = levelLabel.uppercase(),
-                color = HudMutedText,
-                style = MaterialTheme.typography.labelSmall,
-                letterSpacing = 1.5.sp,
-            )
+    return remember(density, cornerCut, leftInset1, leftInset2, notchDepth, notchTopFraction, notchHeightFraction, notchSlant) {
+        val cutPx = with(density) { cornerCut.toPx() }
+        val inset1Px = with(density) { leftInset1.toPx() }
+        val inset2Px = with(density) { leftInset2.toPx() }
+        val stepPx = with(density) { notchDepth.toPx() }
+        val slantPx = with(density) { notchSlant.toPx() }
+
+        GenericShape { size, _ ->
+            val w = size.width
+            val h = size.height
+
+            val nTop = h * notchTopFraction
+
+            // Drawing Clockwise
+            // Top edge
+            moveTo(inset1Px, 0f)
+            lineTo(w - cutPx, 0f)
+            // Top-right chamfer
+            lineTo(w, cutPx)
+            // Right edge
+            lineTo(w, h - cutPx)
+            // Bottom-right chamfer
+            lineTo(w - cutPx, h)
+            // Bottom edge (ends at indented x)
+            lineTo(cutPx, h)
+            // Bottom-left corner (viewed top-down: \) starts from inner vertical
+            lineTo(10f, h - cutPx)
+            // Notch vertical inner (all the way to top slant)
+            lineTo(10f, nTop + slantPx)
+            // Notch top slant (outward and up: \)
+            lineTo(10f, nTop)
+            // Left vertical top
+            lineTo(10f, cutPx)
+            // Close connects back to (insetPx, 0f) with top-left chamfer (UP and RIGHT: /)
+            close()
         }
     }
 }
 
 @Composable
-private fun HeroXpBlock(
+private fun TopStatusPanel(
+    levelLabel: String,
+    xpInLevel: Long,
+    xpToNextLevel: Long,
+    resources: List<MapHudResourceUiModel>,
+    onHeroClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LevelBadgeButton(
+            levelLabel = levelLabel,
+            onClick = onHeroClick,
+        )
+
+        HudPanel(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = 42.dp),
+            shape = rememberHeroButtonShape(
+                cornerCut = 4.dp,
+                leftInset1 = 6.dp,
+                leftInset2 = 5.dp,
+                notchDepth = 4.dp,
+            ),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                XpStrip(
+                    xpInLevel = xpInLevel,
+                    xpToNextLevel = xpToNextLevel,
+                    modifier = Modifier.weight(1f),
+                )
+                resources.forEach { resource ->
+                    CompactResourceChip(state = resource)
+                }
+                IconButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .testTag(MAP_HUD_SETTINGS_BUTTON_TEST_TAG),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = stringResource(R.string.map_hud_settings_content_description),
+                        tint = HudText,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LevelBadgeButton(
+    levelLabel: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val contentDescriptionText = stringResource(R.string.map_hud_hero_content_description, levelLabel)
+    val levelValue = levelLabel.filter(Char::isDigit).ifBlank { "--" }
+
+    HudPanel(
+        modifier = modifier.size(width = 54.dp, height = 54.dp),
+        shape = rememberHeroButtonShape(
+            cornerCut = 9.dp,
+            leftInset1 = 12.dp,
+            leftInset2 = 12.dp,
+            notchDepth = 9.dp,
+        ),
+    ) {
+        TextButton(
+            onClick = onClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .semantics { contentDescription = contentDescriptionText }
+                .testTag(MAP_HUD_HERO_BUTTON_TEST_TAG),
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = "LVL",
+                    color = HudMutedText,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                    letterSpacing = 1.sp,
+                    maxLines = 1,
+                )
+                Text(
+                    text = levelValue,
+                    color = HudText,
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 22.sp),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun XpStrip(
     xpInLevel: Long,
     xpToNextLevel: Long,
     modifier: Modifier = Modifier,
@@ -191,7 +279,7 @@ private fun HeroXpBlock(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Text(
             text = stringResource(
@@ -199,26 +287,28 @@ private fun HeroXpBlock(
                 xpInLevel.toInt(),
                 xpToNextLevel.toInt(),
             ),
-            color = HudMutedText,
-            style = MaterialTheme.typography.labelMedium,
-            letterSpacing = 1.1.sp,
+            color = HudText,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.4.sp,
+            maxLines = 1,
         )
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(8.dp)
+                .height(5.dp)
                 .clip(RoundedCornerShape(999.dp))
-                .background(Color(0xFF0B1218))
-                .border(1.dp, HudStroke.copy(alpha = 0.75f), RoundedCornerShape(999.dp)),
+                .background(Color(0xFF081018))
+                .border(1.dp, HudStroke.copy(alpha = 0.6f), RoundedCornerShape(999.dp)),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(progress)
-                    .height(8.dp)
+                    .height(5.dp)
                     .clip(RoundedCornerShape(999.dp))
                     .background(
                         Brush.horizontalGradient(
-                            colors = listOf(Color(0xFF7FD7FF), Color(0xFF3A83C0)),
+                            colors = listOf(Color(0xFF86E7FF), Color(0xFF3B93B4)),
                         ),
                     ),
             )
@@ -227,7 +317,7 @@ private fun HeroXpBlock(
 }
 
 @Composable
-private fun ResourceAmountChip(
+private fun CompactResourceChip(
     state: MapHudResourceUiModel,
 ) {
     val resourceLabel = resourceTypeLabel(state.resourceType)
@@ -237,23 +327,24 @@ private fun ResourceAmountChip(
         state.amount,
     )
 
-    Column(
+    Row(
         modifier = Modifier
-            .heightIn(min = 40.dp)
+            .heightIn(min = 22.dp)
             .semantics { contentDescription = contentDescriptionText },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         ResourceTypeIcon(
             resourceType = state.resourceType,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(13.dp),
             contentDescription = null,
         )
         Text(
             text = state.amountLabel,
             color = HudText,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
             fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
         )
     }
 }
@@ -315,7 +406,7 @@ private fun HudInfoCard(
 @Composable
 private fun HudPanel(
     modifier: Modifier = Modifier,
-    shape: Shape = rememberSciFiPanelShape(),
+    shape: Shape = rememberHeroButtonShape(),
     content: @Composable () -> Unit,
 ) {
     Box(
@@ -323,11 +414,15 @@ private fun HudPanel(
             .clip(shape)
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(HudPanelTop, HudPanelBottom),
+                    colors = listOf(
+                        HudPanelTop.copy(alpha = 0.92f),
+                        HudPanelBottom.copy(alpha = 0.96f),
+                    ),
                 ),
             )
+            .hudPanelDecoration()
             .border(1.dp, HudStroke, shape)
-            .padding(1.dp),
+            .padding(2.dp),
     ) {
         Box(
             modifier = Modifier
@@ -339,11 +434,71 @@ private fun HudPanel(
     }
 }
 
+private fun Modifier.hudPanelDecoration(): Modifier = drawWithCache {
+    val scanlineColor = Color.White.copy(alpha = 0.018f)
+    val topGlow = Brush.verticalGradient(
+        colors = listOf(
+            Color.White.copy(alpha = 0.07f),
+            Color.Transparent,
+            Color.Black.copy(alpha = 0.16f),
+        ),
+    )
+    val redAccent = HudAccent.copy(alpha = 0.72f)
+    val dimRedAccent = HudAccent.copy(alpha = 0.34f)
+
+    onDrawWithContent {
+        drawContent()
+
+        var y = 0f
+        val step = 5.dp.toPx()
+        while (y < size.height) {
+            drawLine(
+                color = scanlineColor,
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = 1f,
+            )
+            y += step
+        }
+
+        drawRect(brush = topGlow)
+
+        val inset = 2.dp.toPx()
+        val corner = 8.dp.toPx()
+        val shortEdge = size.width.coerceAtMost(44.dp.toPx())
+        val stroke = 1.5.dp.toPx()
+
+        drawLine(
+            color = redAccent,
+            start = Offset(size.width - shortEdge, inset),
+            end = Offset(size.width - corner, inset),
+            strokeWidth = stroke,
+        )
+        drawLine(
+            color = redAccent,
+            start = Offset(size.width - corner, inset),
+            end = Offset(size.width - inset, corner),
+            strokeWidth = stroke,
+        )
+        drawLine(
+            color = redAccent,
+            start = Offset(size.width - inset, corner),
+            end = Offset(size.width - inset, size.height - corner),
+            strokeWidth = stroke,
+        )
+        drawLine(
+            color = dimRedAccent,
+            start = Offset(size.width - corner, size.height - inset),
+            end = Offset(size.width - shortEdge, size.height - inset),
+            strokeWidth = stroke,
+        )
+    }
+}
+
 private fun MapHudUiState.toDisplayState(): MapHudDisplayState =
     when (this) {
         is MapHudUiState.Content -> {
             MapHudDisplayState(
-                heroInitial = heroInitial,
                 levelLabel = levelLabel,
                 xpInLevel = xpInLevel,
                 xpToNextLevel = xpToNextLevel,
@@ -354,7 +509,6 @@ private fun MapHudUiState.toDisplayState(): MapHudDisplayState =
         MapHudUiState.Loading,
         MapHudUiState.Unavailable -> {
             MapHudDisplayState(
-                heroInitial = "?",
                 levelLabel = "Lv --",
                 xpInLevel = 0,
                 xpToNextLevel = 1,
@@ -374,7 +528,6 @@ private fun placeholderResources(): List<MapHudResourceUiModel> =
 
 @Immutable
 private data class MapHudDisplayState(
-    val heroInitial: String,
     val levelLabel: String,
     val xpInLevel: Long,
     val xpToNextLevel: Long,
