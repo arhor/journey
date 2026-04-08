@@ -228,7 +228,7 @@ private fun TopStatusPanel(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 12.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+                    .padding(start = 18.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
