@@ -45,6 +45,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.core.ui.components.ResourceTypeIcon
 import com.github.arhor.journey.core.ui.components.resourceTypeLabel
@@ -60,8 +61,15 @@ private val HudInnerStroke = Color(0xFF8AA0AC)
 private val HudText = Color(0xFFF3F6F7)
 private val HudMutedText = Color(0xFFAAB5BA)
 private val HudGlow = Color(0xFF59A4D7)
-private val HudWarning = Color(0xFFE0A66A)
 private val HudAccent = Color(0xFF65696C)
+private const val LevelBadgeScale = 1.5f
+private val LevelBadgeBaseSize = 54.dp
+private val TopStatusPanelOverlap = (-12).dp
+private const val HeroShieldShoulderStretch = 1.2f
+private const val HeroShieldFlankRiseFraction = 0.45f
+private const val HeroShieldBottomRiseFraction = 0.12f
+private const val HeroShieldBottomWidthFraction = 0.5f
+private val StatusPanelInnerEdge = 10.dp
 
 @Composable
 internal fun MapPlayerHud(
@@ -76,7 +84,7 @@ internal fun MapPlayerHud(
         modifier = modifier
             .fillMaxWidth()
             .testTag(MAP_HUD_TEST_TAG),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         TopStatusPanel(
             levelLabel = displayState.levelLabel,
@@ -105,23 +113,65 @@ internal fun MapPlayerHud(
 }
 
 @Composable
-fun rememberHeroButtonShape(
+private fun rememberHeroButtonShape(
+    cornerCut: Dp = 9.dp,
+    crestInset: Dp = 12.dp,
+    flankInset: Dp = 9.dp,
+    pointDepth: Dp = 9.dp,
+    shoulderFraction: Float = 0.65f,
+    pointWidth: Dp = 9.dp,
+): Shape {
+    val density = LocalDensity.current
+
+    return remember(density, cornerCut, crestInset, flankInset, pointDepth, shoulderFraction, pointWidth) {
+        val cutPx = with(density) { cornerCut.toPx() }
+        val crestInsetPx = with(density) { crestInset.toPx() }
+        val flankInsetPx = with(density) { flankInset.toPx() }
+        val pointDepthPx = with(density) { pointDepth.toPx() }
+        val pointWidthPx = with(density) { pointWidth.toPx() }
+
+        GenericShape { size, _ ->
+            val w = size.width
+            val h = size.height
+
+            val topInset = crestInsetPx.coerceIn(0f, w / 2f)
+            val flankInsetX = flankInsetPx.coerceIn(0f, w / 2f)
+            val shoulderY = (h * shoulderFraction * HeroShieldShoulderStretch).coerceIn(cutPx, h - cutPx)
+            val flankY = (h - pointDepthPx * HeroShieldFlankRiseFraction).coerceIn(shoulderY, h)
+            val bottomY = (h - pointDepthPx * HeroShieldBottomRiseFraction).coerceIn(flankY, h)
+            val bottomFlatHalfWidth = (pointWidthPx * HeroShieldBottomWidthFraction)
+                .coerceIn(0f, (w / 2f) - flankInsetX)
+
+            // Draw a shield silhouette with a flat crest, tapered sides, and a softened bottom point.
+            moveTo(topInset, 0f)
+            lineTo(w - cutPx, 0f)
+            lineTo(w, cutPx)
+            lineTo(w, shoulderY)
+            lineTo(w - flankInsetX, flankY * 1.1f)
+            lineTo(flankInsetX, flankY * 1.1f)
+            lineTo(0f, shoulderY)
+            lineTo(0f, cutPx)
+            close()
+        }
+    }
+}
+
+@Composable
+private fun rememberStatusPanelShape(
     cornerCut: Dp = 9.dp,
     leftInset1: Dp = 12.dp,
     leftInset2: Dp = 9.dp,
-    notchDepth: Dp = 9.dp,
     notchTopFraction: Float = 0.65f,
-    notchHeightFraction: Float = 0.20f,
     notchSlant: Dp = 9.dp,
 ): Shape {
     val density = LocalDensity.current
 
-    return remember(density, cornerCut, leftInset1, leftInset2, notchDepth, notchTopFraction, notchHeightFraction, notchSlant) {
+    return remember(density, cornerCut, leftInset1, leftInset2, notchTopFraction, notchSlant) {
         val cutPx = with(density) { cornerCut.toPx() }
-        val inset1Px = with(density) { leftInset1.toPx() }
-        val inset2Px = with(density) { leftInset2.toPx() }
-        val stepPx = with(density) { notchDepth.toPx() }
+        val topInsetPx = with(density) { leftInset1.toPx() }
+        val innerInsetPx = with(density) { leftInset2.toPx() }
         val slantPx = with(density) { notchSlant.toPx() }
+        val innerEdgePx = with(density) { StatusPanelInnerEdge.toPx() }
 
         GenericShape { size, _ ->
             val w = size.width
@@ -129,27 +179,16 @@ fun rememberHeroButtonShape(
 
             val nTop = h * notchTopFraction
 
-            // Drawing Clockwise
-            // Top edge
-            moveTo(inset1Px, 0f)
+            moveTo(topInsetPx, 0f)
             lineTo(w - cutPx, 0f)
-            // Top-right chamfer
             lineTo(w, cutPx)
-            // Right edge
             lineTo(w, h - cutPx)
-            // Bottom-right chamfer
             lineTo(w - cutPx, h)
-            // Bottom edge (ends at indented x)
             lineTo(cutPx, h)
-            // Bottom-left corner (viewed top-down: \) starts from inner vertical
-            lineTo(10f, h - cutPx)
-            // Notch vertical inner (all the way to top slant)
-            lineTo(10f, nTop + slantPx)
-            // Notch top slant (outward and up: \)
-            lineTo(10f, nTop)
-            // Left vertical top
-            lineTo(10f, cutPx)
-            // Close connects back to (insetPx, 0f) with top-left chamfer (UP and RIGHT: /)
+            lineTo(innerInsetPx, h - cutPx)
+            lineTo(innerInsetPx, nTop + slantPx)
+            lineTo(innerEdgePx, nTop)
+            lineTo(innerEdgePx, cutPx)
             close()
         }
     }
@@ -167,23 +206,23 @@ private fun TopStatusPanel(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(TopStatusPanelOverlap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LevelBadgeButton(
             levelLabel = levelLabel,
             onClick = onHeroClick,
+            modifier = Modifier.zIndex(1f),
         )
 
         HudPanel(
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = 42.dp),
-            shape = rememberHeroButtonShape(
+                .heightIn(min = 55.dp),
+            shape = rememberStatusPanelShape(
                 cornerCut = 4.dp,
                 leftInset1 = 6.dp,
                 leftInset2 = 5.dp,
-                notchDepth = 4.dp,
             ),
         ) {
             Row(
@@ -224,23 +263,24 @@ private fun LevelBadgeButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val badgeSize = LevelBadgeBaseSize * LevelBadgeScale
     val contentDescriptionText = stringResource(R.string.map_hud_hero_content_description, levelLabel)
     val levelValue = levelLabel.filter(Char::isDigit).ifBlank { "--" }
 
     HudPanel(
-        modifier = modifier.size(width = 54.dp, height = 54.dp),
+        modifier = modifier.size(width = badgeSize, height = badgeSize),
         shape = rememberHeroButtonShape(
-            cornerCut = 9.dp,
-            leftInset1 = 12.dp,
-            leftInset2 = 12.dp,
-            notchDepth = 9.dp,
+            cornerCut = 9.dp * LevelBadgeScale,
+            crestInset = 12.dp * LevelBadgeScale,
+            flankInset = 12.dp * LevelBadgeScale,
+            pointDepth = 9.dp * LevelBadgeScale,
         ),
     ) {
         TextButton(
             onClick = onClick,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(54.dp)
+                .height(badgeSize)
                 .semantics { contentDescription = contentDescriptionText }
                 .testTag(MAP_HUD_HERO_BUTTON_TEST_TAG),
             contentPadding = PaddingValues(0.dp),
@@ -252,14 +292,14 @@ private fun LevelBadgeButton(
                 Text(
                     text = "LVL",
                     color = HudMutedText,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
-                    letterSpacing = 1.sp,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp * LevelBadgeScale),
+                    letterSpacing = 1.sp * LevelBadgeScale,
                     maxLines = 1,
                 )
                 Text(
                     text = levelValue,
                     color = HudText,
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 22.sp),
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 22.sp * LevelBadgeScale),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                 )
