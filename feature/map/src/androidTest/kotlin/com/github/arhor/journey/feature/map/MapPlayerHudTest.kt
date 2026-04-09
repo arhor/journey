@@ -62,6 +62,8 @@ class MapPlayerHudTest {
         val scrapAmount = composeRule.onNodeWithText("1.2K")
         val componentsAmount = composeRule.onNodeWithText("12K")
         val fuelAmount = composeRule.onNodeWithText("1.3M")
+        val xpLabel = composeRule.onNodeWithText("XP 4850 / 7500")
+        val weatherLabel = composeRule.onNodeWithText("LIGHT RAIN")
         val scrapDescription = composeRule.onNodeWithContentDescription("Scrap: 1250")
         val componentsDescription = composeRule.onNodeWithContentDescription("Components: 12300")
         val fuelDescription = composeRule.onNodeWithContentDescription("Fuel: 1300000")
@@ -71,6 +73,8 @@ class MapPlayerHudTest {
         scrapAmount.assertIsDisplayed()
         componentsAmount.assertIsDisplayed()
         fuelAmount.assertIsDisplayed()
+        xpLabel.assertIsDisplayed()
+        weatherLabel.assertIsDisplayed()
         scrapDescription.assertIsDisplayed()
         componentsDescription.assertIsDisplayed()
         fuelDescription.assertIsDisplayed()
@@ -80,6 +84,8 @@ class MapPlayerHudTest {
         MapHudUiState.Content(
             heroInitial = "A",
             levelLabel = "Lv 7",
+            xpInLevel = 4_850,
+            xpToNextLevel = 7_500,
             resources = listOf(
                 MapHudResourceUiModel(
                     resourceType = ResourceType.SCRAP,

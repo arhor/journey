@@ -6,6 +6,7 @@ import com.github.arhor.journey.domain.model.Hero
 import com.github.arhor.journey.domain.model.HeroResource
 import com.github.arhor.journey.domain.model.Progression
 import com.github.arhor.journey.domain.model.error.UseCaseError
+import com.github.arhor.journey.domain.internal.ProgressionPolicy
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourcesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroUseCase
 import io.kotest.matchers.shouldBe
@@ -34,6 +35,7 @@ class MapHudViewModelTest {
         try {
             val observeHero = mockk<ObserveHeroUseCase>()
             val observeHeroResources = mockk<ObserveHeroResourcesUseCase>()
+            val progressionPolicy = ProgressionPolicy()
             val hero = hero()
 
             every { observeHero() } returns flowOf(Output.Success(hero))
@@ -58,6 +60,7 @@ class MapHudViewModelTest {
             val viewModel = MapHudViewModel(
                 observeHero = observeHero,
                 observeHeroResources = observeHeroResources,
+                progressionPolicy = progressionPolicy,
             )
 
             // When
@@ -69,6 +72,8 @@ class MapHudViewModelTest {
             actual shouldBe MapHudUiState.Content(
                 heroInitial = "A",
                 levelLabel = "Lv 4",
+                xpInLevel = 350,
+                xpToNextLevel = progressionPolicy.xpToNextLevel(4),
                 resources = listOf(
                     MapHudResourceUiModel(
                         resourceType = ResourceType.SCRAP,
@@ -113,6 +118,7 @@ class MapHudViewModelTest {
             val viewModel = MapHudViewModel(
                 observeHero = observeHero,
                 observeHeroResources = observeHeroResources,
+                progressionPolicy = ProgressionPolicy(),
             )
 
             // When

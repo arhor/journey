@@ -14,6 +14,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.github.arhor.journey.feature.hero.HeroBottomNavDestination
+import com.github.arhor.journey.feature.map.MapDestination
 import com.github.arhor.journey.feature.map.mapBottomNavDestination
 import com.github.arhor.journey.feature.settings.settingsBottomNavDestination
 import com.github.arhor.journey.ui.navigation.navigateToTopLevel
@@ -31,8 +32,9 @@ fun AppBottomBar(navController: NavHostController) {
     val isBottomBarDestination = bottomNavDestinations.any { destination ->
         graphHierarchy.any { it.hasRoute(destination.destination::class) }
     }
+    val isMainMapDestination = graphHierarchy.any { it.hasRoute(MapDestination::class) }
 
-    if (!isBottomBarDestination) {
+    if (!isBottomBarDestination || isMainMapDestination) {
         return
     }
 

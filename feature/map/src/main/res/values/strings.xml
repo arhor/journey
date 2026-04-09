@@ -4,6 +4,11 @@
     <string name="map_hud_hero_content_description">Open hero screen, %1$s</string>
     <string name="map_hud_settings_content_description">Open settings</string>
     <string name="map_hud_resource_content_description">%1$s: %2$d</string>
+    <string name="map_hud_weather_title">Weather</string>
+    <string name="map_hud_weather_condition">Light rain</string>
+    <string name="map_hud_weather_details">18°C / SW 12 km/h</string>
+    <string name="map_hud_xp_label">XP %1$d / %2$d</string>
+    <string name="map_weather_content_description">Weather conditions</string>
     <string name="map_nav_label">Map</string>
     <string name="add_poi_title">Add point of interest</string>
     <string name="add_poi_name_label">Name</string>
@@ -15,6 +20,7 @@
     <string name="add_poi_save_button">Save point of interest</string>
     <string name="poi_details_title">Point of interest</string>
     <string name="poi_details_back_content_description">Navigate back</string>
+    <string name="poi_details_open_mini_game_button">Play mini game</string>
     <string name="poi_details_category_label">Category</string>
     <string name="poi_details_id_label">Identifier</string>
     <string name="poi_details_radius_label">Discovery radius</string>

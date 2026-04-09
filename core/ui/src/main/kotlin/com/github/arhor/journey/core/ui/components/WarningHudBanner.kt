@@ -49,10 +49,10 @@ internal val SecondaryText = Color(0xFF8E877E)
 @Composable
 fun WarningHudBanner(
     modifier: Modifier = Modifier,
-    title: @Composable () -> Unit,
+    title: (@Composable () -> Unit)? = null,
     headline: @Composable () -> Unit,
     subtitle: (@Composable () -> Unit)? = null,
-    icon: @Composable BoxScope.() -> Unit = {
+    icon: (@Composable BoxScope.() -> Unit)? = {
         Icon(
             imageVector = JourneyIcons.WarningNew,
             contentDescription = "Warning",
@@ -103,21 +103,25 @@ fun WarningHudBanner(
                 .padding(horizontal = 18.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier.size(78.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                icon()
-            }
+            if (icon != null) {
+                Box(
+                    modifier = Modifier.size(78.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    icon()
+                }
 
-            Spacer(modifier = Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(14.dp))
+            }
 
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center,
             ) {
-                title()
-                Spacer(modifier = Modifier.height(4.dp))
+                if (title != null) {
+                    title()
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
                 headline()
                 if (subtitle != null) {
                     Spacer(modifier = Modifier.height(4.dp))
