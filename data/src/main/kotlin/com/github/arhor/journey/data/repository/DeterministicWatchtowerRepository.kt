@@ -2,17 +2,20 @@ package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.WatchtowerStateDao
 import com.github.arhor.journey.data.local.db.entity.WatchtowerStateEntity
+import com.github.arhor.journey.data.mapobject.MapObjectAreaStore
+import com.github.arhor.journey.data.mapobject.WatchtowerDefinitionTileSource
 import com.github.arhor.journey.data.mapper.toDomain
-import com.github.arhor.journey.domain.internal.WatchtowerGeneration
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.WatchtowerDefinition
 import com.github.arhor.journey.domain.model.WatchtowerRecord
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,30 +23,38 @@ import javax.inject.Singleton
 @Singleton
 class DeterministicWatchtowerRepository @Inject constructor(
     private val dao: WatchtowerStateDao,
+    private val areaStore: MapObjectAreaStore,
+    private val tileSource: WatchtowerDefinitionTileSource,
+    private val clock: Clock,
 ) : WatchtowerRepository {
     private companion object {
         const val SQLITE_BIND_CHUNK_SIZE = 900
     }
 
-    override fun observeInBounds(bounds: GeoBounds): Flow<List<WatchtowerRecord>> {
-        val definitions = WatchtowerGeneration.definitionsInBounds(bounds)
-        if (definitions.isEmpty()) {
-            return flowOf(emptyList())
-        }
-
-        val ids = definitions.map(WatchtowerDefinition::id)
-
-        return observeStates(ids)
-            .map { states ->
-                composeRecords(
-                    definitions = definitions,
-                    states = states,
-                )
+    override fun observeInBounds(bounds: GeoBounds): Flow<List<WatchtowerRecord>> =
+        areaStore.observeWatchtowerDefinitions(
+            bounds = bounds,
+            asOf = clock.instant(),
+        )
+            .flatMapLatest { definitions ->
+                if (definitions.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    observeStates(definitions.map(WatchtowerDefinition::id))
+                        .map { states ->
+                            composeRecords(
+                                definitions = definitions,
+                                states = states,
+                            )
+                        }
+                }
             }
-    }
 
     override suspend fun getInBounds(bounds: GeoBounds): List<WatchtowerRecord> {
-        val definitions = WatchtowerGeneration.definitionsInBounds(bounds)
+        val definitions = areaStore.getWatchtowerDefinitions(
+            bounds = bounds,
+            asOf = clock.instant(),
+        )
         if (definitions.isEmpty()) {
             return emptyList()
         }
@@ -59,13 +70,7 @@ class DeterministicWatchtowerRepository @Inject constructor(
             return emptyList()
         }
 
-        val definitionsById = linkedMapOf<String, WatchtowerDefinition>()
-        WatchtowerGeneration.intersectingGeneratorRanges(tiles).forEach { range ->
-            WatchtowerGeneration.definitionSequenceInRange(range).forEach { definition ->
-                definitionsById.putIfAbsent(definition.id, definition)
-            }
-        }
-        val definitions = definitionsById.values.toList()
+        val definitions = tileSource.fetchWatchtowerDefinitionsIntersectingTiles(tiles)
         if (definitions.isEmpty()) {
             return emptyList()
         }
@@ -77,7 +82,7 @@ class DeterministicWatchtowerRepository @Inject constructor(
     }
 
     override suspend fun getById(id: String): WatchtowerRecord? {
-        val definition = WatchtowerGeneration.definitionForId(id) ?: return null
+        val definition = areaStore.getWatchtowerDefinition(id) ?: return null
 
         return WatchtowerRecord(
             definition = definition,
@@ -89,7 +94,7 @@ class DeterministicWatchtowerRepository @Inject constructor(
         id: String,
         discoveredAt: Instant,
     ): Boolean {
-        if (WatchtowerGeneration.definitionForId(id) == null) {
+        if (areaStore.getWatchtowerDefinition(id) == null) {
             return false
         }
 

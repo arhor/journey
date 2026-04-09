@@ -1,10 +1,15 @@
 package com.github.arhor.journey.data.repository
 
+import com.github.arhor.journey.data.mapobject.DeterministicResourceSpawnGenerator
+import com.github.arhor.journey.data.mapobject.InMemoryMapObjectChunkCache
+import com.github.arhor.journey.data.mapobject.LocalGeneratedMapObjectAreaSource
+import com.github.arhor.journey.data.mapobject.MapObjectAreaStore
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.time.Instant
@@ -12,7 +17,7 @@ import java.time.ZoneOffset
 
 class DeterministicResourceSpawnRepositoryTest {
 
-    private val subject = DeterministicResourceSpawnRepository()
+    private val generator = DeterministicResourceSpawnGenerator()
 
     @Test
     fun `getActiveSpawns should stay deterministic for the same area and day`() = runTest {
@@ -28,8 +33,8 @@ class DeterministicResourceSpawnRepositoryTest {
         )
 
         // When
-        val first = subject.getActiveSpawns(query)
-        val second = subject.getActiveSpawns(query)
+        val first = generator.activeSpawns(query)
+        val second = generator.activeSpawns(query)
 
         // Then
         first shouldBe second
@@ -49,7 +54,7 @@ class DeterministicResourceSpawnRepositoryTest {
         )
 
         // When
-        val spawns = subject.getActiveSpawns(query)
+        val spawns = generator.activeSpawns(query)
 
         // Then
         spawns shouldHaveSize 2
@@ -77,7 +82,7 @@ class DeterministicResourceSpawnRepositoryTest {
         )
 
         // When
-        val spawns = subject.getActiveSpawns(query)
+        val spawns = generator.activeSpawns(query)
 
         // Then
         spawns.map { it.typeId }.all { it in setOf("scrap", "components", "fuel") } shouldBe true
@@ -88,7 +93,7 @@ class DeterministicResourceSpawnRepositoryTest {
         // Given
         val sameDay = Instant.parse("2026-03-19T10:00:00Z")
         val nextDay = Instant.parse("2026-03-20T10:00:00Z")
-        val spawnId = subject.getActiveSpawns(
+        val spawnId = generator.activeSpawns(
             ResourceSpawnQuery(
                 at = sameDay,
                 bounds = GeoBounds(
@@ -101,8 +106,8 @@ class DeterministicResourceSpawnRepositoryTest {
         ).first().id
 
         // When
-        val available = subject.getActiveSpawn(spawnId = spawnId, at = sameDay)
-        val unavailable = subject.getActiveSpawn(spawnId = spawnId, at = nextDay)
+        val available = generator.activeSpawnById(spawnId = spawnId, at = sameDay)
+        val unavailable = generator.activeSpawnById(spawnId = spawnId, at = nextDay)
 
         // Then
         available?.id shouldBe spawnId
@@ -110,10 +115,44 @@ class DeterministicResourceSpawnRepositoryTest {
     }
 
     @Test
+    fun `repository getActiveSpawn should resolve id from cold cache through direct source lookup`() = runTest {
+        // Given
+        val day = Instant.parse("2026-03-19T10:00:00Z")
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val subject = DeterministicResourceSpawnRepository(
+            areaStore = MapObjectAreaStore(
+                source = LocalGeneratedMapObjectAreaSource(
+                    resourceSpawnGenerator = generator,
+                    defaultDispatcher = dispatcher,
+                ),
+                cache = InMemoryMapObjectChunkCache(),
+                defaultDispatcher = dispatcher,
+            ),
+        )
+        val spawn = generator.activeSpawns(
+            ResourceSpawnQuery(
+                at = day,
+                bounds = GeoBounds(
+                    south = 49.0000,
+                    west = 24.0000,
+                    north = 49.0050,
+                    east = 24.0050,
+                ),
+            ),
+        ).first()
+
+        // When
+        val actual = subject.getActiveSpawn(spawnId = spawn.id, at = day)
+
+        // Then
+        actual shouldBe spawn
+    }
+
+    @Test
     fun `getActiveSpawns should filter nearby queries by center and radius`() = runTest {
         // Given
         val day = Instant.parse("2026-03-19T10:00:00Z")
-        val visibleSpawns = subject.getActiveSpawns(
+        val visibleSpawns = generator.activeSpawns(
             ResourceSpawnQuery(
                 at = day,
                 bounds = GeoBounds(
@@ -127,7 +166,7 @@ class DeterministicResourceSpawnRepositoryTest {
         val targetSpawn = visibleSpawns.first()
 
         // When
-        val nearbySpawns = subject.getActiveSpawns(
+        val nearbySpawns = generator.activeSpawns(
             ResourceSpawnQuery(
                 at = day,
                 center = targetSpawn.position,

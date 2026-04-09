@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.ResourceType
-import com.github.arhor.journey.core.common.combine as combineOutputs
 import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.common.map
 import com.github.arhor.journey.core.common.resolveMessage
@@ -26,14 +25,14 @@ import com.github.arhor.journey.domain.model.WatchtowerResourceCost
 import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
-import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
-import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
+import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
+import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
-import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
+import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
 import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
@@ -62,14 +61,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import kotlin.math.roundToInt
+import com.github.arhor.journey.core.common.combine as combineOutputs
 
 private const val DEFAULT_CAMERA_ZOOM = 17.0
 private const val DEFAULT_CAMERA_BEARING = 0.0
-private const val RESOURCE_QUERY_BUFFER_FRACTION = 0.5
-private const val MIN_LONGITUDE = -180.0
-private const val MAX_LONGITUDE = 180.0 - 1e-9
-private const val MIN_LATITUDE = -85.05112878
-private const val MAX_LATITUDE = 85.05112878
 @Immutable
 private data class State(
     val cameraPosition: CameraPositionState? = null,
@@ -79,7 +74,8 @@ private data class State(
     val isAwaitingLocationPermissionResult: Boolean = false,
     val visibleBounds: GeoBounds? = null,
     val viewportSize: MapViewportSize? = null,
-    val resourceQueryBounds: GeoBounds? = null,
+    val resourceQueryWindow: GeoBounds? = null,
+    val watchtowerMarkerQueryWindow: GeoBounds? = null,
     val addPoiAnchor: LatLng? = null,
     val selectedWatchtowerId: String? = null,
     val selectedWatchtowerSnapshot: Watchtower? = null,
@@ -103,6 +99,7 @@ class MapViewModel @Inject constructor(
     private val fogOfWarControllerFactory: FogOfWarController.Factory,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
+    private val mapObjectQueryWindowPolicy: MapObjectQueryWindowPolicy,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -240,16 +237,25 @@ class MapViewModel @Inject constructor(
 
     private fun observeVisibleWatchtowerData(): Flow<Output<VisibleWatchtowerData, DomainError>> =
         combine(
-            _state.map { it.visibleBounds }.distinctUntilChanged(),
+            _state.map { it.watchtowerMarkerQueryWindow }.distinctUntilChanged(),
             trackingSession,
             watchtowerResourceAmounts,
-        ) { visibleBounds, trackingSessionOutput, resourceAmountsOutput ->
-            Triple(visibleBounds, trackingSessionOutput, resourceAmountsOutput)
+        ) { queryWindow, trackingSessionOutput, resourceAmountsOutput ->
+            WatchtowerMarkerQueryInputs(
+                queryWindow = queryWindow,
+                trackingSessionOutput = trackingSessionOutput,
+                resourceAmountsOutput = resourceAmountsOutput,
+            )
         }
-            .flatMapLatest { (visibleBounds, trackingSessionOutput, resourceAmountsOutput) ->
-                visibleBounds
+            .flatMapLatest { inputs ->
+                inputs.queryWindow
                     ?.let { bounds ->
-                        val interactionContext = when (val result = combineOutputs(trackingSessionOutput, resourceAmountsOutput)) {
+                        val interactionContext = when (
+                            val result = combineOutputs(
+                                inputs.trackingSessionOutput,
+                                inputs.resourceAmountsOutput,
+                            )
+                        ) {
                             is Output.Success -> result.value
                             is Output.Failure -> return@flatMapLatest flowOf(Output.Failure(result.error))
                         }
@@ -288,14 +294,14 @@ class MapViewModel @Inject constructor(
 
     private fun observeResourceDerivedData(): Flow<Output<ResourceDerivedData, DomainError>> =
         _state
-            .map { state -> state.resourceQueryBounds }
+            .map { state -> state.resourceQueryWindow }
             .distinctUntilChanged()
             .flatMapLatest { queryBounds ->
                 observeVisibleResourceSpawns(queryBounds)
                     .map { resourceSpawnsOutput ->
                         resourceSpawnsOutput.map { resourceSpawns ->
                             ResourceDerivedData(
-                                queryBounds = queryBounds,
+                                queryWindow = queryBounds,
                                 resourceSpawns = resourceSpawns,
                             )
                         }
@@ -542,9 +548,13 @@ class MapViewModel @Inject constructor(
         _state.update { state ->
             state.copy(
                 visibleBounds = intent.visibleBounds,
-                resourceQueryBounds = resolveResourceQueryBounds(
+                resourceQueryWindow = mapObjectQueryWindowPolicy.resolveQueryWindow(
                     visibleBounds = intent.visibleBounds,
-                    currentQueryBounds = state.resourceQueryBounds,
+                    currentQueryWindow = state.resourceQueryWindow,
+                ),
+                watchtowerMarkerQueryWindow = mapObjectQueryWindowPolicy.resolveQueryWindow(
+                    visibleBounds = intent.visibleBounds,
+                    currentQueryWindow = state.watchtowerMarkerQueryWindow,
                 ),
             )
         }
@@ -964,8 +974,15 @@ class MapViewModel @Inject constructor(
 
     @Immutable
     private data class ResourceDerivedData(
-        val queryBounds: GeoBounds?,
+        val queryWindow: GeoBounds?,
         val resourceSpawns: List<ResourceSpawn>,
+    )
+
+    @Immutable
+    private data class WatchtowerMarkerQueryInputs(
+        val queryWindow: GeoBounds?,
+        val trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
+        val resourceAmountsOutput: Output<Map<String, Int>, DomainError>,
     )
 
     @Immutable
@@ -999,38 +1016,6 @@ class MapViewModel @Inject constructor(
 
         cachedVisibleObjects = visibleObjects
         return visibleObjects
-    }
-
-    private fun resolveResourceQueryBounds(
-        visibleBounds: GeoBounds,
-        currentQueryBounds: GeoBounds?,
-    ): GeoBounds = currentQueryBounds
-        ?.takeIf { it.containsInclusive(visibleBounds) }
-        ?: visibleBounds.expandedBy(
-            horizontalFraction = RESOURCE_QUERY_BUFFER_FRACTION,
-            verticalFraction = RESOURCE_QUERY_BUFFER_FRACTION,
-        )
-
-    private fun GeoBounds.expandedBy(
-        horizontalFraction: Double,
-        verticalFraction: Double,
-    ): GeoBounds {
-        val longitudePadding = (east - west) * horizontalFraction
-        val latitudePadding = (north - south) * verticalFraction
-
-        return GeoBounds(
-            south = (south - latitudePadding).coerceAtLeast(MIN_LATITUDE),
-            west = (west - longitudePadding).coerceAtLeast(MIN_LONGITUDE),
-            north = (north + latitudePadding).coerceAtMost(MAX_LATITUDE),
-            east = (east + longitudePadding).coerceAtMost(MAX_LONGITUDE),
-        )
-    }
-
-    private fun GeoBounds.containsInclusive(other: GeoBounds): Boolean {
-        return other.south >= south &&
-            other.west >= west &&
-            other.north <= north &&
-            other.east <= east
     }
 
     private companion object {

@@ -2,12 +2,14 @@ package com.github.arhor.journey.data.repository
 
 import com.github.arhor.journey.data.local.db.dao.WatchtowerStateDao
 import com.github.arhor.journey.data.local.db.entity.WatchtowerStateEntity
+import com.github.arhor.journey.data.mapobject.DeterministicResourceSpawnGenerator
+import com.github.arhor.journey.data.mapobject.InMemoryMapObjectChunkCache
+import com.github.arhor.journey.data.mapobject.LocalGeneratedMapObjectAreaSource
+import com.github.arhor.journey.data.mapobject.MapObjectAreaStore
 import com.github.arhor.journey.domain.internal.WatchtowerGeneration
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.internal.tileAt
-import com.github.arhor.journey.domain.internal.tileRange
 import com.github.arhor.journey.domain.model.ExplorationTileRange
-import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.WatchtowerDefinition
 import io.kotest.matchers.collections.shouldHaveSize
@@ -16,9 +18,13 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 
 class DeterministicWatchtowerRepositoryTest {
 
@@ -35,7 +41,7 @@ class DeterministicWatchtowerRepositoryTest {
                 ),
             ),
         )
-        val subject = DeterministicWatchtowerRepository(dao)
+        val subject = createSubject(dao)
 
         // When
         val actual = subject.observeInBounds(bounds(tileFor(definition)))
@@ -59,7 +65,7 @@ class DeterministicWatchtowerRepositoryTest {
             y = cell.y shl 1,
         )
         val dao = FakeWatchtowerStateDao()
-        val subject = DeterministicWatchtowerRepository(dao)
+        val subject = createSubject(dao)
 
         // When
         val actual = subject.getIntersectingTiles(
@@ -87,7 +93,7 @@ class DeterministicWatchtowerRepositoryTest {
                 ),
             ),
         )
-        val subject = DeterministicWatchtowerRepository(dao)
+        val subject = createSubject(dao)
 
         // When
         val actual = subject.getById(definition.id)
@@ -102,23 +108,24 @@ class DeterministicWatchtowerRepositoryTest {
     @Test
     fun `getInBounds should stay bounded for representative areas`() = runTest {
         // Given
-        val queryBounds = GeoBounds(
-            south = 54.18,
-            west = 18.32,
-            north = 54.48,
-            east = 18.88,
+        val definition = occupiedDefinition()
+        val cell = tileFor(definition)
+        val cellRange = ExplorationTileRange(
+            zoom = cell.zoom,
+            minX = cell.x,
+            maxX = cell.x + 1,
+            minY = cell.y,
+            maxY = cell.y + 1,
         )
+        val queryBounds = bounds(cellRange)
         val dao = FakeWatchtowerStateDao()
-        val subject = DeterministicWatchtowerRepository(dao)
-        val cellRange = tileRange(
-            bounds = queryBounds,
-            zoom = WatchtowerGeneration.GENERATOR_TILE_ZOOM,
-        )
+        val subject = createSubject(dao)
 
         // When
         val actual = subject.getInBounds(queryBounds)
 
         // Then
+        actual.map { it.definition.id }.contains(definition.id) shouldBe true
         (actual.size <= cellRange.tileCount.toInt()) shouldBe true
         dao.getByIdsRequests.single().size shouldBe actual.size
     }
@@ -127,7 +134,7 @@ class DeterministicWatchtowerRepositoryTest {
     fun `markDiscovered should return false when the id is not a valid deterministic watchtower`() = runTest {
         // Given
         val dao = FakeWatchtowerStateDao()
-        val subject = DeterministicWatchtowerRepository(dao)
+        val subject = createSubject(dao)
 
         // When
         val actual = subject.markDiscovered(
@@ -141,7 +148,7 @@ class DeterministicWatchtowerRepositoryTest {
     }
 
     @Test
-    fun `getInBounds should chunk sparse state lookups when candidate ids exceed sqlite bind limits`() = runTest {
+    fun `getInBounds should skip uncached generation when requested area exceeds chunk limit`() = runTest {
         // Given
         val queryBounds = bounds(
             ExplorationTileRange(
@@ -153,15 +160,36 @@ class DeterministicWatchtowerRepositoryTest {
             ),
         )
         val dao = FakeWatchtowerStateDao()
-        val subject = DeterministicWatchtowerRepository(dao)
+        val subject = createSubject(dao)
 
         // When
         val actual = subject.getInBounds(queryBounds)
 
         // Then
-        actual.isNotEmpty() shouldBe true
-        dao.getByIdsRequests.size shouldBe 2
-        dao.getByIdsRequests.sumOf(List<String>::size) shouldBe actual.size
+        actual shouldBe emptyList()
+        dao.getByIdsRequests shouldBe emptyList()
+    }
+
+    private fun TestScope.createSubject(
+        dao: WatchtowerStateDao,
+    ): DeterministicWatchtowerRepository {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val source = LocalGeneratedMapObjectAreaSource(
+            resourceSpawnGenerator = DeterministicResourceSpawnGenerator(),
+            defaultDispatcher = dispatcher,
+        )
+        val areaStore = MapObjectAreaStore(
+            source = source,
+            cache = InMemoryMapObjectChunkCache(),
+            defaultDispatcher = dispatcher,
+        )
+
+        return DeterministicWatchtowerRepository(
+            dao = dao,
+            areaStore = areaStore,
+            tileSource = source,
+            clock = Clock.fixed(Instant.parse("2026-04-01T10:00:00Z"), ZoneOffset.UTC),
+        )
     }
 
     private fun occupiedDefinition(): WatchtowerDefinition = searchCells { cell ->

@@ -8,7 +8,6 @@ import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.DiscoveredPoi
 import com.github.arhor.journey.domain.model.ExplorationProgress
-import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
@@ -17,6 +16,7 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.PoiCategory
 import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
@@ -29,11 +29,11 @@ import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.model.error.UseCaseError
-import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
+import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
-import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.ObserveClaimedWatchtowerRevealTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
@@ -52,26 +52,21 @@ import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
-import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import io.mockk.verify
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -2246,6 +2241,49 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `dispatch should reuse buffered watchtower marker query when viewport changes inside current marker bounds`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val initialVisibleBounds = GeoBounds(
+                south = 50.0,
+                west = 30.0,
+                north = 50.1,
+                east = 30.1,
+            )
+            val shiftedVisibleBounds = GeoBounds(
+                south = 50.01,
+                west = 30.01,
+                north = 50.11,
+                east = 30.11,
+            )
+            val fixture = createFixture()
+
+            try {
+                fixture.viewModel.awaitContent()
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = initialVisibleBounds,
+                    ),
+                )
+                advanceUntilIdle()
+
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraViewportChanged(
+                        visibleBounds = shiftedVisibleBounds,
+                    ),
+                )
+                runCurrent()
+
+                // Then
+                verify(exactly = 1) { fixture.observeVisibleWatchtowers.invoke(any()) }
+            } finally {
+                tearDownMainDispatcher(fixture.viewModel)
+            }
+        }
+
+    @Test
     fun `dispatch should reuse buffered resource query when the viewport changes inside the current resource bounds`() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -2718,6 +2756,7 @@ class MapViewModelTest {
                 },
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
+                mapObjectQueryWindowPolicy = MapObjectQueryWindowPolicy(),
             ),
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,

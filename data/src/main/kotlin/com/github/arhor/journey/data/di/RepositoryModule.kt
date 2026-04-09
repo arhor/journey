@@ -1,8 +1,11 @@
 package com.github.arhor.journey.data.di
 
+import com.github.arhor.journey.data.mapobject.LocalGeneratedMapObjectAreaSource
+import com.github.arhor.journey.data.mapobject.MapObjectAreaSource
+import com.github.arhor.journey.data.mapobject.WatchtowerDefinitionTileSource
 import com.github.arhor.journey.data.repository.DataStoreSettingsRepositoryImpl
-import com.github.arhor.journey.data.repository.DeterministicWatchtowerRepository
 import com.github.arhor.journey.data.repository.DeterministicResourceSpawnRepository
+import com.github.arhor.journey.data.repository.DeterministicWatchtowerRepository
 import com.github.arhor.journey.data.repository.MapStylesRepositoryImpl
 import com.github.arhor.journey.data.repository.RoomCollectedResourceSpawnRepository
 import com.github.arhor.journey.data.repository.RoomExplorationRepository
@@ -28,6 +31,14 @@ import dagger.hilt.components.SingletonComponent
 @Module
 @InstallIn(SingletonComponent::class)
 interface RepositoryModule {
+
+    @Binds
+    fun bindMapObjectAreaSource(impl: LocalGeneratedMapObjectAreaSource)
+        : MapObjectAreaSource
+
+    @Binds
+    fun bindWatchtowerDefinitionTileSource(impl: LocalGeneratedMapObjectAreaSource)
+        : WatchtowerDefinitionTileSource
 
     @Binds
     fun bindHeroRepository(impl: RoomHeroRepository)
