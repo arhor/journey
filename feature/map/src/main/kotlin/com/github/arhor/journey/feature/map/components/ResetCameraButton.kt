@@ -45,8 +45,8 @@ fun ResetCameraButton(
             )
             .drawWithCache {
                 val s = size.minDimension
-                val inset = s * 0.05f
-                val strokeWidth = s * 0.015f
+                val inset = s * 0.075f
+                val strokeWidth = s * 0.025f
                 val halfStrokeW = strokeWidth / 2f
 
                 val (w, h) = size
