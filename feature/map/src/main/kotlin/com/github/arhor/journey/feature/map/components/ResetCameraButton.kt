@@ -1,11 +1,14 @@
 package com.github.arhor.journey.feature.map.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
@@ -19,6 +22,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
@@ -26,13 +32,22 @@ val LineColor = Color(0xFF8C855B)
 
 @Composable
 fun ResetCameraButton(
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit = {},
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = modifier
+            .semantics { role = Role.Button }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(),
+                onClick = onClick,
+            )
             .drawWithCache {
-                val strokeWidth = 3.dp.toPx()
+                val s = size.minDimension
+                val strokeWidth = s * 0.01f
                 val halfStrokeW = strokeWidth / 2f
                 val inset = 12.dp.toPx() + halfStrokeW
 
@@ -234,8 +249,13 @@ fun ResetCameraButton(
                 }
             },
         contentAlignment = Alignment.Center,
-        content = content,
-    )
+    ) {
+        CompassRoseIcon(
+            modifier = Modifier.fillMaxSize(0.80f),
+            color = LineColor,
+            cutoutColor = Color.Transparent,
+        )
+    }
 }
 
 @Composable
@@ -246,14 +266,9 @@ internal fun ResetCameraButtonPreview() {
         contentAlignment = Alignment.Center
     ) {
         ResetCameraButton(
+            onClick = {},
             modifier = Modifier.size(320.dp),
-        ) {
-            CompassRoseIcon(
-                modifier = Modifier.fillMaxSize(0.80f),
-                color = LineColor,
-                cutoutColor = Color.Transparent,
-            )
-        }
+        )
     }
 }
 
@@ -264,24 +279,6 @@ private fun sweepGradient(
     rotateDegrees: Float = 0f
 ): Brush = Brush
     .sweepGradient(colors = colors, center = center)
-    .toShaderBrush()
-    .apply {
-        transform = Matrix().apply {
-            resetToPivotedTransform(
-                pivotX = center.x,
-                pivotY = center.y,
-                rotationZ = rotateDegrees
-            )
-        }
-    }
-
-@Stable
-private fun sweepGradient(
-    vararg colorStops: Pair<Float, Color>,
-    center: Offset,
-    rotateDegrees: Float = 0f
-): Brush = Brush
-    .sweepGradient(*colorStops, center = center)
     .toShaderBrush()
     .apply {
         transform = Matrix().apply {
