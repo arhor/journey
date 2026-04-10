@@ -366,8 +366,8 @@ internal fun MapContent(
             onClick = { dispatch(MapIntent.RecenterClicked) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .size(92.dp)
-                .padding(end = 26.dp, bottom = 26.dp),
+                .size(96.dp)
+                .padding(end = 16.dp, bottom =  16.dp),
         )
     }
 
