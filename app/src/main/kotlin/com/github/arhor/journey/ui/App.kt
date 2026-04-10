@@ -8,7 +8,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.navigation.compose.rememberNavController
-import com.github.arhor.journey.ui.components.AppBottomBar
 import com.github.arhor.journey.ui.navigation.AppNavGraph
 import com.github.arhor.journey.ui.theme.AppTheme
 
@@ -28,7 +27,6 @@ fun App(
             LocalSnackbarHostState provides snackbarHostState,
         ) {
             Scaffold(
-                bottomBar = { AppBottomBar(navController) },
                 snackbarHost = { SnackbarHost(snackbarHostState) },
             ) { innerPadding ->
                 AppNavGraph(
