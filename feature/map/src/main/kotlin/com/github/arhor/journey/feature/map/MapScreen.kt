@@ -6,16 +6,10 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.view.MotionEvent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,17 +19,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
@@ -160,10 +149,6 @@ internal fun MapContent(
     }
 
     LaunchedEffect(state.cameraPosition, cameraState) {
-        if (state.cameraPosition == null) {
-            return@LaunchedEffect
-        }
-
         snapshotFlow { cameraState.isCameraMoving to cameraState.moveReason }
             .distinctUntilChanged()
             .filter { (isCameraMoving, moveReason) ->
@@ -179,10 +164,6 @@ internal fun MapContent(
     }
 
     LaunchedEffect(state.cameraPosition, cameraState) {
-        if (state.cameraPosition == null) {
-            return@LaunchedEffect
-        }
-
         snapshotFlow {
             cameraState.position
             cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()
@@ -198,10 +179,6 @@ internal fun MapContent(
     }
 
     LaunchedEffect(state.cameraPosition, cameraState) {
-        if (state.cameraPosition == null) {
-            return@LaunchedEffect
-        }
-
         snapshotFlow {
             CameraSettledSnapshot(
                 position = cameraState.position,
@@ -327,14 +304,7 @@ internal fun MapContent(
                         ornamentOptions = OrnamentOptions.AllDisabled,
                     ),
                     onMapClick = { position, _ ->
-                        dispatch(
-                            MapIntent.MapTapped(
-                                target = LatLng(
-                                    latitude = position.latitude,
-                                    longitude = position.longitude,
-                                ),
-                            ),
-                        )
+                        dispatch(MapIntent.MapTapped)
                         org.maplibre.compose.util.ClickResult.Pass
                     },
                     onMapLoadFailed = { dispatch(MapIntent.MapLoadFailed(it)) },
@@ -390,21 +360,6 @@ internal fun MapContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-
-        MapHudActionButton(
-            contentDescription = stringResource(R.string.map_add_poi_content_description),
-            icon = {
-                Icon(
-                    imageVector = Icons.Filled.Add,
-                    contentDescription = null,
-                    tint = Color(0xFF7A7F83),
-                )
-            },
-            onClick = { dispatch(MapIntent.AddPoiClicked) },
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 26.dp),
         )
 
         ResetCameraButton(
@@ -522,36 +477,6 @@ private data class CameraSettledSnapshot(
     val origin: CameraUpdateOrigin,
     val isCameraMoving: Boolean,
 )
-
-@Composable
-private fun MapHudActionButton(
-    contentDescription: String,
-    icon: @Composable () -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val panelShape: Shape = RoundedCornerShape(18.dp)
-
-    Box(
-        modifier = modifier
-            .clip(panelShape)
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xE11B242D), Color(0xE10A1015)),
-                ),
-            )
-            .border(1.dp, Color(0xFF556873), panelShape),
-    ) {
-        IconButton(
-            onClick = onClick,
-            modifier = Modifier
-                .padding(10.dp)
-                .semantics { this.contentDescription = contentDescription },
-        ) {
-            icon()
-        }
-    }
-}
 
 internal data class HorizontalDragRotationUpdate(
     val bearing: Double? = null,

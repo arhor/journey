@@ -8,18 +8,14 @@ import com.github.arhor.journey.data.repository.DeterministicResourceSpawnReposi
 import com.github.arhor.journey.data.repository.DeterministicWatchtowerRepository
 import com.github.arhor.journey.data.repository.MapStylesRepositoryImpl
 import com.github.arhor.journey.data.repository.RoomCollectedResourceSpawnRepository
-import com.github.arhor.journey.data.repository.RoomExplorationRepository
 import com.github.arhor.journey.data.repository.RoomExplorationTileRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
 import com.github.arhor.journey.data.repository.RoomHeroResourcesRepository
-import com.github.arhor.journey.data.repository.RoomPointOfInterestRepository
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
-import com.github.arhor.journey.domain.repository.ExplorationRepository
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
 import com.github.arhor.journey.domain.repository.MapStylesRepository
-import com.github.arhor.journey.domain.repository.PointOfInterestRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.SettingsRepository
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
@@ -55,14 +51,6 @@ interface RepositoryModule {
     @Binds
     fun bindResourceSpawnRepository(impl: DeterministicResourceSpawnRepository)
         : ResourceSpawnRepository
-
-    @Binds
-    fun bindPointOfInterestRepository(impl: RoomPointOfInterestRepository)
-        : PointOfInterestRepository
-
-    @Binds
-    fun bindExplorationRepository(impl: RoomExplorationRepository)
-        : ExplorationRepository
 
     @Binds
     fun bindExplorationTileRepository(impl: RoomExplorationTileRepository)

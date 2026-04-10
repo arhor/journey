@@ -5,11 +5,9 @@ import androidx.room.Room
 import com.github.arhor.journey.data.local.db.JourneyDatabase
 import com.github.arhor.journey.data.local.db.RoomTransactionRunner
 import com.github.arhor.journey.data.local.db.dao.CollectedResourceSpawnDao
-import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.dao.HeroDao
 import com.github.arhor.journey.data.local.db.dao.HeroResourceDao
-import com.github.arhor.journey.data.local.db.dao.PoiDao
 import com.github.arhor.journey.data.local.db.dao.WatchtowerStateDao
 import com.github.arhor.journey.domain.TransactionRunner
 import dagger.Module
@@ -46,16 +44,6 @@ object DatabaseModule {
     @Singleton
     fun provideCollectedResourceSpawnDao(db: JourneyDatabase): CollectedResourceSpawnDao =
         db.collectedResourceSpawnDao()
-
-    @Provides
-    @Singleton
-    fun providePoiDao(db: JourneyDatabase): PoiDao =
-        db.poiDao()
-
-    @Provides
-    @Singleton
-    fun provideDiscoveredPoiDao(db: JourneyDatabase): DiscoveredPoiDao =
-        db.discoveredPoiDao()
 
     @Provides
     @Singleton

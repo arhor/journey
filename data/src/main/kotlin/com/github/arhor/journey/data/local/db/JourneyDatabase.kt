@@ -6,18 +6,14 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.data.local.db.dao.CollectedResourceSpawnDao
-import com.github.arhor.journey.data.local.db.dao.DiscoveredPoiDao
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.dao.HeroDao
 import com.github.arhor.journey.data.local.db.dao.HeroResourceDao
-import com.github.arhor.journey.data.local.db.dao.PoiDao
 import com.github.arhor.journey.data.local.db.dao.WatchtowerStateDao
 import com.github.arhor.journey.data.local.db.entity.CollectedResourceSpawnEntity
-import com.github.arhor.journey.data.local.db.entity.DiscoveredPoiEntity
 import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
 import com.github.arhor.journey.data.local.db.entity.HeroEntity
 import com.github.arhor.journey.data.local.db.entity.HeroResourceEntity
-import com.github.arhor.journey.data.local.db.entity.PoiEntity
 import com.github.arhor.journey.data.local.db.entity.WatchtowerStateEntity
 
 @Database(
@@ -25,12 +21,10 @@ import com.github.arhor.journey.data.local.db.entity.WatchtowerStateEntity
         HeroEntity::class,
         HeroResourceEntity::class,
         CollectedResourceSpawnEntity::class,
-        PoiEntity::class,
-        DiscoveredPoiEntity::class,
         ExploredTileEntity::class,
         WatchtowerStateEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 @TypeConverters(
@@ -46,17 +40,13 @@ abstract class JourneyDatabase : RoomDatabase() {
 
     abstract fun collectedResourceSpawnDao(): CollectedResourceSpawnDao
 
-    abstract fun poiDao(): PoiDao
-
-    abstract fun discoveredPoiDao(): DiscoveredPoiDao
-
     abstract fun explorationTileDao(): ExplorationTileDao
 
     abstract fun watchtowerStateDao(): WatchtowerStateDao
 
     companion object {
         val MIGRATIONS: Array<Migration>
-            get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
         private val MIGRATION_1_2 = Migration(1, 2) { db ->
             val legacyResourceIdMappings = listOf(
@@ -147,6 +137,11 @@ abstract class JourneyDatabase : RoomDatabase() {
                 )
                 """.trimIndent(),
             )
+        }
+
+        val MIGRATION_4_5 = Migration(4, 5) { db ->
+            db.execSQL("DROP TABLE IF EXISTS `discovered_poi`")
+            db.execSQL("DROP TABLE IF EXISTS `poi`")
         }
     }
 }

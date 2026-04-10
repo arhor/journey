@@ -6,8 +6,6 @@ import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.ResourceType
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
-import com.github.arhor.journey.domain.model.DiscoveredPoi
-import com.github.arhor.journey.domain.model.ExplorationProgress
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
@@ -17,8 +15,6 @@ import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
-import com.github.arhor.journey.domain.model.PoiCategory
-import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.Watchtower
 import com.github.arhor.journey.domain.model.WatchtowerPhase
@@ -30,18 +26,15 @@ import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessi
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
-import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.ObserveClaimedWatchtowerRevealTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
-import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
-import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
@@ -86,51 +79,11 @@ import kotlin.math.sqrt
 class MapViewModelTest {
 
     @Test
-    fun `uiState should map discovery flags when exploration progress contains discovered points of interest`() =
-        runTest {
-            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-            // Given
-            val pointsOfInterest = listOf(
-                pointOfInterest(id = FIRST_POI_ID, lat = 49.0, lon = 24.0),
-                pointOfInterest(id = SECOND_POI_ID, lat = 49.1, lon = 24.1),
-            )
-            val fixture = createFixture(
-                pointsOfInterest = pointsOfInterest,
-                explorationProgress = ExplorationProgress(
-                    discovered = setOf(
-                        DiscoveredPoi(
-                            poiId = FIRST_POI_ID,
-                            discoveredAt = Instant.parse("2026-03-01T12:00:00Z"),
-                        ),
-                    ),
-                ),
-            )
-
-            try {
-                // When
-                val actual = fixture.viewModel.awaitContent()
-
-                // Then
-                actual.selectedStyle shouldBe fixture.mapStyle
-                actual.visibleObjects.map { it.id to it.isDiscovered }.toMap() shouldBe mapOf(
-                    "${POI_ID_PREFIX}:$FIRST_POI_ID" to true,
-                    "${POI_ID_PREFIX}:$SECOND_POI_ID" to false,
-                )
-            } finally {
-                tearDownMainDispatcher(fixture.viewModel)
-            }
-        }
-
-    @Test
-    fun `uiState should include resource spawns alongside points of interest`() = runTest {
+    fun `uiState should include resource spawns when query window contains them`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
         val fixture = createFixture(
-            pointsOfInterest = listOf(
-                pointOfInterest(id = FIRST_POI_ID, lat = 50.45, lon = 30.52),
-            ),
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = "cell-1-slot-0",
@@ -139,6 +92,9 @@ class MapViewModelTest {
                     lon = 30.53,
                     collectionRadiusMeters = 24.0,
                 ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 50.45, lon = 30.52),
             ),
         )
         val visibleRange = ExplorationTileRange(
@@ -164,10 +120,7 @@ class MapViewModelTest {
             }
 
             // Then
-            actual.visibleObjects.map { it.id }.toSet() shouldBe setOf(
-                "${POI_ID_PREFIX}:$FIRST_POI_ID",
-                "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0",
-            )
+            actual.visibleObjects.map { it.id }.toSet() shouldBe setOf("${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0")
             actual.visibleObjects
                 .first { it.id == "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0" }
                 .title shouldBe "Scrap"
@@ -189,7 +142,6 @@ class MapViewModelTest {
             maxY = 21,
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -281,7 +233,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(tower),
             observeVisibleWatchtowersFlowFactory = { bounds ->
                 MutableStateFlow(
@@ -346,7 +297,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-unaffordable",
@@ -415,7 +365,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -484,7 +433,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -550,7 +498,6 @@ class MapViewModelTest {
                 ),
             )
             val fixture = createFixture(
-                pointsOfInterest = emptyList(),
                 watchtowers = listOf(
                     watchtower(
                         id = "tower-1",
@@ -618,7 +565,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -688,7 +634,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -752,7 +697,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -816,7 +760,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -882,7 +825,6 @@ class MapViewModelTest {
             ),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             watchtowers = listOf(
                 watchtower(
                     id = "tower-1",
@@ -951,7 +893,6 @@ class MapViewModelTest {
                 ),
             )
             val fixture = createFixture(
-                pointsOfInterest = emptyList(),
                 watchtowers = listOf(
                     watchtower(
                         id = "tower-1",
@@ -1025,7 +966,6 @@ class MapViewModelTest {
         val visibleSpawnId = "cell-1-slot-0"
         val hiddenSpawnId = "cell-1-slot-1"
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = visibleSpawnId,
@@ -1105,7 +1045,6 @@ class MapViewModelTest {
             lastKnownLocation = centerPointOf(firstTile),
         )
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = firstSpawnId,
@@ -1199,7 +1138,6 @@ class MapViewModelTest {
         )
         val hiddenSpawnId = "cell-3-slot-0"
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = hiddenSpawnId,
@@ -1242,9 +1180,6 @@ class MapViewModelTest {
 
         // Given
         val fixture = createFixture(
-            pointsOfInterest = listOf(
-                pointOfInterest(id = FIRST_POI_ID, lat = 50.45, lon = 30.52),
-            ),
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = "cell-1-slot-0",
@@ -1253,6 +1188,9 @@ class MapViewModelTest {
                     lon = 30.53,
                     collectionRadiusMeters = 24.0,
                 ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = GeoPoint(lat = 50.45, lon = 30.52),
             ),
         )
         val visibleRange = ExplorationTileRange(
@@ -1300,8 +1238,7 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             val actual = fixture.viewModel.awaitContent { content ->
-                content.fogOfWar.visibleBounds == updatedVisibleBounds &&
-                    content.cameraUpdateOrigin == CameraUpdateOrigin.USER
+                content.fogOfWar.visibleBounds == updatedVisibleBounds
             }
 
             // Then
@@ -2347,7 +2284,6 @@ class MapViewModelTest {
                 lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
             ),
         )
-        val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
 
         try {
             fixture.viewModel.awaitContent {
@@ -2355,7 +2291,7 @@ class MapViewModelTest {
             }
 
             // When
-            fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
+            fixture.viewModel.dispatch(MapIntent.MapTapped)
             advanceUntilIdle()
             fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
                 lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
@@ -2374,42 +2310,52 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should use tapped anchor for add poi and fall back to user location when missing`() = runTest {
+    fun `dispatch should dismiss selected watchtower when map is tapped`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
-        val fixture = createFixture(
-            trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
             ),
         )
-        val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
+        val fixture = createFixture(
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-dismiss",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.DISCOVERED_DORMANT,
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
+        )
 
         try {
-            fixture.viewModel.awaitContent()
-            val firstEffect = async { fixture.viewModel.effects.first() }
-            runCurrent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.AddPoiClicked)
-            advanceUntilIdle()
-
-            // Then
-            firstEffect.await() shouldBe MapEffect.OpenAddPoi(latitude = 40.7128, longitude = -74.006)
-
-            val secondEffect = async { fixture.viewModel.effects.first() }
-            runCurrent()
-
-            // When
-            fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
-            fixture.viewModel.dispatch(MapIntent.AddPoiClicked)
-            advanceUntilIdle()
-
-            // Then
-            secondEffect.await() shouldBe MapEffect.OpenAddPoi(
-                latitude = 40.7580,
-                longitude = -73.9855,
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-dismiss",
             )
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.MapTapped)
+            advanceUntilIdle()
+
+            // Then
+            fixture.viewModel.awaitContent().selectedWatchtower shouldBe null
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -2425,7 +2371,6 @@ class MapViewModelTest {
                 lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
             ),
         )
-        val tappedLocation = LatLng(latitude = 40.7580, longitude = -73.9855)
         val gestureCameraPosition = CameraPositionState(
             target = LatLng(latitude = 40.7615, longitude = -73.9777),
             zoom = 15.5,
@@ -2436,8 +2381,6 @@ class MapViewModelTest {
             fixture.viewModel.awaitContent {
                 it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
             }
-            fixture.viewModel.dispatch(MapIntent.MapTapped(target = tappedLocation))
-            advanceUntilIdle()
 
             // When
             fixture.viewModel.dispatch(
@@ -2463,62 +2406,38 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `dispatch should not recenter camera and should open object details when tapped object is present`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture(
-            trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
-            ),
-            pointsOfInterest = listOf(
-                pointOfInterest(id = FIRST_POI_ID, lat = 51.1, lon = 17.03),
-            ),
-        )
-
-        try {
-            val initial = fixture.viewModel.awaitContent()
-            val effectDeferred = async { fixture.viewModel.effects.first() }
-            runCurrent()
-
-            // When
-            fixture.viewModel.dispatch(
-                MapIntent.ObjectTapped(
-                    objectId = "${POI_ID_PREFIX}:$FIRST_POI_ID",
-                ),
-            )
-            advanceUntilIdle()
-
-            // Then
-            effectDeferred.await() shouldBe MapEffect.OpenObjectDetails(objectId = FIRST_POI_ID.toString())
-            coVerify(exactly = 1) { fixture.discoverPointOfInterest.invoke(FIRST_POI_ID) }
-            fixture.viewModel.awaitContent().cameraPosition shouldBe initial.cameraPosition
-
-            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
-                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
-            )
-            advanceUntilIdle()
-            val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition?.target == LatLng(latitude = 40.7306, longitude = -73.9352)
-            }
-            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7306, longitude = -73.9352)
-            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
-    fun `dispatch should not recenter camera and should not open POI details when tapped object is a resource spawn`() = runTest {
+    fun `dispatch should clear selected watchtower when a resource spawn is tapped`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
         val spawnId = "cell-2-slot-1"
-        val fixture = createFixture(
-            trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+        val towerLocation = centerPointOf(
+            MapTile(
+                zoom = visibleRange.zoom,
+                x = visibleRange.minX,
+                y = visibleRange.minY,
             ),
-            pointsOfInterest = emptyList(),
+        )
+        val fixture = createFixture(
+            watchtowers = listOf(
+                watchtower(
+                    id = "tower-resource",
+                    location = towerLocation,
+                    phase = WatchtowerPhase.DISCOVERED_DORMANT,
+                ),
+            ),
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = towerLocation,
+            ),
             resourceSpawns = listOf(
                 resourceSpawn(
                     id = spawnId,
@@ -2529,26 +2448,15 @@ class MapViewModelTest {
                 ),
             ),
         )
-        val visibleRange = ExplorationTileRange(
-            zoom = CANONICAL_ZOOM,
-            minX = 10,
-            maxX = 11,
-            minY = 20,
-            maxY = 21,
-        )
 
         try {
-            val initial = fixture.viewModel.awaitContent()
-            fixture.viewModel.dispatch(
-                MapIntent.CameraViewportChanged(
-                    visibleBounds = visibleBoundsInside(visibleRange),
-                ),
+            selectWatchtower(
+                fixture = fixture,
+                visibleRange = visibleRange,
+                watchtowerId = "tower-resource",
             )
-            advanceUntilIdle()
             fixture.viewModel.awaitContent {
-                it.visibleObjects.any { objectModel ->
-                    objectModel.id == "${RESOURCE_SPAWN_ID_PREFIX}:$spawnId"
-                }
+                it.visibleObjects.any { objectModel -> objectModel.id == "${RESOURCE_SPAWN_ID_PREFIX}:$spawnId" }
             }
 
             // When
@@ -2560,13 +2468,7 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             // Then
-            coVerify(exactly = 0) { fixture.discoverPointOfInterest.invoke(any()) }
-            fixture.viewModel.awaitContent().cameraPosition shouldBe initial.cameraPosition
-            val actual = fixture.viewModel.awaitContent {
-                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
-            }
-            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
-            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+            fixture.viewModel.awaitContent().selectedWatchtower shouldBe null
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -2614,7 +2516,6 @@ class MapViewModelTest {
         val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
         val observeExploredTiles: ObserveExploredTilesUseCase,
         val observeVisibleWatchtowers: ObserveVisibleWatchtowersUseCase,
-        val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
         val claimWatchtower: ClaimWatchtowerUseCase,
         val upgradeWatchtower: UpgradeWatchtowerUseCase,
         val getWatchtower: GetWatchtowerUseCase,
@@ -2624,11 +2525,7 @@ class MapViewModelTest {
 
     private fun createFixture(
         mapStyleOutput: Output<MapStyle?, DomainError>? = null,
-        pointsOfInterest: List<PointOfInterest> = listOf(
-            pointOfInterest(id = FIRST_POI_ID, lat = 50.45, lon = 30.52),
-        ),
         resourceSpawns: List<ResourceSpawn> = emptyList(),
-        explorationProgress: ExplorationProgress = ExplorationProgress(discovered = emptySet()),
         exploredTiles: Set<MapTile> = emptySet(),
         watchtowerRevealSnapshot: WatchtowerRevealSnapshot = WatchtowerRevealSnapshot(emptySet()),
         watchtowers: List<Watchtower> = emptyList(),
@@ -2660,15 +2557,12 @@ class MapViewModelTest {
             ),
         ),
     ): Fixture {
-        val observePointsOfInterest = mockk<ObservePointsOfInterestUseCase>()
         val observeCollectibleResourceSpawns = mockk<ObserveCollectibleResourceSpawnsUseCase>()
-        val observeExplorationProgress = mockk<ObserveExplorationProgressUseCase>()
         val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
         val observeClaimedWatchtowerRevealTiles = mockk<ObserveClaimedWatchtowerRevealTilesUseCase>()
         val observeVisibleWatchtowers = mockk<ObserveVisibleWatchtowersUseCase>()
         val observeHeroResourceAmount = mockk<ObserveHeroResourceAmountUseCase>()
         val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
-        val discoverPointOfInterest = mockk<DiscoverPointOfInterestUseCase>()
         val claimWatchtower = mockk<ClaimWatchtowerUseCase>()
         val upgradeWatchtower = mockk<UpgradeWatchtowerUseCase>()
         val getWatchtower = mockk<GetWatchtowerUseCase>()
@@ -2685,9 +2579,7 @@ class MapViewModelTest {
         )
         val trackingSessionFlow = MutableStateFlow(trackingSession)
 
-        every { observePointsOfInterest.invoke() } returns MutableStateFlow(Output.Success(pointsOfInterest))
         every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(Output.Success(resourceSpawns))
-        every { observeExplorationProgress.invoke() } returns MutableStateFlow(Output.Success(explorationProgress))
         every { observeExploredTiles.invoke(any()) } answers {
             observeExploredTilesFlowFactory?.invoke(arg(0))?.map { Output.Success(it) }
                 ?: MutableStateFlow(Output.Success(exploredTiles))
@@ -2723,19 +2615,14 @@ class MapViewModelTest {
                     ?: exploredTiles,
             )
         }
-
-        coEvery { discoverPointOfInterest.invoke(any()) } returns Output.Success(Unit)
         coEvery { claimWatchtower.invoke(any(), any()) } returns claimWatchtowerResult
         coEvery { upgradeWatchtower.invoke(any(), any()) } returns upgradeWatchtowerResult
         coEvery { startTrackingSession.invoke() } returns startTrackingResult
 
         return Fixture(
             viewModel = MapViewModel(
-                observePointsOfInterest = observePointsOfInterest,
                 observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
-                observeExplorationProgress = observeExplorationProgress,
                 observeSelectedMapStyle = observeSelectedMapStyle,
-                discoverPointOfInterest = discoverPointOfInterest,
                 observeVisibleWatchtowers = observeVisibleWatchtowers,
                 observeHeroResourceAmount = observeHeroResourceAmount,
                 claimWatchtower = claimWatchtower,
@@ -2763,7 +2650,6 @@ class MapViewModelTest {
             observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
             observeExploredTiles = observeExploredTiles,
             observeVisibleWatchtowers = observeVisibleWatchtowers,
-            discoverPointOfInterest = discoverPointOfInterest,
             claimWatchtower = claimWatchtower,
             upgradeWatchtower = upgradeWatchtower,
             getWatchtower = getWatchtower,
@@ -2771,19 +2657,6 @@ class MapViewModelTest {
             startTrackingSession = startTrackingSession,
         )
     }
-
-    private fun pointOfInterest(
-        id: Long,
-        lat: Double,
-        lon: Double,
-    ): PointOfInterest = PointOfInterest(
-        id = id,
-        name = "Point $id",
-        description = "Description $id",
-        category = PoiCategory.LANDMARK,
-        location = GeoPoint(lat = lat, lon = lon),
-        radiusMeters = 100,
-    )
 
     private fun resourceSpawn(
         id: String,
@@ -2896,9 +2769,6 @@ class MapViewModelTest {
         }
 
         const val VIEWPORT_BOUNDS_EPSILON = 1e-6
-        const val FIRST_POI_ID = 1L
-        const val SECOND_POI_ID = 2L
-        const val POI_ID_PREFIX = "poi"
         const val RESOURCE_SPAWN_ID_PREFIX = "spawn"
         const val WATCHTOWER_ID_PREFIX = "watchtower"
     }

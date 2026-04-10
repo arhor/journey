@@ -21,7 +21,6 @@ data class MapObjectUiModel(
 enum class MapObjectKind(
     val idPrefix: String,
 ) {
-    PointOfInterest(idPrefix = "poi"),
     ResourceSpawn(idPrefix = "spawn"),
     Watchtower(idPrefix = "watchtower"),
 }

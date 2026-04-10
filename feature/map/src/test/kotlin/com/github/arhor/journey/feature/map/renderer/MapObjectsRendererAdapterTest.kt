@@ -35,14 +35,14 @@ class MapObjectsRendererAdapterTest {
     fun `toFeatureCollection should map objects into features when objects list has elements`() {
         // Given
         val objectUiModel = mapObject(
-            id = "poi-1",
+            id = "watchtower-1",
             title = "Old Tower",
             description = "Historic tower",
             latitude = 49.84,
             longitude = 24.03,
             radiusMeters = 120,
             isDiscovered = true,
-            kind = MapObjectKind.PointOfInterest,
+            kind = MapObjectKind.Watchtower,
         )
 
         // When
@@ -53,8 +53,8 @@ class MapObjectsRendererAdapterTest {
 
         val feature = actual.features.single()
         feature.geometry shouldBe Point(longitude = 24.03, latitude = 49.84)
-        feature.id shouldBe JsonPrimitive("poi-1")
-        feature.properties.get(PROPERTY_OBJECT_KIND)?.jsonPrimitive?.contentOrNull shouldBe "poi"
+        feature.id shouldBe JsonPrimitive("watchtower-1")
+        feature.properties.get(PROPERTY_OBJECT_KIND)?.jsonPrimitive?.contentOrNull shouldBe "watchtower"
         feature.properties.get(PROPERTY_OBJECT_TITLE)?.jsonPrimitive?.contentOrNull shouldBe "Old Tower"
         feature.properties.get(PROPERTY_OBJECT_DESCRIPTION)?.jsonPrimitive?.contentOrNull shouldBe "Historic tower"
         feature.properties.get(PROPERTY_OBJECT_RADIUS_METERS)?.jsonPrimitive?.contentOrNull shouldBe "120"
@@ -66,23 +66,24 @@ class MapObjectsRendererAdapterTest {
     fun `toFeatureProperties should omit description when object description is null`() {
         // Given
         val objectUiModel = mapObject(
-            id = "poi-2",
-            title = "Bridge",
+            id = "spawn-2",
+            title = "Fuel",
             description = null,
             latitude = 50.45,
             longitude = 30.52,
             radiusMeters = 80,
             isDiscovered = false,
-            kind = MapObjectKind.PointOfInterest,
+            kind = MapObjectKind.ResourceSpawn,
+            resourceType = ResourceType.FUEL,
         )
 
         // When
         val actual = objectUiModel.toFeatureProperties()
 
         // Then
-        actual[PROPERTY_OBJECT_ID]?.jsonPrimitive?.contentOrNull shouldBe "poi-2"
-        actual[PROPERTY_OBJECT_KIND]?.jsonPrimitive?.contentOrNull shouldBe "poi"
-        actual[PROPERTY_OBJECT_TITLE]?.jsonPrimitive?.contentOrNull shouldBe "Bridge"
+        actual[PROPERTY_OBJECT_ID]?.jsonPrimitive?.contentOrNull shouldBe "spawn-2"
+        actual[PROPERTY_OBJECT_KIND]?.jsonPrimitive?.contentOrNull shouldBe "spawn"
+        actual[PROPERTY_OBJECT_TITLE]?.jsonPrimitive?.contentOrNull shouldBe "Fuel"
         actual.containsKey(PROPERTY_OBJECT_DESCRIPTION) shouldBe false
         actual[PROPERTY_OBJECT_RADIUS_METERS]?.jsonPrimitive?.contentOrNull shouldBe "80"
         actual[PROPERTY_OBJECT_IS_DISCOVERED]?.jsonPrimitive?.contentOrNull shouldBe "false"
@@ -143,15 +144,15 @@ class MapObjectsRendererAdapterTest {
         // Given
         val features = listOf(
             featureWithObjectId(objectId = null),
-            featureWithObjectId(objectId = "poi-3"),
-            featureWithObjectId(objectId = "poi-4"),
+            featureWithObjectId(objectId = "spawn-3"),
+            featureWithObjectId(objectId = "watchtower-4"),
         )
 
         // When
         val actual = resolveObjectId(features)
 
         // Then
-        actual shouldBe "poi-3"
+        actual shouldBe "spawn-3"
     }
 
     @Test
@@ -174,14 +175,14 @@ class MapObjectsRendererAdapterTest {
         // Given
         val objects = listOf(
             mapObject(
-                id = "poi-5",
-                title = "Library",
-                description = "City library",
+                id = "watchtower-5",
+                title = "Library Tower",
+                description = "City watchtower",
                 latitude = 48.2,
                 longitude = 16.37,
                 radiusMeters = 90,
                 isDiscovered = true,
-                kind = MapObjectKind.PointOfInterest,
+                kind = MapObjectKind.Watchtower,
             ),
         )
 

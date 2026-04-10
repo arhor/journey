@@ -373,6 +373,190 @@ class JourneyDatabaseMigrationTest {
         InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(dbName) shouldBe true
     }
 
+    @Test
+    fun migrate4To5_should_drop_poi_tables_and_preserve_other_data() {
+        val dbName = "journey-migration-test-v5"
+
+        migrationHelper.createDatabase(dbName, 4).apply {
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `hero` (
+                    `id` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `level` INTEGER NOT NULL,
+                    `xpInLevel` INTEGER NOT NULL,
+                    `energyNow` INTEGER NOT NULL,
+                    `energyMax` INTEGER NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `hero_resources` (
+                    `heroId` TEXT NOT NULL,
+                    `typeId` TEXT NOT NULL,
+                    `amount` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`heroId`, `typeId`),
+                    FOREIGN KEY(`heroId`) REFERENCES `hero`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `collected_resource_spawns` (
+                    `heroId` TEXT NOT NULL,
+                    `typeId` TEXT NOT NULL,
+                    `spawnId` TEXT NOT NULL,
+                    `collectedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`heroId`, `spawnId`),
+                    FOREIGN KEY(`heroId`) REFERENCES `hero`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_collected_resource_spawns_heroId_collectedAt`
+                ON `collected_resource_spawns` (`heroId`, `collectedAt`)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `poi` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `description` TEXT,
+                    `category` TEXT NOT NULL,
+                    `lat` REAL NOT NULL,
+                    `lon` REAL NOT NULL,
+                    `radiusMeters` INTEGER NOT NULL
+                )
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `discovered_poi` (
+                    `poiId` INTEGER NOT NULL,
+                    `discoveredAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`poiId`),
+                    FOREIGN KEY(`poiId`) REFERENCES `poi`(`id`) ON UPDATE CASCADE ON DELETE CASCADE
+                )
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `explored_tiles` (
+                    `zoom` INTEGER NOT NULL,
+                    `x` INTEGER NOT NULL,
+                    `y` INTEGER NOT NULL,
+                    PRIMARY KEY(`zoom`, `x`, `y`)
+                )
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `watchtower_state` (
+                    `watchtowerId` TEXT NOT NULL,
+                    `discoveredAt` INTEGER NOT NULL,
+                    `claimedAt` INTEGER,
+                    `level` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`watchtowerId`)
+                )
+                """.trimIndent(),
+            )
+
+            execSQL(
+                """
+                INSERT INTO `hero` (`id`, `name`, `level`, `xpInLevel`, `energyNow`, `energyMax`, `createdAt`, `updatedAt`)
+                VALUES ('player', 'Scout', 3, 25, 87, 100, 1700000000000, 1700001000000)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO `hero_resources` (`heroId`, `typeId`, `amount`, `updatedAt`)
+                VALUES ('player', 'scrap', 11, 1700001100000)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO `collected_resource_spawns` (`heroId`, `typeId`, `spawnId`, `collectedAt`)
+                VALUES ('player', 'scrap', 'resource-spawn:v1:20527:10:20:0:scrap', 1700001200000)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO `poi` (`id`, `name`, `description`, `category`, `lat`, `lon`, `radiusMeters`)
+                VALUES (1, 'Retired POI', 'legacy', 'LANDMARK', 50.4500, 30.5230, 75)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO `discovered_poi` (`poiId`, `discoveredAt`)
+                VALUES (1, 1700001300000)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO `explored_tiles` (`zoom`, `x`, `y`)
+                VALUES (16, 34567, 22345)
+                """.trimIndent(),
+            )
+            execSQL(
+                """
+                INSERT INTO `watchtower_state` (`watchtowerId`, `discoveredAt`, `claimedAt`, `level`, `updatedAt`)
+                VALUES ('tower-legacy', 1700001400000, 1700001500000, 2, 1700001500000)
+                """.trimIndent(),
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(
+            dbName,
+            5,
+            true,
+            JourneyDatabase.MIGRATION_4_5,
+        )
+
+        migrated.hasTable("poi").shouldBeFalse()
+        migrated.hasTable("discovered_poi").shouldBeFalse()
+        migrated.hasTable("hero").shouldBeTrue()
+        migrated.hasTable("hero_resources").shouldBeTrue()
+        migrated.hasTable("collected_resource_spawns").shouldBeTrue()
+        migrated.hasTable("explored_tiles").shouldBeTrue()
+        migrated.hasTable("watchtower_state").shouldBeTrue()
+
+        migrated.rowCount("hero") shouldBe 1
+        migrated.rowCount("hero_resources") shouldBe 1
+        migrated.rowCount("collected_resource_spawns") shouldBe 1
+        migrated.rowCount("explored_tiles") shouldBe 1
+        migrated.rowCount("watchtower_state") shouldBe 1
+        migrated.intScalar(
+            """
+            SELECT amount FROM `hero_resources`
+            WHERE `heroId` = 'player' AND `typeId` = 'scrap'
+            """.trimIndent(),
+        ) shouldBe 11
+        migrated.stringScalar(
+            """
+            SELECT spawnId FROM `collected_resource_spawns`
+            WHERE `heroId` = 'player'
+            """.trimIndent(),
+        ) shouldBe "resource-spawn:v1:20527:10:20:0:scrap"
+        migrated.intScalar(
+            """
+            SELECT level FROM `watchtower_state`
+            WHERE `watchtowerId` = 'tower-legacy'
+            """.trimIndent(),
+        ) shouldBe 2
+
+        migrated.close()
+        InstrumentationRegistry.getInstrumentation().targetContext.deleteDatabase(dbName) shouldBe true
+    }
+
     private suspend fun heroResourcesSnapshot(heroResources: HeroResourceDao): List<Pair<String, Int>> =
         heroResources.observeAll(heroId = "player")
             .first()
@@ -402,6 +586,18 @@ class JourneyDatabaseMigrationTest {
         query("SELECT COUNT(*) FROM `$tableName`").use { cursor ->
             cursor.moveToFirst()
             cursor.getInt(0)
+        }
+
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.intScalar(sql: String): Int =
+        query(sql).use { cursor ->
+            cursor.moveToFirst()
+            cursor.getInt(0)
+        }
+
+    private fun androidx.sqlite.db.SupportSQLiteDatabase.stringScalar(sql: String): String =
+        query(sql).use { cursor ->
+            cursor.moveToFirst()
+            cursor.getString(0)
         }
 
     private fun generatedWatchtowerDefinition() =

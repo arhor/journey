@@ -25,8 +25,6 @@ fun MapRoute(
     snackbarHostState: SnackbarHostState,
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenObjectDetails: (String) -> Unit,
-    onOpenAddPoi: (Double, Double) -> Unit,
 ) {
     val context = LocalContext.current
     val state by vm.uiState.collectAsStateWithLifecycle()
@@ -51,14 +49,6 @@ fun MapRoute(
             when (effect) {
                 is MapEffect.ShowMessage -> {
                     snackbarHostState.showSnackbar(effect.message)
-                }
-
-                is MapEffect.OpenObjectDetails -> {
-                    onOpenObjectDetails(effect.objectId)
-                }
-
-                is MapEffect.OpenAddPoi -> {
-                    onOpenAddPoi(effect.latitude, effect.longitude)
                 }
 
                 MapEffect.RequestLocationPermission -> {
