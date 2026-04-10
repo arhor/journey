@@ -5,7 +5,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
@@ -23,8 +22,6 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 
@@ -39,17 +36,16 @@ fun ResetCameraButton(
 
     Box(
         modifier = modifier
-            .semantics { role = Role.Button }
             .clickable(
+                role = Role.Button,
                 interactionSource = interactionSource,
-                indication = ripple(),
                 onClick = onClick,
             )
             .drawWithCache {
                 val s = size.minDimension
-                val strokeWidth = s * 0.01f
+                val inset = s * 0.05f
+                val strokeWidth = s * 0.015f
                 val halfStrokeW = strokeWidth / 2f
-                val inset = 12.dp.toPx() + halfStrokeW
 
                 val (w, h) = size
                 val center = size.center
@@ -251,7 +247,7 @@ fun ResetCameraButton(
         contentAlignment = Alignment.Center,
     ) {
         CompassRoseIcon(
-            modifier = Modifier.fillMaxSize(0.80f),
+            modifier = Modifier.fillMaxSize(0.85f),
             color = LineColor,
             cutoutColor = Color.Transparent,
         )
@@ -267,7 +263,7 @@ internal fun ResetCameraButtonPreview() {
     ) {
         ResetCameraButton(
             onClick = {},
-            modifier = Modifier.size(320.dp),
+            modifier = Modifier.size(100.dp),
         )
     }
 }

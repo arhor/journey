@@ -45,7 +45,7 @@ fun CompassRoseIcon(
 
                 val outerRadius = s * 0.39f
                 val innerRadius = s * 0.26f
-                val strokeWidth = s * 0.01f
+                val strokeWidth = s * 0.015f
 
                 val outerArcSize = Size(outerRadius * 2f, outerRadius * 2f)
                 val innerArcSize = Size(innerRadius * 2f, innerRadius * 2f)
