@@ -1,6 +1,8 @@
 package com.github.arhor.journey.feature.map.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -222,10 +224,15 @@ fun CompassRoseIcon(
 internal fun CompassRoseIconPreview() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
-        CompassRoseIcon(
-            modifier = Modifier.size(320.dp),
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(100.dp),
+        ) {
+            CompassRoseIcon(modifier = Modifier.size(48.dp))
+            CompassRoseIcon(modifier = Modifier.size(96.dp))
+            CompassRoseIcon(modifier = Modifier.size(192.dp))
+        }
     }
 }

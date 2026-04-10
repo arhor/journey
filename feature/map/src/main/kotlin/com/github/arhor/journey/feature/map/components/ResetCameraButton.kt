@@ -2,7 +2,9 @@ package com.github.arhor.journey.feature.map.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -249,7 +251,6 @@ fun ResetCameraButton(
         CompassRoseIcon(
             modifier = Modifier.fillMaxSize(0.85f),
             color = LineColor,
-            cutoutColor = Color.Transparent,
         )
     }
 }
@@ -259,12 +260,16 @@ fun ResetCameraButton(
 internal fun ResetCameraButtonPreview() {
     Box(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
-        ResetCameraButton(
-            onClick = {},
-            modifier = Modifier.size(100.dp),
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(100.dp),
+        ) {
+            ResetCameraButton(onClick = {}, modifier = Modifier.size(48.dp))
+            ResetCameraButton(onClick = {}, modifier = Modifier.size(96.dp))
+            ResetCameraButton(onClick = {}, modifier = Modifier.size(192.dp))
+        }
     }
 }
 
