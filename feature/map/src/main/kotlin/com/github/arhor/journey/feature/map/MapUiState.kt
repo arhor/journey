@@ -25,6 +25,8 @@ sealed interface MapUiState {
         val cameraPosition: CameraPositionState?,
         val cameraUpdateOrigin: CameraUpdateOrigin,
         val northResetRequestToken: Int,
+        val currentLocation: CurrentLocationUiModel?,
+        val cameraLocation: LatLng?,
         val userLocation: LatLng?,
         val isExplorationTrackingActive: Boolean,
         val explorationTrackingCadence: ExplorationTrackingCadence,
@@ -35,3 +37,13 @@ sealed interface MapUiState {
         val fogOfWar: FogOfWarUiState,
     ) : MapUiState
 }
+
+@Immutable
+data class CurrentLocationUiModel(
+    val position: LatLng,
+    val horizontalAccuracyMeters: Double?,
+    val speedMetersPerSecond: Double?,
+    val bearingDegrees: Double?,
+    val bearingAccuracyDegrees: Double?,
+    val elapsedRealtimeNanos: Long?,
+)

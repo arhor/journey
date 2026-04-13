@@ -158,6 +158,7 @@ class ExplorationTrackingRuntime @Inject constructor(
                 isActive = true,
                 status = ExplorationTrackingStatus.TRACKING,
                 lastKnownLocation = update.location,
+                lastKnownLocationFix = update.fix,
             )
         }
 

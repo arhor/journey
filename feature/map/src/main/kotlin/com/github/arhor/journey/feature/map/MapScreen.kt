@@ -1,9 +1,6 @@
 package com.github.arhor.journey.feature.map
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -55,14 +51,15 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraMoveReason
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.location.Location
+import org.maplibre.compose.location.LocationProvider
 import org.maplibre.compose.location.LocationPuck
-import org.maplibre.compose.location.UserLocationState
-import org.maplibre.compose.location.rememberDefaultLocationProvider
-import org.maplibre.compose.location.rememberNullLocationProvider
 import org.maplibre.compose.location.rememberUserLocationState
 import org.maplibre.compose.map.GestureOptions
 import org.maplibre.compose.map.MapOptions
@@ -74,8 +71,10 @@ import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 @Composable
 fun MapScreen(
@@ -106,8 +105,13 @@ internal fun MapContent(
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val userLocationState = rememberUserLocationStateInternal(context)
+    val userLocationProvider = remember {
+        MapUiLocationProvider(state.currentLocation?.toMapLibreLocation())
+    }
+    LaunchedEffect(state.currentLocation, userLocationProvider) {
+        userLocationProvider.update(state.currentLocation?.toMapLibreLocation())
+    }
+    val userLocationState = rememberUserLocationState(userLocationProvider)
     val cameraState = key(state.cameraPosition == null) {
         rememberCameraState(
             firstPosition = state.cameraPosition?.toCameraPosition() ?: CameraPosition(),
@@ -115,7 +119,7 @@ internal fun MapContent(
     }
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
-    val latestUserLocation by rememberUpdatedState(state.userLocation)
+    val latestRecenterLocation by rememberUpdatedState(state.recenterTargetLocation())
     val onObjectTapped = remember(dispatch) {
         { objectId: String ->
             dispatch(MapIntent.ObjectTapped(objectId))
@@ -227,8 +231,8 @@ internal fun MapContent(
             return@LaunchedEffect
         }
 
-        val location = latestUserLocation ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
-            snapshotFlow { latestUserLocation }
+        val location = latestRecenterLocation ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
+            snapshotFlow { latestRecenterLocation }
                 .filterNotNull()
                 .first()
         }
@@ -440,16 +444,16 @@ private const val DEFAULT_CAMERA_BEARING = 0.0
 private val NORTH_RESET_ANIMATION_DURATION = 600.milliseconds
 private val CAMERA_ZOOM_BOUNDS = 14f..20f
 
-@SuppressLint("MissingPermission")
-@Composable
-private fun rememberUserLocationStateInternal(ctx: Context): UserLocationState {
-    return rememberUserLocationState(
-        if (ctx.checkPermission()) {
-            rememberDefaultLocationProvider()
-        } else {
-            rememberNullLocationProvider()
-        }
-    )
+internal class MapUiLocationProvider(
+    initialLocation: Location?,
+) : LocationProvider {
+    private val locations = MutableStateFlow(initialLocation)
+
+    override val location: StateFlow<Location?> = locations
+
+    fun update(location: Location?) {
+        locations.value = location
+    }
 }
 
 private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): Boolean {
@@ -487,10 +491,6 @@ private fun BoundingBox.toGeoBounds(): GeoBounds = GeoBounds(
     east = east,
 )
 
-private fun Context.checkPermission(): Boolean =
-    checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
 private fun CameraPosition.toCameraPositionState(): CameraPositionState =
     CameraPositionState(
         target = LatLng(
@@ -509,6 +509,36 @@ private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosit
     zoom = zoom,
     bearing = bearing,
 )
+
+internal fun MapUiState.Content.recenterTargetLocation(): LatLng? =
+    currentLocation?.position ?: cameraLocation
+
+internal fun CurrentLocationUiModel.toMapLibreLocation(
+    nowElapsedRealtimeNanos: () -> Long = SystemClock::elapsedRealtimeNanos,
+): Location =
+    Location(
+        position = Position(
+            latitude = position.latitude,
+            longitude = position.longitude,
+        ),
+        accuracy = horizontalAccuracyMeters ?: 0.0,
+        bearing = bearingDegrees,
+        bearingAccuracy = bearingAccuracyDegrees,
+        speed = speedMetersPerSecond,
+        speedAccuracy = null,
+        timestamp = elapsedRealtimeNanos.toTimeMark(nowElapsedRealtimeNanos),
+    )
+
+internal fun Long?.toTimeMark(
+    nowElapsedRealtimeNanos: () -> Long = SystemClock::elapsedRealtimeNanos,
+) = this
+    ?.let { elapsedRealtimeNanos ->
+        val age = (nowElapsedRealtimeNanos() - elapsedRealtimeNanos)
+            .coerceAtLeast(0L)
+            .nanoseconds
+        TimeSource.Monotonic.markNow() - age
+    }
+    ?: TimeSource.Monotonic.markNow()
 
 private fun CameraMoveReason.toCameraUpdateOrigin(): CameraUpdateOrigin =
     if (this == CameraMoveReason.GESTURE) {
