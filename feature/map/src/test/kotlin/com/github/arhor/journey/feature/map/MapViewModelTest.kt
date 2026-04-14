@@ -1459,6 +1459,50 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `dispatch should keep default zoom when initial programmatic camera settle happens before first location`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val fixture = createFixture()
+            val mapLibreInitialPosition = CameraPositionState(
+                target = LatLng(latitude = 0.0, longitude = 0.0),
+                zoom = 14.0,
+                bearing = 0.0,
+            )
+
+            try {
+                fixture.viewModel.awaitContent()
+                fixture.viewModel.dispatch(
+                    MapIntent.CameraSettled(
+                        position = mapLibreInitialPosition,
+                        origin = CameraUpdateOrigin.PROGRAMMATIC,
+                    ),
+                )
+                advanceUntilIdle()
+
+                // When
+                fixture.trackingSessionFlow.value = ExplorationTrackingSession(
+                    lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                )
+                advanceUntilIdle()
+
+                // Then
+                val actual = fixture.viewModel.awaitContent {
+                    it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+                }
+                actual.cameraPosition shouldBe CameraPositionState(
+                    target = LatLng(latitude = 40.7128, longitude = -74.006),
+                    zoom = DEFAULT_CAMERA_ZOOM,
+                    bearing = 0.0,
+                )
+                actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+            } finally {
+                tearDownMainDispatcher(fixture.viewModel)
+            }
+        }
+
+    @Test
     fun `uiState should hold camera target when updated location is too inaccurate for camera follow`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 

@@ -243,6 +243,41 @@ class MapScreenLocationProviderTest {
         actualSettled shouldBe true
     }
 
+    @Test
+    fun `resolveInitialMapCameraPosition should use app default zoom when view model camera is absent`() {
+        // Given
+        val position = null
+
+        // When
+        val actual = resolveInitialMapCameraPosition(position)
+
+        // Then
+        actual.zoom shouldBe DEFAULT_CAMERA_ZOOM
+        actual.bearing shouldBe DEFAULT_CAMERA_BEARING
+    }
+
+    @Test
+    fun `resolveInitialMapCameraPosition should preserve view model camera when present`() {
+        // Given
+        val position = cameraPositionState(
+            latitude = 40.7128,
+            longitude = -74.0060,
+            zoom = 16.5,
+            bearing = 25.0,
+        )
+
+        // When
+        val actual = resolveInitialMapCameraPosition(position)
+
+        // Then
+        actual shouldBe cameraPosition(
+            latitude = 40.7128,
+            longitude = -74.0060,
+            zoom = 16.5,
+            bearing = 25.0,
+        )
+    }
+
     private fun contentState(
         currentLocation: CurrentLocationUiModel?,
         cameraLocation: LatLng?,

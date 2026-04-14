@@ -106,7 +106,7 @@ internal fun MapContent(
     val userLocationState = rememberUserLocationState(userLocationProvider)
     val cameraState = key(state.cameraPosition == null) {
         rememberCameraState(
-            firstPosition = state.cameraPosition?.toCameraPosition() ?: CameraPosition(),
+            firstPosition = resolveInitialMapCameraPosition(state.cameraPosition),
         )
     }
     val styleState = rememberStyleState()
@@ -419,7 +419,6 @@ private const val CAMERA_SETTLE_BEARING_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 private val USER_LOCATION_TIMEOUT = 5.seconds
-private const val DEFAULT_CAMERA_BEARING = 0.0
 private val FOLLOW_CAMERA_ANIMATION_DURATION = 900.milliseconds
 private val NORTH_RESET_ANIMATION_DURATION = 600.milliseconds
 private val CAMERA_ZOOM_BOUNDS = 14f..20f
@@ -465,6 +464,13 @@ internal fun resolveProgrammaticCameraFollowUpdate(
 
 internal fun shouldPublishCameraViewportSnapshot(snapshot: CameraViewportSnapshot): Boolean =
     !snapshot.isCameraMoving || snapshot.moveReason == CameraMoveReason.GESTURE
+
+internal fun resolveInitialMapCameraPosition(position: CameraPositionState?): CameraPosition =
+    position?.toCameraPosition()
+        ?: CameraPosition(
+            zoom = DEFAULT_CAMERA_ZOOM,
+            bearing = DEFAULT_CAMERA_BEARING,
+        )
 
 private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): Boolean {
     return abs(a.target.latitude - b.target.latitude) < CAMERA_SETTLE_COORDINATE_THRESHOLD

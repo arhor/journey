@@ -62,8 +62,6 @@ import javax.inject.Inject
 import kotlin.math.roundToInt
 import com.github.arhor.journey.core.common.combine as combineOutputs
 
-private const val DEFAULT_CAMERA_ZOOM = 17.0
-private const val DEFAULT_CAMERA_BEARING = 0.0
 private val LOCATION_HIDDEN_STATUSES = setOf(
     ExplorationTrackingStatus.PERMISSION_DENIED,
     ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED,
@@ -555,12 +553,22 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onCameraSettled(intent: MapIntent.CameraSettled) {
-        _state.update {
-            it.copy(
-                cameraPosition = intent.position,
+        _state.update { state ->
+            state.copy(
+                cameraPosition = state.resolveSettledCameraPosition(intent),
                 cameraUpdateOrigin = intent.origin,
                 isUserInteractingCamera = false,
             )
+        }
+    }
+
+    private fun State.resolveSettledCameraPosition(intent: MapIntent.CameraSettled): CameraPositionState {
+        val isInitialProgrammaticSettle = cameraPosition == null && intent.origin == CameraUpdateOrigin.PROGRAMMATIC
+
+        return if (isInitialProgrammaticSettle && intent.position.zoom < DEFAULT_CAMERA_ZOOM) {
+            intent.position.copy(zoom = DEFAULT_CAMERA_ZOOM)
+        } else {
+            intent.position
         }
     }
 
