@@ -49,6 +49,7 @@ import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
+import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -1182,6 +1183,7 @@ class MapViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
+        val locationFix = locationFix(lat = 50.45, lon = 30.52, accuracy = 10.0)
         val fixture = createFixture(
             resourceSpawns = listOf(
                 resourceSpawn(
@@ -1193,7 +1195,8 @@ class MapViewModelTest {
                 ),
             ),
             trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 50.45, lon = 30.52),
+                lastKnownLocation = locationFix.location,
+                lastKnownLocationFix = locationFix,
             ),
         )
         val visibleRange = ExplorationTileRange(
@@ -1402,12 +1405,14 @@ class MapViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
+        val locationFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
         val fixture = createFixture(
             trackingSession = ExplorationTrackingSession(
                 isActive = true,
                 status = ExplorationTrackingStatus.TRACKING,
                 cadence = ExplorationTrackingCadence.FOREGROUND,
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                lastKnownLocation = locationFix.location,
+                lastKnownLocationFix = locationFix,
             ),
         )
 
@@ -1430,9 +1435,12 @@ class MapViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+        val movedFix = locationFix(lat = 40.7306, lon = -73.9352, accuracy = 10.0)
         val fixture = createFixture(
             trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
             ),
         )
 
@@ -1442,9 +1450,7 @@ class MapViewModelTest {
             }
 
             // When
-            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
-                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
-            )
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(movedFix)
             advanceUntilIdle()
 
             // Then
@@ -1482,8 +1488,10 @@ class MapViewModelTest {
                 advanceUntilIdle()
 
                 // When
+                val locationFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
                 fixture.trackingSessionFlow.value = ExplorationTrackingSession(
-                    lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                    lastKnownLocation = locationFix.location,
+                    lastKnownLocationFix = locationFix,
                 )
                 advanceUntilIdle()
 
@@ -1573,6 +1581,87 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `uiState should keep camera and puck position stable for repeated stationary location jitter`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0, speed = 0.0)
+        val jitterFixes = listOf(
+            locationFix(lat = 40.71283, lon = -74.0060, accuracy = 10.0, speed = 0.2),
+            locationFix(lat = 40.7128, lon = -74.00588, accuracy = 10.0, speed = 0.3),
+            locationFix(lat = 40.7129, lon = -74.00608, accuracy = 30.0, speed = 0.1),
+        )
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.currentLocation?.position == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            jitterFixes.forEach { fix ->
+                fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(fix)
+                advanceUntilIdle()
+            }
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.currentLocation?.horizontalAccuracyMeters == 30.0
+            }
+            actual.currentLocation?.position shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.userLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.cameraLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should update camera and puck after confirmed walking movement`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0, speed = 1.6)
+        val movedFix = locationFix(lat = 40.71305, lon = -74.0060, accuracy = 10.0, speed = 1.6)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(movedFix)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.currentLocation?.position?.latitude != 40.7128
+            }
+            actual.currentLocation?.position?.latitude shouldBe (40.7129875 plusOrMinus 0.0000001)
+            actual.currentLocation?.position?.longitude shouldBe -74.006
+            actual.cameraLocation?.latitude shouldBe (40.7129625 plusOrMinus 0.0000001)
+            actual.cameraLocation?.longitude shouldBe -74.006
+            actual.cameraPosition?.target?.latitude shouldBe (40.7129625 plusOrMinus 0.0000001)
+            actual.cameraPosition?.target?.longitude shouldBe -74.006
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
     fun `uiState should recenter camera promptly for meaningful accepted movement`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -1649,9 +1738,12 @@ class MapViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+        val movedFix = locationFix(lat = 40.7306, lon = -73.9352, accuracy = 10.0)
         val fixture = createFixture(
             trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
             ),
         )
         val manualCameraPosition = CameraPositionState(
@@ -1673,9 +1765,7 @@ class MapViewModelTest {
                 ),
             )
             advanceUntilIdle()
-            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
-                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
-            )
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(movedFix)
             advanceUntilIdle()
 
             // Then
@@ -1699,9 +1789,12 @@ class MapViewModelTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
             // Given
+            val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+            val movedFix = locationFix(lat = 40.7306, lon = -73.9352, accuracy = 10.0)
             val fixture = createFixture(
                 trackingSession = ExplorationTrackingSession(
-                    lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                    lastKnownLocation = initialFix.location,
+                    lastKnownLocationFix = initialFix,
                 ),
                 startTrackingResult = Output.Success(Unit),
             )
@@ -1722,9 +1815,7 @@ class MapViewModelTest {
                     ),
                 )
                 advanceUntilIdle()
-                fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
-                    lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
-                )
+                fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(movedFix)
                 advanceUntilIdle()
                 fixture.viewModel.awaitContent {
                     it.cameraPosition == CameraPositionState(
@@ -2468,9 +2559,12 @@ class MapViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+        val movedFix = locationFix(lat = 40.7306, lon = -73.9352, accuracy = 10.0)
         val fixture = createFixture(
             trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
             ),
         )
 
@@ -2482,9 +2576,7 @@ class MapViewModelTest {
             // When
             fixture.viewModel.dispatch(MapIntent.MapTapped)
             advanceUntilIdle()
-            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
-                lastKnownLocation = GeoPoint(lat = 40.7306, lon = -73.9352),
-            )
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(movedFix)
             advanceUntilIdle()
 
             // Then
@@ -2555,9 +2647,11 @@ class MapViewModelTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
         val fixture = createFixture(
             trackingSession = ExplorationTrackingSession(
-                lastKnownLocation = GeoPoint(lat = 40.7128, lon = -74.0060),
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
             ),
         )
         val gestureCameraPosition = CameraPositionState(
