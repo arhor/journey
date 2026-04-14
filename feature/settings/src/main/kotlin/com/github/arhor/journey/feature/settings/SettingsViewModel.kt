@@ -12,7 +12,6 @@ import com.github.arhor.journey.domain.model.error.AppSettingsError
 import com.github.arhor.journey.domain.model.error.MapStylesError
 import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
-import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
 import com.github.arhor.journey.core.ui.MviViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,7 +33,6 @@ private data class State(
 class SettingsViewModel @Inject constructor(
     private val observeSettings: ObserveSettingsUseCase,
     private val observeMapStyles: ObserveMapStylesUseCase,
-    private val setDistanceUnit: SetDistanceUnitUseCase,
     private val setMapStyle: SetMapStyleUseCase,
 ) : MviViewModel<SettingsUiState, SettingsEffect, SettingsIntent>(
     initialState = SettingsUiState.Loading,
@@ -57,7 +55,6 @@ class SettingsViewModel @Inject constructor(
 
     override suspend fun handleIntent(intent: SettingsIntent) {
         when (intent) {
-            is SettingsIntent.SelectDistanceUnit -> onSelectDistanceUnit(intent)
             is SettingsIntent.SelectMapStyle -> onSelectMapStyle(intent)
         }
     }
@@ -73,7 +70,6 @@ class SettingsViewModel @Inject constructor(
             onSuccess = { (settings, mapStyles) ->
                 SettingsUiState.Content(
                     isUpdating = state.isUpdating,
-                    distanceUnit = settings.distanceUnit,
                     selectedMapStyleId = settings.selectedMapStyleId,
                     availableMapStyles = mapStyles,
                 )
@@ -84,25 +80,6 @@ class SettingsViewModel @Inject constructor(
                 )
             },
         )
-    }
-
-    private suspend fun onSelectDistanceUnit(intent: SettingsIntent.SelectDistanceUnit) {
-        if (_state.value.isUpdating) {
-            return
-        }
-
-        _state.update { it.copy(isUpdating = true) }
-        when (val result = setDistanceUnit(intent.unit)) {
-            is Output.Success -> Unit
-            is Output.Failure -> {
-                emitEffect(
-                    SettingsEffect.Error(
-                        message = result.error.resolveMessage("Failed to update distance unit."),
-                    ),
-                )
-            }
-        }
-        _state.update { it.copy(isUpdating = false) }
     }
 
     private suspend fun onSelectMapStyle(intent: SettingsIntent.SelectMapStyle) {

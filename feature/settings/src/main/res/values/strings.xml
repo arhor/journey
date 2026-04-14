@@ -1,8 +1,5 @@
 <resources>
     <string name="settings_title">Settings</string>
-    <string name="settings_distance_unit_title">Distance Unit</string>
-    <string name="settings_distance_unit_metric">Metric (km, m)</string>
-    <string name="settings_distance_unit_imperial">Imperial (mi, ft)</string>
     <string name="settings_map_style_title">Map Style</string>
     <string name="settings_map_style_default">Default</string>
     <string name="settings_map_style_classic">Classic</string>

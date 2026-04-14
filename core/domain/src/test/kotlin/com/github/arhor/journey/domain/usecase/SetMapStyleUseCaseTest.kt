@@ -2,7 +2,6 @@ package com.github.arhor.journey.domain.usecase
 
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.error.AppSettingsError
 import com.github.arhor.journey.domain.model.error.MapStylesError
@@ -77,9 +76,7 @@ class SetMapStyleUseCaseTest {
         val selectedStyleIds: MutableList<String> = mutableListOf()
 
         override fun observeSettings(): Flow<Output<AppSettings, AppSettingsError>> =
-            flowOf(Output.Success(AppSettings(distanceUnit = DistanceUnit.METRIC, selectedMapStyleId = null)))
-
-        override suspend fun setDistanceUnit(unit: DistanceUnit) = Unit
+            flowOf(Output.Success(AppSettings(selectedMapStyleId = null)))
 
         override suspend fun setSelectedMapStyleId(styleId: String) {
             selectedStyleIds += styleId

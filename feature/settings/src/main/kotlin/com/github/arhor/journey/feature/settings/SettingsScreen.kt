@@ -24,7 +24,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
-import com.github.arhor.journey.domain.model.DistanceUnit
 
 @Composable
 fun SettingsScreen(
@@ -59,35 +58,6 @@ internal fun SettingsContent(
                 text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineSmall,
             )
-            Text(
-                text = stringResource(R.string.settings_distance_unit_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            DistanceUnit.entries.forEach { unit ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = state.distanceUnit == unit,
-                            enabled = !state.isUpdating,
-                            role = Role.RadioButton,
-                            onClick = { dispatch(SettingsIntent.SelectDistanceUnit(unit)) },
-                        ),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RadioButton(
-                        selected = state.distanceUnit == unit,
-                        onClick = null,
-                        enabled = !state.isUpdating,
-                    )
-                    Text(
-                        text = distanceUnitLabel(unit),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-            }
-
 
             Text(
                 text = stringResource(R.string.settings_map_style_title),
@@ -161,10 +131,3 @@ private fun MapCreditsCard() {
         }
     }
 }
-
-@Composable
-private fun distanceUnitLabel(unit: DistanceUnit): String =
-    when (unit) {
-        DistanceUnit.METRIC -> stringResource(R.string.settings_distance_unit_metric)
-        DistanceUnit.IMPERIAL -> stringResource(R.string.settings_distance_unit_imperial)
-    }

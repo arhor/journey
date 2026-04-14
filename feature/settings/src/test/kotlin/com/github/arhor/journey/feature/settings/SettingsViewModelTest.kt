@@ -2,7 +2,6 @@ package com.github.arhor.journey.feature.settings
 
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.error.AppSettingsError
 import com.github.arhor.journey.domain.model.error.MapStylesError
@@ -10,7 +9,6 @@ import com.github.arhor.journey.domain.repository.MapStylesRepository
 import com.github.arhor.journey.domain.repository.SettingsRepository
 import com.github.arhor.journey.domain.usecase.ObserveMapStylesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSettingsUseCase
-import com.github.arhor.journey.domain.usecase.SetDistanceUnitUseCase
 import com.github.arhor.journey.domain.usecase.SetMapStyleUseCase
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +42,6 @@ class SettingsViewModelTest {
             val settingsRepository = FakeSettingsRepository(
                 initialOutput = Output.Success(
                     AppSettings(
-                        distanceUnit = DistanceUnit.IMPERIAL,
                         selectedMapStyleId = "remote",
                     ),
                 ),
@@ -62,7 +59,6 @@ class SettingsViewModelTest {
             // Then
             actual shouldBe SettingsUiState.Content(
                 isUpdating = false,
-                distanceUnit = DistanceUnit.IMPERIAL,
                 selectedMapStyleId = "remote",
                 availableMapStyles = expectedMapStyles,
             )
@@ -177,57 +173,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun `dispatch should persist selected distance unit when update succeeds`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        lateinit var viewModel: SettingsViewModel
-        try {
-            val settingsRepository = FakeSettingsRepository()
-            val mapStylesRepository = FakeMapStylesRepository(initialOutput = Output.Success(emptyList()))
-            viewModel = createViewModel(settingsRepository, mapStylesRepository)
-            runCurrent()
-
-            // When
-            viewModel.dispatch(SettingsIntent.SelectDistanceUnit(DistanceUnit.IMPERIAL))
-            advanceUntilIdle()
-
-            // Then
-            settingsRepository.savedDistanceUnits shouldBe listOf(DistanceUnit.IMPERIAL)
-        } finally {
-            Dispatchers.resetMain()
-        }
-    }
-
-    @Test
-    fun `dispatch should emit error effect when distance unit update fails`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        lateinit var viewModel: SettingsViewModel
-        try {
-            val settingsRepository = FakeSettingsRepository().apply {
-                setDistanceUnitError = IllegalArgumentException("Distance unit update failed.")
-            }
-            val mapStylesRepository = FakeMapStylesRepository(initialOutput = Output.Success(emptyList()))
-            viewModel = createViewModel(settingsRepository, mapStylesRepository)
-            runCurrent()
-            val effectDeferred = async { viewModel.effects.first() }
-            runCurrent()
-
-            // When
-            viewModel.dispatch(SettingsIntent.SelectDistanceUnit(DistanceUnit.METRIC))
-            advanceUntilIdle()
-
-            // Then
-            effectDeferred.await() shouldBe SettingsEffect.Error(message = "Distance unit update failed.")
-            settingsRepository.savedDistanceUnits shouldBe emptyList()
-        } finally {
-            Dispatchers.resetMain()
-        }
-    }
-
-    @Test
     fun `dispatch should persist selected map style when style id exists`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -325,12 +270,10 @@ class SettingsViewModelTest {
     ): SettingsViewModel {
         val observeSettings = ObserveSettingsUseCase(settingsRepository)
         val observeMapStyles = ObserveMapStylesUseCase(mapStylesRepository)
-        val setDistanceUnit = SetDistanceUnitUseCase(settingsRepository)
         val setMapStyle = SetMapStyleUseCase(settingsRepository, mapStylesRepository)
         return SettingsViewModel(
             observeSettings = observeSettings,
             observeMapStyles = observeMapStyles,
-            setDistanceUnit = setDistanceUnit,
             setMapStyle = setMapStyle,
         )
     }
@@ -338,25 +281,17 @@ class SettingsViewModelTest {
     private class FakeSettingsRepository(
         initialOutput: Output<AppSettings, AppSettingsError> = Output.Success(
             AppSettings(
-                distanceUnit = DistanceUnit.METRIC,
                 selectedMapStyleId = null,
             ),
         ),
     ) : SettingsRepository {
         private val settingsOutput = MutableStateFlow(initialOutput)
 
-        val savedDistanceUnits = mutableListOf<DistanceUnit>()
         val savedMapStyleIds = mutableListOf<String>()
 
-        var setDistanceUnitError: Throwable? = null
         var setSelectedMapStyleIdError: Throwable? = null
 
         override fun observeSettings(): Flow<Output<AppSettings, AppSettingsError>> = settingsOutput
-
-        override suspend fun setDistanceUnit(unit: DistanceUnit) {
-            setDistanceUnitError?.let { throw it }
-            savedDistanceUnits += unit
-        }
 
         override suspend fun setSelectedMapStyleId(styleId: String) {
             setSelectedMapStyleIdError?.let { throw it }
@@ -369,8 +304,6 @@ class SettingsViewModelTest {
     ) : SettingsRepository {
         override fun observeSettings(): Flow<Output<AppSettings, AppSettingsError>> =
             flow { throw throwable }
-
-        override suspend fun setDistanceUnit(unit: DistanceUnit) = Unit
 
         override suspend fun setSelectedMapStyleId(styleId: String) = Unit
     }

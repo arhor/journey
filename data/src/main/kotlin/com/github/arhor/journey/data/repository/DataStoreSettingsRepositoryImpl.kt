@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.toOutputFlow
 import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.error.AppSettingsError
 import com.github.arhor.journey.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
@@ -23,7 +22,6 @@ class DataStoreSettingsRepositoryImpl @Inject constructor(
         dataStore.data.toOutputFlow(
             onSuccess = {
                 AppSettings(
-                    distanceUnit = it.distanceUnitPref,
                     selectedMapStyleId = it.selectedMapStyleIdPref,
                 )
             },
@@ -34,27 +32,16 @@ class DataStoreSettingsRepositoryImpl @Inject constructor(
             },
         )
 
-
-    override suspend fun setDistanceUnit(unit: DistanceUnit) {
-        dataStore.edit {
-            it[distanceUnit] = unit.name
-        }
-    }
-
     override suspend fun setSelectedMapStyleId(styleId: String) {
         dataStore.edit {
             it[selectedMapStyleId] = styleId
         }
     }
 
-    private val Preferences.distanceUnitPref: DistanceUnit
-        get() = this[distanceUnit]?.let(DistanceUnit::fromString) ?: DistanceUnit.METRIC
-
     private val Preferences.selectedMapStyleIdPref: String?
         get() = this[selectedMapStyleId]
 
     companion object {
-        val distanceUnit = stringPreferencesKey("distance_unit")
         val selectedMapStyleId = stringPreferencesKey("selected_map_style_id")
     }
 }

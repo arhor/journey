@@ -2,7 +2,6 @@ package com.github.arhor.journey.domain.usecase
 
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.model.AppSettings
-import com.github.arhor.journey.domain.model.DistanceUnit
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.error.AppSettingsError
 import com.github.arhor.journey.domain.model.error.MapStylesError
@@ -26,7 +25,7 @@ class ObserveSelectedMapStyleUseCaseTest {
             value = "https://styles/sat.json",
         )
         val settingsRepository = FakeSettingsRepository(
-            Output.Success(AppSettings(distanceUnit = DistanceUnit.METRIC, selectedMapStyleId = "remote-sat")),
+            Output.Success(AppSettings(selectedMapStyleId = "remote-sat")),
         )
         val mapStylesRepository = FakeMapStylesRepository(
             Output.Success(
@@ -52,7 +51,7 @@ class ObserveSelectedMapStyleUseCaseTest {
     fun `invoke should emit null when settings reference missing map style id`() = runTest {
         // Given
         val settingsRepository = FakeSettingsRepository(
-            Output.Success(AppSettings(distanceUnit = DistanceUnit.IMPERIAL, selectedMapStyleId = "missing")),
+            Output.Success(AppSettings(selectedMapStyleId = "missing")),
         )
         val mapStylesRepository = FakeMapStylesRepository(
             Output.Success(
@@ -97,8 +96,6 @@ class ObserveSelectedMapStyleUseCaseTest {
         private val state = MutableStateFlow(value)
 
         override fun observeSettings(): Flow<Output<AppSettings, AppSettingsError>> = state
-
-        override suspend fun setDistanceUnit(unit: DistanceUnit) = Unit
 
         override suspend fun setSelectedMapStyleId(styleId: String) = Unit
     }
