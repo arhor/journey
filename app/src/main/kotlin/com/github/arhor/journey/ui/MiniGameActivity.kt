@@ -4,11 +4,8 @@ import org.godotengine.godot.GodotActivity
 
 class MiniGameActivity : GodotActivity() {
 
-    override fun getCommandLine(): List<String> =
-        super.getCommandLine()
-            .toMutableList()
-            .apply {
-                add("--main-pack")
-                add("res://minigame.pck")
-            }
+    override fun getCommandLine(): MutableList<String> = super.getCommandLine().apply {
+        add("--main-pack")
+        add("res://minigame.pck")
+    }
 }
