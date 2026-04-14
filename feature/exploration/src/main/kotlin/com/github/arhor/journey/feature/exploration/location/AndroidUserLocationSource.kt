@@ -7,11 +7,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.location.LocationListener
 import android.location.LocationManager
+import android.location.LocationRequest
 import android.os.Looper
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.UserLocationFix
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -45,7 +47,7 @@ class AndroidUserLocationSource @Inject constructor(
 
         val listener = object : LocationListener {
             override fun onLocationChanged(location: android.location.Location) {
-                trySend(UserLocationUpdate.Available(location.toGeoPoint()))
+                trySend(UserLocationUpdate.Available(location.toUserLocationFix()))
             }
 
             override fun onProviderDisabled(provider: String) {
@@ -96,37 +98,28 @@ class AndroidUserLocationSource @Inject constructor(
             return
         }
 
-        val providers = buildList {
-            if (permissionChecker.hasFineLocationPermission() && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-                add(LocationManager.GPS_PROVIDER)
-            }
+        val provider = locationManager.resolveLocationProvider()
 
-            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                add(LocationManager.NETWORK_PROVIDER)
-            }
-        }
-
-        if (providers.isEmpty()) {
+        if (provider == null) {
             trySend(UserLocationUpdate.LocationServicesDisabled)
             return
         }
 
-        providers.asSequence()
-            .mapNotNull(locationManager::getLastKnownLocation)
-            .firstOrNull()
+        locationManager.getLastKnownLocation(provider)
             ?.let {
-                trySend(UserLocationUpdate.Available(it.toGeoPoint()))
+                trySend(UserLocationUpdate.Available(it.toUserLocationFix()))
             } ?: trySend(UserLocationUpdate.TemporarilyUnavailable)
 
-        providers.forEach { provider ->
-            locationManager.requestLocationUpdates(
-                provider,
-                cadence.intervalMillis,
-                cadence.minDistanceMeters,
-                listener,
-                Looper.getMainLooper(),
-            )
+        locationManager.requestLocationUpdates(provider, cadence, listener)
+    }
+
+    private fun LocationManager.resolveLocationProvider(): String? = when {
+        isProviderEnabled(LocationManager.FUSED_PROVIDER) -> LocationManager.FUSED_PROVIDER
+        permissionChecker.hasFineLocationPermission() && isProviderEnabled(LocationManager.GPS_PROVIDER) -> {
+            LocationManager.GPS_PROVIDER
         }
+        isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
+        else -> null
     }
 
     private val ExplorationTrackingCadence.intervalMillis: Long
@@ -141,15 +134,56 @@ class AndroidUserLocationSource @Inject constructor(
             ExplorationTrackingCadence.BACKGROUND -> BACKGROUND_LOCATION_UPDATE_MIN_DISTANCE_METERS
         }
 
-    private fun android.location.Location.toGeoPoint(): GeoPoint =
-        GeoPoint(
-            lat = latitude,
-            lon = longitude,
+    @SuppressLint("MissingPermission")
+    private fun LocationManager.requestLocationUpdates(
+        provider: String,
+        cadence: ExplorationTrackingCadence,
+        listener: LocationListener,
+    ) {
+        if (provider == LocationManager.FUSED_PROVIDER) {
+            requestLocationUpdates(
+                provider,
+                LocationRequest.Builder(cadence.intervalMillis)
+                    .setMinUpdateDistanceMeters(cadence.minDistanceMeters)
+                    .setQuality(cadence.locationRequestQuality)
+                    .build(),
+                ContextCompat.getMainExecutor(context),
+                listener,
+            )
+        } else {
+            requestLocationUpdates(
+                provider,
+                cadence.intervalMillis,
+                cadence.minDistanceMeters,
+                listener,
+                Looper.getMainLooper(),
+            )
+        }
+    }
+
+    private val ExplorationTrackingCadence.locationRequestQuality: Int
+        get() = when {
+            permissionChecker.hasFineLocationPermission() -> LocationRequest.QUALITY_HIGH_ACCURACY
+            this == ExplorationTrackingCadence.FOREGROUND -> LocationRequest.QUALITY_BALANCED_POWER_ACCURACY
+            else -> LocationRequest.QUALITY_LOW_POWER
+        }
+
+    private fun android.location.Location.toUserLocationFix(): UserLocationFix =
+        UserLocationFix(
+            location = GeoPoint(
+                lat = latitude,
+                lon = longitude,
+            ),
+            horizontalAccuracyMeters = if (hasAccuracy()) accuracy.toDouble() else null,
+            speedMetersPerSecond = if (hasSpeed()) speed.toDouble() else null,
+            bearingDegrees = if (hasBearing()) bearing.toDouble() else null,
+            bearingAccuracyDegrees = if (hasBearingAccuracy()) bearingAccuracyDegrees.toDouble() else null,
+            elapsedRealtimeNanos = elapsedRealtimeNanos,
         )
 
     private companion object {
         const val FOREGROUND_LOCATION_UPDATE_INTERVAL_MS = 2_000L
-        const val FOREGROUND_LOCATION_UPDATE_MIN_DISTANCE_METERS = 5f
+        const val FOREGROUND_LOCATION_UPDATE_MIN_DISTANCE_METERS = 1f
         const val BACKGROUND_LOCATION_UPDATE_INTERVAL_MS = 15_000L
         const val BACKGROUND_LOCATION_UPDATE_MIN_DISTANCE_METERS = 25f
     }

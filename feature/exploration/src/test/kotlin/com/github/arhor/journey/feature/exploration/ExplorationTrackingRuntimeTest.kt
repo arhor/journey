@@ -7,6 +7,7 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapTile
+import com.github.arhor.journey.domain.model.UserLocationFix
 import com.github.arhor.journey.domain.model.error.CollectResourceSpawnError
 import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.DiscoverWatchtowersByClearedTilesUseCase
@@ -55,15 +56,22 @@ class ExplorationTrackingRuntimeTest {
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
+        val locationFix = UserLocationFix(
+            location = location,
+            horizontalAccuracyMeters = 15.0,
+            speedMetersPerSecond = 2.0,
+            bearingDegrees = 45.0,
+            elapsedRealtimeNanos = 1_000L,
+        )
         coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
         coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(locationFix))
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(locationFix))
         runCurrent()
 
         // Then
@@ -71,6 +79,7 @@ class ExplorationTrackingRuntimeTest {
         coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(location) }
         runtime.snapshot().status shouldBe ExplorationTrackingStatus.TRACKING
         runtime.snapshot().lastKnownLocation shouldBe location
+        runtime.snapshot().lastKnownLocationFix shouldBe locationFix
     }
 
     @Test
@@ -148,10 +157,10 @@ class ExplorationTrackingRuntimeTest {
         // When
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
         configHolder.setCanonicalZoom(18)
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
 
         // Then
@@ -181,10 +190,10 @@ class ExplorationTrackingRuntimeTest {
         // When
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
         configHolder.setRevealRadiusMeters(100.0)
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
 
         // Then
@@ -217,9 +226,9 @@ class ExplorationTrackingRuntimeTest {
         // When
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(firstLocation))
+        userLocationSource.emit(UserLocationUpdate.Available(firstLocation.toUserLocationFix()))
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(secondLocation))
+        userLocationSource.emit(UserLocationUpdate.Available(secondLocation.toUserLocationFix()))
         runCurrent()
 
         // Then
@@ -252,13 +261,13 @@ class ExplorationTrackingRuntimeTest {
         // When
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
         runtime.stop()
         runCurrent()
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
 
         // Then
@@ -293,9 +302,9 @@ class ExplorationTrackingRuntimeTest {
         // When
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
 
         // Then
@@ -326,9 +335,9 @@ class ExplorationTrackingRuntimeTest {
         try {
             runtime.startIfNeeded()
             runCurrent()
-            userLocationSource.emit(UserLocationUpdate.Available(location))
+            userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
             advanceUntilIdle()
-            userLocationSource.emit(UserLocationUpdate.Available(location))
+            userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
             advanceUntilIdle()
 
             // Then
@@ -364,12 +373,15 @@ class ExplorationTrackingRuntimeTest {
         // When
         runtime.startIfNeeded()
         runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location))
+        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
         runCurrent()
 
         // Then
         coVerify(exactly = 1) { discoverWatchtowersByClearedTiles.invoke(clearedTiles) }
     }
+
+    private fun GeoPoint.toUserLocationFix(): UserLocationFix =
+        UserLocationFix(location = this)
 
     private class FakeUserLocationSource : UserLocationSource {
         private val updates = MutableSharedFlow<UserLocationUpdate>(replay = 1, extraBufferCapacity = 8)

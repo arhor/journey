@@ -5,5 +5,5 @@ data class ExplorationTrackingSession(
     val status: ExplorationTrackingStatus = ExplorationTrackingStatus.INACTIVE,
     val cadence: ExplorationTrackingCadence = ExplorationTrackingCadence.BACKGROUND,
     val lastKnownLocation: GeoPoint? = null,
+    val lastKnownLocationFix: UserLocationFix? = null,
 )
-

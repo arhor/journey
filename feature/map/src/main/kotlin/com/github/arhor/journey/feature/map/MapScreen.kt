@@ -1,9 +1,6 @@
 package com.github.arhor.journey.feature.map
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
+import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -14,8 +11,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +22,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
@@ -38,20 +36,22 @@ import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeoutOrNull
 import org.maplibre.compose.camera.CameraMoveReason
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.location.Location
+import org.maplibre.compose.location.LocationProvider
 import org.maplibre.compose.location.LocationPuck
-import org.maplibre.compose.location.UserLocationState
-import org.maplibre.compose.location.rememberDefaultLocationProvider
-import org.maplibre.compose.location.rememberNullLocationProvider
 import org.maplibre.compose.location.rememberUserLocationState
 import org.maplibre.compose.map.GestureOptions
 import org.maplibre.compose.map.MapOptions
@@ -64,7 +64,9 @@ import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.Position
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 @Composable
 fun MapScreen(
@@ -95,8 +97,13 @@ internal fun MapContent(
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val context = LocalContext.current
-    val userLocationState = rememberUserLocationStateInternal(context)
+    val userLocationProvider = remember {
+        MapUiLocationProvider(state.currentLocation?.toMapLibreLocation())
+    }
+    LaunchedEffect(state.currentLocation, userLocationProvider) {
+        userLocationProvider.update(state.currentLocation?.toMapLibreLocation())
+    }
+    val userLocationState = rememberUserLocationState(userLocationProvider)
     val cameraState = key(state.cameraPosition == null) {
         rememberCameraState(
             firstPosition = state.cameraPosition?.toCameraPosition() ?: CameraPosition(),
@@ -104,7 +111,7 @@ internal fun MapContent(
     }
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
-    val latestUserLocation by rememberUpdatedState(state.userLocation)
+    val latestRecenterLocation by rememberUpdatedState(state.recenterTargetLocation())
     val onObjectTapped = remember(dispatch) {
         { objectId: String ->
             dispatch(MapIntent.ObjectTapped(objectId))
@@ -113,39 +120,43 @@ internal fun MapContent(
     val dragRotationTracker = remember {
         HorizontalDragRotationTracker()
     }
+    var lastNorthResetCameraFollowSkipToken by remember {
+        mutableIntStateOf(state.northResetRequestToken)
+    }
+    var activeNorthResetToken by remember {
+        mutableIntStateOf(0)
+    }
+    val isCameraGestureMoving = cameraState.isCameraMoving && cameraState.moveReason == CameraMoveReason.GESTURE
 
     LaunchedEffect(
         state.cameraPosition,
         state.cameraUpdateOrigin,
-        cameraState.isCameraMoving,
-        cameraState.moveReason,
+        state.northResetRequestToken,
+        activeNorthResetToken,
+        isCameraGestureMoving,
+        cameraState,
     ) {
-        val cameraPosition = state.cameraPosition ?: return@LaunchedEffect
-
-        if (state.cameraUpdateOrigin != CameraUpdateOrigin.PROGRAMMATIC) {
+        if (state.northResetRequestToken != lastNorthResetCameraFollowSkipToken) {
+            lastNorthResetCameraFollowSkipToken = state.northResetRequestToken
             return@LaunchedEffect
         }
 
-        if (cameraState.isCameraMoving && cameraState.moveReason == CameraMoveReason.GESTURE) {
+        if (activeNorthResetToken > 0 && activeNorthResetToken == state.northResetRequestToken) {
             return@LaunchedEffect
         }
 
-        val current = cameraState.position
-        if (
-            current.target.latitude != cameraPosition.target.latitude ||
-            current.target.longitude != cameraPosition.target.longitude ||
-            current.zoom != cameraPosition.zoom ||
-            current.bearing != cameraPosition.bearing
-        ) {
-            cameraState.position = current.copy(
-                target = Position(
-                    latitude = cameraPosition.target.latitude,
-                    longitude = cameraPosition.target.longitude,
-                ),
-                zoom = cameraPosition.zoom,
-                bearing = cameraPosition.bearing,
-            )
-        }
+        val targetPosition = resolveProgrammaticCameraFollowUpdate(
+            target = state.cameraPosition,
+            origin = state.cameraUpdateOrigin,
+            current = cameraState.position,
+            isCameraMoving = cameraState.isCameraMoving,
+            moveReason = cameraState.moveReason,
+        ) ?: return@LaunchedEffect
+
+        cameraState.animateTo(
+            finalPosition = targetPosition,
+            duration = FOLLOW_CAMERA_ANIMATION_DURATION,
+        )
     }
 
     LaunchedEffect(state.cameraPosition, cameraState) {
@@ -166,8 +177,16 @@ internal fun MapContent(
     LaunchedEffect(state.cameraPosition, cameraState) {
         snapshotFlow {
             cameraState.position
-            cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()
+            cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()?.let { visibleBounds ->
+                CameraViewportSnapshot(
+                    visibleBounds = visibleBounds,
+                    isCameraMoving = cameraState.isCameraMoving,
+                    moveReason = cameraState.moveReason,
+                )
+            }
         }.filterNotNull()
+            .filter(::shouldPublishCameraViewportSnapshot)
+            .map { it.visibleBounds }
             .distinctUntilChanged(::areGeoBoundsEquivalent)
             .collectLatest { visibleBounds ->
                 dispatch(
@@ -200,32 +219,41 @@ internal fun MapContent(
     }
 
     LaunchedEffect(state.northResetRequestToken) {
-        if (state.northResetRequestToken <= 0) {
+        val requestToken = state.northResetRequestToken
+        if (requestToken <= 0) {
             return@LaunchedEffect
         }
 
-        val location = latestUserLocation ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
-            snapshotFlow { latestUserLocation }
-                .filterNotNull()
-                .first()
-        }
+        activeNorthResetToken = requestToken
 
-        if (location == null) {
-            dispatch(MapIntent.CurrentLocationUnavailable)
-            return@LaunchedEffect
-        }
+        try {
+            val location = latestRecenterLocation ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
+                snapshotFlow { latestRecenterLocation }
+                    .filterNotNull()
+                    .first()
+            }
 
-        cameraState.animateTo(
-            finalPosition = cameraState.position.copy(
-                target = Position(
-                    latitude = location.latitude,
-                    longitude = location.longitude,
+            if (location == null) {
+                dispatch(MapIntent.CurrentLocationUnavailable)
+                return@LaunchedEffect
+            }
+
+            cameraState.animateTo(
+                finalPosition = cameraState.position.copy(
+                    target = Position(
+                        latitude = location.latitude,
+                        longitude = location.longitude,
+                    ),
+                    zoom = state.cameraPosition?.zoom ?: cameraState.position.zoom,
+                    bearing = DEFAULT_CAMERA_BEARING,
                 ),
-                zoom = state.cameraPosition?.zoom ?: cameraState.position.zoom,
-                bearing = DEFAULT_CAMERA_BEARING,
-            ),
-            duration = NORTH_RESET_ANIMATION_DURATION,
-        )
+                duration = NORTH_RESET_ANIMATION_DURATION,
+            )
+        } finally {
+            if (activeNorthResetToken == requestToken) {
+                activeNorthResetToken = 0
+            }
+        }
     }
 
     Box(
@@ -392,20 +420,51 @@ private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 private val USER_LOCATION_TIMEOUT = 5.seconds
 private const val DEFAULT_CAMERA_BEARING = 0.0
+private val FOLLOW_CAMERA_ANIMATION_DURATION = 900.milliseconds
 private val NORTH_RESET_ANIMATION_DURATION = 600.milliseconds
 private val CAMERA_ZOOM_BOUNDS = 14f..20f
 
-@SuppressLint("MissingPermission")
-@Composable
-private fun rememberUserLocationStateInternal(ctx: Context): UserLocationState {
-    return rememberUserLocationState(
-        if (ctx.checkPermission()) {
-            rememberDefaultLocationProvider()
-        } else {
-            rememberNullLocationProvider()
-        }
-    )
+internal class MapUiLocationProvider(
+    initialLocation: Location?,
+) : LocationProvider {
+    private val locations = MutableStateFlow(initialLocation)
+
+    override val location: StateFlow<Location?> = locations
+
+    fun update(location: Location?) {
+        locations.value = location
+    }
 }
+
+internal fun resolveProgrammaticCameraFollowUpdate(
+    target: CameraPositionState?,
+    origin: CameraUpdateOrigin,
+    current: CameraPosition,
+    isCameraMoving: Boolean,
+    moveReason: CameraMoveReason,
+): CameraPosition? {
+    if (target == null || origin != CameraUpdateOrigin.PROGRAMMATIC) {
+        return null
+    }
+
+    if (isCameraMoving && moveReason == CameraMoveReason.GESTURE) {
+        return null
+    }
+
+    val targetPosition = current.copy(
+        target = Position(
+            latitude = target.target.latitude,
+            longitude = target.target.longitude,
+        ),
+        zoom = target.zoom,
+        bearing = target.bearing,
+    )
+
+    return targetPosition.takeUnless { areCameraPositionsEquivalent(current, it) }
+}
+
+internal fun shouldPublishCameraViewportSnapshot(snapshot: CameraViewportSnapshot): Boolean =
+    !snapshot.isCameraMoving || snapshot.moveReason == CameraMoveReason.GESTURE
 
 private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): Boolean {
     return abs(a.target.latitude - b.target.latitude) < CAMERA_SETTLE_COORDINATE_THRESHOLD
@@ -442,10 +501,6 @@ private fun BoundingBox.toGeoBounds(): GeoBounds = GeoBounds(
     east = east,
 )
 
-private fun Context.checkPermission(): Boolean =
-    checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-        checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-
 private fun CameraPosition.toCameraPositionState(): CameraPositionState =
     CameraPositionState(
         target = LatLng(
@@ -465,6 +520,36 @@ private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosit
     bearing = bearing,
 )
 
+internal fun MapUiState.Content.recenterTargetLocation(): LatLng? =
+    currentLocation?.position ?: cameraLocation
+
+internal fun CurrentLocationUiModel.toMapLibreLocation(
+    nowElapsedRealtimeNanos: () -> Long = SystemClock::elapsedRealtimeNanos,
+): Location =
+    Location(
+        position = Position(
+            latitude = position.latitude,
+            longitude = position.longitude,
+        ),
+        accuracy = horizontalAccuracyMeters ?: 0.0,
+        bearing = bearingDegrees,
+        bearingAccuracy = bearingAccuracyDegrees,
+        speed = speedMetersPerSecond,
+        speedAccuracy = null,
+        timestamp = elapsedRealtimeNanos.toTimeMark(nowElapsedRealtimeNanos),
+    )
+
+internal fun Long?.toTimeMark(
+    nowElapsedRealtimeNanos: () -> Long = SystemClock::elapsedRealtimeNanos,
+) = this
+    ?.let { elapsedRealtimeNanos ->
+        val age = (nowElapsedRealtimeNanos() - elapsedRealtimeNanos)
+            .coerceAtLeast(0L)
+            .nanoseconds
+        TimeSource.Monotonic.markNow() - age
+    }
+    ?: TimeSource.Monotonic.markNow()
+
 private fun CameraMoveReason.toCameraUpdateOrigin(): CameraUpdateOrigin =
     if (this == CameraMoveReason.GESTURE) {
         CameraUpdateOrigin.USER
@@ -476,6 +561,12 @@ private data class CameraSettledSnapshot(
     val position: CameraPosition,
     val origin: CameraUpdateOrigin,
     val isCameraMoving: Boolean,
+)
+
+internal data class CameraViewportSnapshot(
+    val visibleBounds: GeoBounds,
+    val isCameraMoving: Boolean,
+    val moveReason: CameraMoveReason,
 )
 
 internal data class HorizontalDragRotationUpdate(

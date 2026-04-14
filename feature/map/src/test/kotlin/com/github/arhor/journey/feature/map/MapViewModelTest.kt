@@ -16,6 +16,7 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
+import com.github.arhor.journey.domain.model.UserLocationFix
 import com.github.arhor.journey.domain.model.Watchtower
 import com.github.arhor.journey.domain.model.WatchtowerPhase
 import com.github.arhor.journey.domain.model.WatchtowerResourceCost
@@ -42,6 +43,7 @@ import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
+import com.github.arhor.journey.feature.map.location.LocationStabilizer
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -1456,6 +1458,149 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `uiState should hold camera target when updated location is too inaccurate for camera follow`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 20.0)
+        val inaccurateFix = locationFix(lat = 40.7128, lon = -74.0040, accuracy = 80.0)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(inaccurateFix)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.currentLocation?.position == LatLng(latitude = 40.7128, longitude = -74.004)
+            }
+            actual.userLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.004)
+            actual.cameraLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should keep camera and puck position stable for tiny location drift`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+        val driftFix = locationFix(lat = 40.7128, lon = -74.00599, accuracy = 12.0)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.currentLocation?.position == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(driftFix)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.currentLocation?.horizontalAccuracyMeters == 12.0
+            }
+            actual.userLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.cameraLocation shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+            actual.cameraPosition?.target shouldBe LatLng(latitude = 40.7128, longitude = -74.006)
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should recenter camera promptly for meaningful accepted movement`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+        val movedFix = locationFix(lat = 40.7228, lon = -74.0060, accuracy = 10.0)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.withLocationFix(movedFix)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(latitude = 40.7228, longitude = -74.006)
+            }
+            actual.currentLocation?.position shouldBe LatLng(latitude = 40.7228, longitude = -74.006)
+            actual.cameraLocation shouldBe LatLng(latitude = 40.7228, longitude = -74.006)
+            actual.cameraUpdateOrigin shouldBe CameraUpdateOrigin.PROGRAMMATIC
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should hide stabilized location when permission is denied`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+        val fixture = createFixture(
+            pointsOfInterest = emptyList(),
+            trackingSession = ExplorationTrackingSession(
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
+            ),
+        )
+
+        try {
+            fixture.viewModel.awaitContent {
+                it.currentLocation?.position == LatLng(latitude = 40.7128, longitude = -74.006)
+            }
+
+            // When
+            fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
+                status = ExplorationTrackingStatus.PERMISSION_DENIED,
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent {
+                it.explorationTrackingStatus == ExplorationTrackingStatus.PERMISSION_DENIED
+            }
+            actual.currentLocation shouldBe null
+            actual.userLocation shouldBe null
+            actual.cameraLocation shouldBe null
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
     fun `dispatch should keep following updated user location when camera settles from a user gesture`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -2644,6 +2789,7 @@ class MapViewModelTest {
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 mapObjectQueryWindowPolicy = MapObjectQueryWindowPolicy(),
+                locationStabilizer = LocationStabilizer(),
             ),
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
@@ -2657,6 +2803,27 @@ class MapViewModelTest {
             startTrackingSession = startTrackingSession,
         )
     }
+
+    private fun locationFix(
+        lat: Double,
+        lon: Double,
+        accuracy: Double,
+        speed: Double? = null,
+        bearing: Double? = null,
+    ): UserLocationFix =
+        UserLocationFix(
+            location = GeoPoint(lat = lat, lon = lon),
+            horizontalAccuracyMeters = accuracy,
+            speedMetersPerSecond = speed,
+            bearingDegrees = bearing,
+            elapsedRealtimeNanos = 1_000L,
+        )
+
+    private fun ExplorationTrackingSession.withLocationFix(fix: UserLocationFix): ExplorationTrackingSession =
+        copy(
+            lastKnownLocation = fix.location,
+            lastKnownLocationFix = fix,
+        )
 
     private fun resourceSpawn(
         id: String,

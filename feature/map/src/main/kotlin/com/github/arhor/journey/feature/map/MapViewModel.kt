@@ -13,11 +13,13 @@ import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.internal.tileAt
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
+import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
+import com.github.arhor.journey.domain.model.UserLocationFix
 import com.github.arhor.journey.domain.model.Watchtower
 import com.github.arhor.journey.domain.model.WatchtowerPhase
 import com.github.arhor.journey.domain.model.WatchtowerResourceCost
@@ -36,6 +38,7 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
+import com.github.arhor.journey.feature.map.location.LocationStabilizer
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -61,6 +64,11 @@ import com.github.arhor.journey.core.common.combine as combineOutputs
 
 private const val DEFAULT_CAMERA_ZOOM = 17.0
 private const val DEFAULT_CAMERA_BEARING = 0.0
+private val LOCATION_HIDDEN_STATUSES = setOf(
+    ExplorationTrackingStatus.PERMISSION_DENIED,
+    ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED,
+)
+
 @Immutable
 private data class State(
     val cameraPosition: CameraPositionState? = null,
@@ -92,6 +100,7 @@ class MapViewModel @Inject constructor(
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
     private val mapObjectQueryWindowPolicy: MapObjectQueryWindowPolicy,
+    private val locationStabilizer: LocationStabilizer,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -398,8 +407,18 @@ class MapViewModel @Inject constructor(
                     )
                     ?.toSheetUiState(watchtowerResourceAmounts)
             }
-        val userLocation = trackingSession.lastKnownLocation?.toLatLng()
-        val resolvedCameraPosition = userLocation?.toCameraPosition(
+        val rawLocationFix = trackingSession.lastKnownLocationFix
+            ?: trackingSession.lastKnownLocation?.toUserLocationFix()
+        val shouldExposeLocation = trackingSession.status !in LOCATION_HIDDEN_STATUSES
+        if (!shouldExposeLocation || rawLocationFix == null) {
+            locationStabilizer.reset()
+        }
+        val locationFix = rawLocationFix.takeIf { shouldExposeLocation }
+        val stabilizedLocation = locationStabilizer.stabilize(locationFix)
+        val currentLocation = stabilizedLocation.visualLocation?.toCurrentLocationUiModel()
+        val userLocation = currentLocation?.position
+        val cameraLocation = stabilizedLocation.cameraLocation?.location?.toLatLng()
+        val resolvedCameraPosition = cameraLocation?.toCameraPosition(
             zoom = state.cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
             bearing = state.cameraPosition?.bearing ?: DEFAULT_CAMERA_BEARING,
         )
@@ -414,6 +433,8 @@ class MapViewModel @Inject constructor(
             cameraPosition = resolvedCameraPosition,
             cameraUpdateOrigin = resolvedCameraUpdateOrigin,
             northResetRequestToken = state.northResetRequestToken,
+            currentLocation = currentLocation,
+            cameraLocation = cameraLocation,
             userLocation = userLocation,
             isExplorationTrackingActive = trackingSession.isActive,
             explorationTrackingCadence = trackingSession.cadence,
@@ -839,6 +860,19 @@ class MapViewModel @Inject constructor(
         LatLng(
             latitude = lat,
             longitude = lon,
+        )
+
+    private fun GeoPoint.toUserLocationFix(): UserLocationFix =
+        UserLocationFix(location = this)
+
+    private fun UserLocationFix.toCurrentLocationUiModel(): CurrentLocationUiModel =
+        CurrentLocationUiModel(
+            position = location.toLatLng(),
+            horizontalAccuracyMeters = horizontalAccuracyMeters,
+            speedMetersPerSecond = speedMetersPerSecond,
+            bearingDegrees = bearingDegrees,
+            bearingAccuracyDegrees = bearingAccuracyDegrees,
+            elapsedRealtimeNanos = elapsedRealtimeNanos,
         )
 
     private fun LatLng.toCameraPosition(
