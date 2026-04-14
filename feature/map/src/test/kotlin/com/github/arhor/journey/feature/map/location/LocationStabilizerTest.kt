@@ -11,7 +11,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should reject poor accuracy updates for camera follow`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
         val initial = fix(lat = 0.0, lon = 0.0, accuracy = 20.0)
         val poorCameraFix = fix(lat = 0.0, lon = 0.001, accuracy = 80.0)
 
@@ -27,7 +27,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should keep tiny drift inside movement deadband`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
         val initial = fix(lat = 0.0, lon = 0.0, accuracy = 10.0, speed = 2.0)
         val drift = fix(lat = 0.0, lon = 0.00001, accuracy = 12.0, speed = 3.0)
 
@@ -45,7 +45,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should pass through large real movement without smoothing lag`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
         val initial = fix(lat = 0.0, lon = 0.0, accuracy = 10.0)
         val realMovement = fix(lat = 0.0, lon = 0.01, accuracy = 10.0)
 
@@ -61,7 +61,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should move visual and camera locations for normal walking movement`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
         val initial = fix(lat = 0.0, lon = 0.0, accuracy = 10.0, speed = 1.6)
         val walkingMovement = fix(lat = 0.000055, lon = 0.0, accuracy = 10.0, speed = 1.6)
 
@@ -77,7 +77,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should ignore bearing below speed threshold`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
         val slowFix = fix(
             lat = 0.0,
             lon = 0.0,
@@ -100,7 +100,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should allow visual bearing when speed only satisfies visual threshold`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
         val slowCameraFix = fix(
             lat = 0.0,
             lon = 0.0,
@@ -123,7 +123,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should smooth accepted camera fixes predictably across updates`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
 
         // When
         subject.stabilize(fix(lat = 0.0, lon = 0.0, accuracy = 10.0))
@@ -138,7 +138,7 @@ class LocationStabilizerTest {
     @Test
     fun `stabilize should allow visual and camera policies to differ`() {
         // Given
-        val subject = LocationStabilizer()
+        val subject = LocationStabilizer(LocationStabilizerConfig())
         val initial = fix(lat = 0.0, lon = 0.0, accuracy = 10.0)
         val mediumAccuracyFix = fix(lat = 0.0, lon = 0.001, accuracy = 60.0)
 

@@ -1,12 +1,5 @@
 package com.github.arhor.journey.domain.model
 
-private const val ZOOM_SHIFT = 48
-private const val X_SHIFT = 24
-private const val Y_SHIFT = 0
-
-private const val ZOOM_COORDINATE_MASK = 0xFFL
-private const val AXIS_COORDINATE_MASK = 0xFFFFFFL
-
 /**
  * Packed representation of a map tile coordinate.
  *
@@ -18,7 +11,7 @@ private const val AXIS_COORDINATE_MASK = 0xFFFFFFL
  *
  * In other words, the memory layout is:
  *
- * `[zoom | x | y]`
+ * `[ zoom | x | y ]`
  *
  * Natural ordering by [packedValue] follows the packed layout, meaning values are
  * effectively ordered by `zoom`, then `x`, then `y`.
@@ -26,19 +19,26 @@ private const val AXIS_COORDINATE_MASK = 0xFFFFFFL
 @JvmInline
 value class MapTile private constructor(
     val packedValue: Long,
-): Comparable<MapTile> {
+) : Comparable<MapTile> {
     /** Zoom level extracted from the packed [packedValue]. */
-    val zoom: Int get() = unpackZoom(packedValue)
+    val zoom: Int get() = unpack(value = packedValue, shift = ZOOM_SHIFT, mask = ZOOM_COORDINATE_MASK)
 
     /** X coordinate extracted from the packed [packedValue]. */
-    val x: Int get() = unpackX(packedValue)
+    val x: Int get() = unpack(value = packedValue, shift = X_SHIFT, mask = AXIS_COORDINATE_MASK)
 
     /** Y coordinate extracted from the packed [packedValue]. */
-    val y: Int get() = unpackY(packedValue)
+    val y: Int get() = unpack(value = packedValue, shift = Y_SHIFT, mask = AXIS_COORDINATE_MASK)
 
     override fun compareTo(other: MapTile): Int = packedValue.compareTo(other.packedValue)
 
     companion object {
+        const val ZOOM_SHIFT = 48
+        const val X_SHIFT = 24
+        const val Y_SHIFT = 0
+
+        const val ZOOM_COORDINATE_MASK = 0xFFL
+        const val AXIS_COORDINATE_MASK = 0xFFFFFFL
+
         /**
          * Creates a [MapTile] from zoom, x, and y coordinates.
          */
@@ -69,14 +69,12 @@ value class MapTile private constructor(
                    ((y.toLong() and AXIS_COORDINATE_MASK) shl Y_SHIFT)
         }
 
-        fun unpackZoom(value: Long): Int =
-            ((value ushr ZOOM_SHIFT) and ZOOM_COORDINATE_MASK).toInt()
+        fun unpack(value: Long, shift: Int, mask: Long): Int =
+            ((value ushr shift) and mask).toInt()
 
-        fun unpackX(value: Long): Int =
-            ((value ushr X_SHIFT) and AXIS_COORDINATE_MASK).toInt()
-
-        fun unpackY(value: Long): Int =
-            ((value ushr Y_SHIFT) and AXIS_COORDINATE_MASK).toInt()
+        fun unpackZoom(value: Long): Int = unpack(value, ZOOM_SHIFT, ZOOM_COORDINATE_MASK)
+        fun unpackX(value: Long): Int = unpack(value, X_SHIFT, AXIS_COORDINATE_MASK)
+        fun unpackY(value: Long): Int = unpack(value, Y_SHIFT, AXIS_COORDINATE_MASK)
     }
 }
 
