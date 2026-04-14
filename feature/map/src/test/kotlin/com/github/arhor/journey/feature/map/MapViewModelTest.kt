@@ -44,6 +44,7 @@ import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
 import com.github.arhor.journey.feature.map.location.LocationStabilizer
+import com.github.arhor.journey.feature.map.location.LocationStabilizerConfig
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
@@ -1569,7 +1570,6 @@ class MapViewModelTest {
         // Given
         val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
         val fixture = createFixture(
-            pointsOfInterest = emptyList(),
             trackingSession = ExplorationTrackingSession(
                 status = ExplorationTrackingStatus.TRACKING,
                 lastKnownLocation = initialFix.location,
@@ -2789,7 +2789,7 @@ class MapViewModelTest {
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 mapObjectQueryWindowPolicy = MapObjectQueryWindowPolicy(),
-                locationStabilizer = LocationStabilizer(),
+                locationStabilizer = LocationStabilizer(LocationStabilizerConfig()),
             ),
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
