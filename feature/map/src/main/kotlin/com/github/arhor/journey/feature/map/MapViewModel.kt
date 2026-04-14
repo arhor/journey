@@ -18,7 +18,6 @@ import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
-import com.github.arhor.journey.domain.model.PointOfInterest
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.UserLocationFix
 import com.github.arhor.journey.domain.model.Watchtower
@@ -28,14 +27,11 @@ import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
-import com.github.arhor.journey.domain.usecase.DiscoverPointOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
-import com.github.arhor.journey.domain.usecase.ObserveExplorationProgressUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
-import com.github.arhor.journey.domain.usecase.ObservePointsOfInterestUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
@@ -84,7 +80,6 @@ private data class State(
     val viewportSize: MapViewportSize? = null,
     val resourceQueryWindow: GeoBounds? = null,
     val watchtowerMarkerQueryWindow: GeoBounds? = null,
-    val addPoiAnchor: LatLng? = null,
     val selectedWatchtowerId: String? = null,
     val selectedWatchtowerSnapshot: Watchtower? = null,
     val failureMessage: String? = null,
@@ -93,11 +88,8 @@ private data class State(
 @Stable
 @HiltViewModel
 class MapViewModel @Inject constructor(
-    private val observePointsOfInterest: ObservePointsOfInterestUseCase,
     private val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
-    private val observeExplorationProgress: ObserveExplorationProgressUseCase,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
-    private val discoverPointOfInterest: DiscoverPointOfInterestUseCase,
     private val observeVisibleWatchtowers: ObserveVisibleWatchtowersUseCase,
     private val observeHeroResourceAmount: ObserveHeroResourceAmountUseCase,
     private val claimWatchtower: ClaimWatchtowerUseCase,
@@ -154,14 +146,12 @@ class MapViewModel @Inject constructor(
                 fogOfWarController.uiState,
                 trackingSession,
                 observeSelectedMapStyle(),
-                observePointsOfInterest(),
-            ) { state, fogOfWar, session, mapStyleOutput, pointsOfInterest ->
+            ) { state, fogOfWar, session, mapStyleOutput ->
                 UiStateInputs(
                     state = state,
                     fogOfWar = fogOfWar,
                     trackingSessionOutput = session,
                     mapStyleOutput = mapStyleOutput,
-                    pointsOfInterestOutput = pointsOfInterest,
                 )
             },
             watchtowerResourceAmounts,
@@ -171,7 +161,6 @@ class MapViewModel @Inject constructor(
                 state = inputs.state,
                 trackingSessionOutput = inputs.trackingSessionOutput,
                 mapStyleOutput = inputs.mapStyleOutput,
-                pointsOfInterestOutput = inputs.pointsOfInterestOutput,
                 fogOfWar = inputs.fogOfWar,
                 visibleWorldObjectsOutput = visibleWorldObjects,
                 watchtowerResourceAmountsOutput = watchtowerResourceAmounts,
@@ -188,34 +177,14 @@ class MapViewModel @Inject constructor(
 
     private fun observeVisibleWorldObjects(): Flow<Output<VisibleWorldObjects, DomainError>> =
         combine(
-            observePointOfInterestObjects(),
             observeVisibleResourceSpawnObjects(),
             visibleWatchtowerData,
-        ) { pointOfInterestObjects, resourceSpawnObjects, watchtowerData ->
-            combineOutputs(
-                combineOutputs(pointOfInterestObjects, resourceSpawnObjects),
-                watchtowerData,
-            ) { (pointOfInterestObjectsValue, resourceSpawnObjectsValue), watchtowerDataValue ->
+        ) { resourceSpawnObjects, watchtowerData ->
+            combineOutputs(resourceSpawnObjects, watchtowerData) { resourceSpawnObjectsValue, watchtowerDataValue ->
                 VisibleWorldObjects(
-                    objects = pointOfInterestObjectsValue + resourceSpawnObjectsValue + watchtowerDataValue.objects,
+                    objects = resourceSpawnObjectsValue + watchtowerDataValue.objects,
                     watchtowers = watchtowerDataValue.watchtowers,
                 )
-            }
-        }
-            .distinctUntilChanged()
-
-    private fun observePointOfInterestObjects(): Flow<Output<List<MapObjectUiModel>, DomainError>> =
-        combine(
-            observePointsOfInterest(),
-            observeExplorationProgress(),
-        ) { pointsOfInterestOutput, explorationProgressOutput ->
-            combineOutputs(pointsOfInterestOutput, explorationProgressOutput) { pointsOfInterest, explorationProgress ->
-                val discoveredPoiIds = explorationProgress.discovered
-                    .mapTo(mutableSetOf()) { it.poiId }
-
-                pointsOfInterest.map { pointOfInterest ->
-                    pointOfInterest.toUiModel(isDiscovered = pointOfInterest.id in discoveredPoiIds)
-                }
             }
         }
             .distinctUntilChanged()
@@ -344,13 +313,12 @@ class MapViewModel @Inject constructor(
             is MapIntent.CameraSettled -> onCameraSettled(intent)
             is MapIntent.CurrentLocationUnavailable -> onCurrentLocationUnavailable()
             is MapIntent.LocationPermissionResult -> onLocationPermissionResult(intent)
-            is MapIntent.MapTapped -> onMapTapped(intent)
+            MapIntent.MapTapped -> onMapTapped()
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
             MapIntent.DismissWatchtowerSheet -> onDismissWatchtowerSheet()
             MapIntent.ClaimSelectedWatchtower -> onClaimSelectedWatchtower()
             MapIntent.UpgradeSelectedWatchtower -> onUpgradeSelectedWatchtower()
-            is MapIntent.AddPoiClicked -> onAddPoiClicked()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
@@ -387,7 +355,6 @@ class MapViewModel @Inject constructor(
         state: State,
         trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
         mapStyleOutput: Output<MapStyle?, DomainError>,
-        pointsOfInterestOutput: Output<List<PointOfInterest>, DomainError>,
         fogOfWar: FogOfWarUiState,
         visibleWorldObjectsOutput: Output<VisibleWorldObjects, DomainError>,
         watchtowerResourceAmountsOutput: Output<Map<String, Int>, DomainError>,
@@ -405,14 +372,6 @@ class MapViewModel @Inject constructor(
             is Output.Failure -> {
                 return MapUiState.Failure(
                     errorMessage = mapStyleOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
-                )
-            }
-        }
-        val pointsOfInterest = when (pointsOfInterestOutput) {
-            is Output.Success -> pointsOfInterestOutput.value
-            is Output.Failure -> {
-                return MapUiState.Failure(
-                    errorMessage = pointsOfInterestOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
                 )
             }
         }
@@ -464,8 +423,7 @@ class MapViewModel @Inject constructor(
             bearing = state.cameraPosition?.bearing ?: DEFAULT_CAMERA_BEARING,
         )
             ?: state.cameraPosition
-            ?: pointsOfInterest.defaultCameraPosition()
-        val resolvedCameraUpdateOrigin = if (cameraLocation != null && !state.isUserInteractingCamera) {
+        val resolvedCameraUpdateOrigin = if (userLocation != null && !state.isUserInteractingCamera) {
             CameraUpdateOrigin.PROGRAMMATIC
         } else {
             state.cameraUpdateOrigin
@@ -541,28 +499,13 @@ class MapViewModel @Inject constructor(
         emitEffect(MapEffect.ShowMessage(CURRENT_LOCATION_UNAVAILABLE_MESSAGE))
     }
 
-    private fun onMapTapped(intent: MapIntent.MapTapped) {
+    private fun onMapTapped() {
         _state.update {
             it.copy(
-                addPoiAnchor = intent.target,
                 selectedWatchtowerId = null,
                 selectedWatchtowerSnapshot = null,
             )
         }
-    }
-
-    private fun onAddPoiClicked() {
-        val contentState = uiState.value as? MapUiState.Content ?: return
-        val target = _state.value.addPoiAnchor
-            ?: contentState.userLocation
-            ?: return
-
-        emitEffect(
-            MapEffect.OpenAddPoi(
-                latitude = target.latitude,
-                longitude = target.longitude,
-            ),
-        )
     }
 
     private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
@@ -632,52 +575,31 @@ class MapViewModel @Inject constructor(
             ?: return
         val parsedId = parseMapObjectId(objectUiModel.id) ?: return
 
-        try {
-            val selectedWatchtowerSnapshot = if (parsedId.kind == MapObjectKind.Watchtower) {
-                when (val result = getWatchtower(parsedId.rawId)) {
-                    is Output.Success -> result.value
-                    is Output.Failure -> {
-                        (visibleWatchtowerData.value as? Output.Success)
-                            ?.value
-                            ?.watchtowers
-                            ?.firstOrNull { watchtower ->
-                                watchtower.id == parsedId.rawId
-                            }
-                    }
-                }
-            } else {
-                null
-            }
-
-            _state.update {
-                it.copy(
-                    selectedWatchtowerId = if (parsedId.kind == MapObjectKind.Watchtower) {
-                        parsedId.rawId
-                    } else {
-                        null
-                    },
-                    selectedWatchtowerSnapshot = selectedWatchtowerSnapshot,
-                )
-            }
-
-            if (parsedId.kind == MapObjectKind.PointOfInterest) {
-                val poiId = parsedId.rawId.toLongOrNull() ?: return
-                when (val result = discoverPointOfInterest(poiId)) {
-                    is Output.Success -> {
-                        emitEffect(MapEffect.OpenObjectDetails(parsedId.rawId))
-                    }
-
-                    is Output.Failure -> {
-                        emitEffect(
-                            MapEffect.ShowMessage(
-                                result.error.resolveMessage(OBJECT_DISCOVERY_FAILED_MESSAGE),
-                            ),
-                        )
-                    }
+        val selectedWatchtowerSnapshot = if (parsedId.kind == MapObjectKind.Watchtower) {
+            when (val result = getWatchtower(parsedId.rawId)) {
+                is Output.Success -> result.value
+                is Output.Failure -> {
+                    (visibleWatchtowerData.value as? Output.Success)
+                        ?.value
+                        ?.watchtowers
+                        ?.firstOrNull { watchtower ->
+                            watchtower.id == parsedId.rawId
+                        }
                 }
             }
-        } catch (e: Throwable) {
-            emitEffect(MapEffect.ShowMessage(e.message ?: OBJECT_DISCOVERY_FAILED_MESSAGE))
+        } else {
+            null
+        }
+
+        _state.update {
+            it.copy(
+                selectedWatchtowerId = if (parsedId.kind == MapObjectKind.Watchtower) {
+                    parsedId.rawId
+                } else {
+                    null
+                },
+                selectedWatchtowerSnapshot = selectedWatchtowerSnapshot,
+            )
         }
     }
 
@@ -786,20 +708,6 @@ class MapViewModel @Inject constructor(
             }
         }
     }
-
-    private fun PointOfInterest.toUiModel(isDiscovered: Boolean): MapObjectUiModel =
-        MapObjectUiModel(
-            id = mapObjectId(
-                kind = MapObjectKind.PointOfInterest,
-                rawId = id.toString(),
-            ),
-            kind = MapObjectKind.PointOfInterest,
-            title = name,
-            description = description,
-            position = location.toLatLng(),
-            radiusMeters = radiusMeters,
-            isDiscovered = isDiscovered,
-        )
 
     private fun ResourceSpawn.toUiModel(isHiddenByFog: Boolean): MapObjectUiModel {
         val resourceType = ResourceType.fromTypeId(typeId)
@@ -977,33 +885,12 @@ class MapViewModel @Inject constructor(
             bearing = bearing,
         )
 
-    private fun List<PointOfInterest>.defaultCameraPosition(): CameraPositionState? {
-        if (isEmpty()) {
-            return null
-        }
-
-        val minLatitude = minOf { it.location.lat }
-        val maxLatitude = maxOf { it.location.lat }
-        val minLongitude = minOf { it.location.lon }
-        val maxLongitude = maxOf { it.location.lon }
-
-        return CameraPositionState(
-            target = LatLng(
-                latitude = (minLatitude + maxLatitude) / 2.0,
-                longitude = (minLongitude + maxLongitude) / 2.0,
-            ),
-            zoom = DEFAULT_CAMERA_ZOOM,
-            bearing = DEFAULT_CAMERA_BEARING,
-        )
-    }
-
     @Immutable
     private data class UiStateInputs(
         val state: State,
         val fogOfWar: FogOfWarUiState,
         val trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
         val mapStyleOutput: Output<MapStyle?, DomainError>,
-        val pointsOfInterestOutput: Output<List<PointOfInterest>, DomainError>,
     )
 
     @Immutable
@@ -1055,7 +942,6 @@ class MapViewModel @Inject constructor(
     private companion object {
         const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."
         const val SETTINGS_LOADING_FAILED_MESSAGE = "Failed to load settings state."
-        const val OBJECT_DISCOVERY_FAILED_MESSAGE = "Failed to open map object details."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
         const val TRACKING_PERMISSION_REQUIRED_MESSAGE =
             "Location permission is required to start exploration tracking."

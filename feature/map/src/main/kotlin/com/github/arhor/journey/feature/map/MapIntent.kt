@@ -3,7 +3,6 @@ package com.github.arhor.journey.feature.map
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
-import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 
 sealed interface MapIntent {
@@ -26,9 +25,7 @@ sealed interface MapIntent {
         val origin: CameraUpdateOrigin,
     ) : MapIntent
 
-    data class MapTapped(
-        val target: LatLng,
-    ) : MapIntent
+    data object MapTapped : MapIntent
 
     data object RecenterClicked : MapIntent
 
@@ -47,8 +44,6 @@ sealed interface MapIntent {
     data object ClaimSelectedWatchtower : MapIntent
 
     data object UpgradeSelectedWatchtower : MapIntent
-
-    data object AddPoiClicked : MapIntent
 
     data class MapLoadFailed(
         val message: String? = null,

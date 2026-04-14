@@ -149,23 +149,6 @@ fun MapObjectsRendererAdapter(
         textSize = const(12.sp),
     )
 
-    CircleLayer(
-        id = OBJECT_LAYER_ID,
-        source = source,
-        minZoom = DECLUSTER_ZOOM.toFloat(),
-        filter = feature[PROPERTY_OBJECT_KIND].asString(const("")) eq const(MapObjectKind.PointOfInterest.idPrefix),
-        color = const(Color(0xFF3949AB)),
-        strokeColor = const(Color.White),
-        strokeWidth = const(2.dp),
-        radius = const(8.dp),
-        onClick = { features ->
-            resolveObjectId(features)?.let { objectId ->
-                onObjectTapped(objectId)
-                ClickResult.Consume
-            } ?: ClickResult.Pass
-        },
-    )
-
     val watchtowerMarkerStateExpression = feature[PROPERTY_OBJECT_WATCHTOWER_STATE].asString(
         const(WatchtowerMarkerState.DISCOVERED_DORMANT.name),
     )
@@ -317,7 +300,6 @@ internal fun resolveObjectId(features: List<Feature<*, JsonObject?>>): String? =
 internal const val GAME_ENTITIES_SOURCE_ID = "game-entities-source"
 internal const val CLUSTER_LAYER_ID = "game-entities-cluster-layer"
 internal const val CLUSTER_COUNT_LAYER_ID = "game-entities-cluster-count-layer"
-internal const val OBJECT_LAYER_ID = "game-entities-object-layer"
 internal const val WATCHTOWER_HALO_LAYER_ID = "watchtower-halo-layer"
 internal const val WATCHTOWER_LAYER_ID = "watchtower-layer"
 internal const val RESOURCE_SPAWN_LAYER_ID = "resource-spawn-layer"

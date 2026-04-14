@@ -38,7 +38,7 @@ Gradle modules:
 - `:core:ui` - shared UI architecture support; currently mainly `MviViewModel`.
 - `:feature:exploration` - foreground exploration tracking runtime, services, and location orchestration.
 - `:feature:hero` - hero screen, route, navigation contract, and view model.
-- `:feature:map` - map flow, POI flows, map rendering integration, tracking session UI, and related view models.
+- `:feature:map` - map flow, map rendering integration, tracking session UI, and related view models.
 - `:feature:map:fog-of-war` - fog-of-war state, buffering, render-data preparation, diagnostics, and map overlay application.
 - `:feature:settings` - settings screen, navigation contract, Health Connect entry points, and view model.
 

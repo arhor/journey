@@ -1,7 +1,5 @@
 package com.github.arhor.journey.ui
 
-import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -26,9 +24,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            App(
-                onOpenMiniGame = { startActivity(intent<MiniGameActivity>()) },
-            )
+            App()
         }
     }
 
@@ -69,5 +65,3 @@ class MainActivity : ComponentActivity() {
         const val TAG = "MainActivity"
     }
 }
-
-private inline fun <reified T> Context.intent() = Intent(this, T::class.java)
