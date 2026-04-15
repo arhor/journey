@@ -150,10 +150,7 @@ internal fun MapContent(
             moveReason = cameraState.moveReason,
         ) ?: return@LaunchedEffect
 
-        cameraState.animateTo(
-            finalPosition = targetPosition,
-            duration = FOLLOW_CAMERA_ANIMATION_DURATION,
-        )
+        cameraState.position = targetPosition
     }
 
     LaunchedEffect(state.cameraPosition, cameraState) {
@@ -402,7 +399,6 @@ private const val CAMERA_SETTLE_BEARING_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
 private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 private val USER_LOCATION_TIMEOUT = 5.seconds
-private val FOLLOW_CAMERA_ANIMATION_DURATION = 900.milliseconds
 private val NORTH_RESET_ANIMATION_DURATION = 600.milliseconds
 private val CAMERA_ZOOM_BOUNDS = 14f..20f
 

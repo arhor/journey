@@ -12,4 +12,14 @@ object LocationModule {
     @Provides
     fun provideLocationStabilizerConfig(): LocationStabilizerConfig =
         LocationStabilizerConfig()
+
+    @Provides
+    internal fun provideMapLocationAnimator(
+        config: MapLocationAnimatorConfig,
+    ): MapLocationAnimator =
+        MapLocationAnimator(config)
+
+    @Provides
+    internal fun provideMapLocationAnimatorConfig(): MapLocationAnimatorConfig =
+        MapLocationAnimatorConfig()
 }

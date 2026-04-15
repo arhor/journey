@@ -43,6 +43,9 @@ import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
+import com.github.arhor.journey.feature.map.location.LocationStabilizationSnapshot
+import com.github.arhor.journey.feature.map.location.MapLocationAnimationSnapshot
+import com.github.arhor.journey.feature.map.location.MapLocationAnimator
 import com.github.arhor.journey.feature.map.location.LocationStabilizer
 import com.github.arhor.journey.feature.map.location.LocationStabilizerConfig
 import com.github.arhor.journey.feature.map.model.CameraPositionState
@@ -62,6 +65,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -1546,6 +1550,84 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `uiState should use map location animator output for visual and camera locations`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val initialFix = locationFix(lat = 40.7128, lon = -74.0060, accuracy = 10.0)
+        val firstAnimatedVisualLocation = GeoPoint(lat = 40.71285, lon = -74.00595)
+        val firstAnimatedCameraLocation = GeoPoint(lat = 40.71292, lon = -74.0059)
+        val secondAnimatedVisualLocation = GeoPoint(lat = 40.7129, lon = -74.00585)
+        val secondAnimatedCameraLocation = GeoPoint(lat = 40.7130, lon = -74.0058)
+        val animatedLocationFrames = MutableSharedFlow<MapLocationAnimationSnapshot>(replay = 1)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                lastKnownLocation = initialFix.location,
+                lastKnownLocationFix = initialFix,
+            ),
+            mapLocationAnimatorFlowFactory = { animatedLocationFrames },
+        )
+
+        try {
+            // When
+            animatedLocationFrames.emit(
+                MapLocationAnimationSnapshot(
+                    visualLocation = initialFix.copy(location = firstAnimatedVisualLocation),
+                    cameraLocation = initialFix.copy(location = firstAnimatedCameraLocation),
+                ),
+            )
+            val first = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(
+                    latitude = firstAnimatedCameraLocation.lat,
+                    longitude = firstAnimatedCameraLocation.lon,
+                )
+            }
+            animatedLocationFrames.emit(
+                MapLocationAnimationSnapshot(
+                    visualLocation = initialFix.copy(location = secondAnimatedVisualLocation),
+                    cameraLocation = initialFix.copy(location = secondAnimatedCameraLocation),
+                ),
+            )
+            val second = fixture.viewModel.awaitContent {
+                it.cameraPosition?.target == LatLng(
+                    latitude = secondAnimatedCameraLocation.lat,
+                    longitude = secondAnimatedCameraLocation.lon,
+                )
+            }
+            animatedLocationFrames.emit(MapLocationAnimationSnapshot())
+            val reset = fixture.viewModel.awaitContent {
+                it.currentLocation == null && it.cameraLocation == null
+            }
+
+            // Then
+            first.currentLocation?.position shouldBe LatLng(
+                latitude = firstAnimatedVisualLocation.lat,
+                longitude = firstAnimatedVisualLocation.lon,
+            )
+            first.cameraLocation shouldBe LatLng(
+                latitude = firstAnimatedCameraLocation.lat,
+                longitude = firstAnimatedCameraLocation.lon,
+            )
+            second.currentLocation?.position shouldBe LatLng(
+                latitude = secondAnimatedVisualLocation.lat,
+                longitude = secondAnimatedVisualLocation.lon,
+            )
+            second.cameraLocation shouldBe LatLng(
+                latitude = secondAnimatedCameraLocation.lat,
+                longitude = secondAnimatedCameraLocation.lon,
+            )
+            second.cameraPosition?.target shouldBe LatLng(
+                latitude = secondAnimatedCameraLocation.lat,
+                longitude = secondAnimatedCameraLocation.lon,
+            )
+            reset.currentLocation shouldBe null
+            reset.cameraLocation shouldBe null
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
     fun `uiState should keep camera and puck position stable for tiny location drift`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -2839,6 +2921,7 @@ class MapViewModelTest {
                 updatedAt = Instant.parse("2026-04-01T10:00:00Z"),
             ),
         ),
+        mapLocationAnimatorFlowFactory: ((Flow<LocationStabilizationSnapshot>) -> Flow<MapLocationAnimationSnapshot>)? = null,
     ): Fixture {
         val observeCollectibleResourceSpawns = mockk<ObserveCollectibleResourceSpawnsUseCase>()
         val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
@@ -2854,6 +2937,7 @@ class MapViewModelTest {
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
+        val mapLocationAnimator = mockk<MapLocationAnimator>()
 
         val mapStyle = MapStyle.remote(
             id = "style-remote",
@@ -2901,6 +2985,16 @@ class MapViewModelTest {
         coEvery { claimWatchtower.invoke(any(), any()) } returns claimWatchtowerResult
         coEvery { upgradeWatchtower.invoke(any(), any()) } returns upgradeWatchtowerResult
         coEvery { startTrackingSession.invoke() } returns startTrackingResult
+        every { mapLocationAnimator.animate(any()) } answers {
+            val targets: Flow<LocationStabilizationSnapshot> = arg(0)
+            mapLocationAnimatorFlowFactory?.invoke(targets)
+                ?: targets.map { snapshot ->
+                    MapLocationAnimationSnapshot(
+                        visualLocation = snapshot.visualLocation,
+                        cameraLocation = snapshot.cameraLocation,
+                    )
+                }
+        }
 
         return Fixture(
             viewModel = MapViewModel(
@@ -2928,6 +3022,7 @@ class MapViewModelTest {
                 startExplorationTrackingSession = startTrackingSession,
                 mapObjectQueryWindowPolicy = MapObjectQueryWindowPolicy(),
                 locationStabilizer = LocationStabilizer(LocationStabilizerConfig()),
+                mapLocationAnimator = mapLocationAnimator,
             ),
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
