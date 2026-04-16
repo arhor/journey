@@ -1,53 +1,37 @@
 package com.github.arhor.journey.feature.map
 
-import android.os.SystemClock
-import android.view.MotionEvent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.motionEventSpy
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
+import com.github.arhor.journey.feature.map.camera.MapCameraCoordinator
+import com.github.arhor.journey.feature.map.camera.MapCameraGestureReporter
+import com.github.arhor.journey.feature.map.camera.MapCameraSettledReporter
+import com.github.arhor.journey.feature.map.camera.MapViewportReporter
+import com.github.arhor.journey.feature.map.camera.recenterTargetLocation
+import com.github.arhor.journey.feature.map.camera.resolveInitialMapCameraPosition
 import com.github.arhor.journey.feature.map.components.ResetCameraButton
 import com.github.arhor.journey.feature.map.fow.ui.FogOfWarOverlay
+import com.github.arhor.journey.feature.map.gesture.mapRotationGestureHandler
+import com.github.arhor.journey.feature.map.location.USER_LOCATION_PUCK_ID_PREFIX
+import com.github.arhor.journey.feature.map.location.rememberMapLocationProvider
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
-import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withTimeoutOrNull
-import org.maplibre.compose.camera.CameraMoveReason
-import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
-import org.maplibre.compose.location.Location
-import org.maplibre.compose.location.LocationProvider
 import org.maplibre.compose.location.LocationPuck
 import org.maplibre.compose.location.rememberUserLocationState
 import org.maplibre.compose.map.GestureOptions
@@ -57,13 +41,6 @@ import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.map.RenderOptions
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.style.rememberStyleState
-import org.maplibre.spatialk.geojson.BoundingBox
-import org.maplibre.spatialk.geojson.Position
-import kotlin.math.abs
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.nanoseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 
 @Composable
 fun MapScreen(
@@ -94,12 +71,7 @@ internal fun MapContent(
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val userLocationProvider = remember {
-        MapUiLocationProvider(state.currentLocation?.toMapLibreLocation())
-    }
-    LaunchedEffect(state.currentLocation, userLocationProvider) {
-        userLocationProvider.update(state.currentLocation?.toMapLibreLocation())
-    }
+    val userLocationProvider = rememberMapLocationProvider(state.currentLocation)
     val userLocationState = rememberUserLocationState(userLocationProvider)
     val cameraState = key(state.cameraPosition == null) {
         rememberCameraState(
@@ -108,188 +80,57 @@ internal fun MapContent(
     }
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
-    val latestRecenterLocation by rememberUpdatedState(state.recenterTargetLocation())
     val onObjectTapped = remember(dispatch) {
         { objectId: String ->
             dispatch(MapIntent.ObjectTapped(objectId))
         }
     }
-    val dragRotationTracker = remember {
-        HorizontalDragRotationTracker()
-    }
-    var lastNorthResetCameraFollowSkipToken by remember {
-        mutableIntStateOf(state.northResetRequestToken)
-    }
-    var activeNorthResetToken by remember {
-        mutableIntStateOf(0)
-    }
-    val isCameraGestureMoving = cameraState.isCameraMoving && cameraState.moveReason == CameraMoveReason.GESTURE
-
-    LaunchedEffect(
-        state.cameraPosition,
-        state.cameraUpdateOrigin,
-        state.northResetRequestToken,
-        activeNorthResetToken,
-        isCameraGestureMoving,
-        cameraState,
-    ) {
-        if (state.northResetRequestToken != lastNorthResetCameraFollowSkipToken) {
-            lastNorthResetCameraFollowSkipToken = state.northResetRequestToken
-            return@LaunchedEffect
-        }
-
-        if (activeNorthResetToken > 0 && activeNorthResetToken == state.northResetRequestToken) {
-            return@LaunchedEffect
-        }
-
-        val targetPosition = resolveProgrammaticCameraFollowUpdate(
-            target = state.cameraPosition,
-            origin = state.cameraUpdateOrigin,
-            current = cameraState.position,
-            isCameraMoving = cameraState.isCameraMoving,
-            moveReason = cameraState.moveReason,
-        ) ?: return@LaunchedEffect
-
-        cameraState.position = targetPosition
-    }
-
-    LaunchedEffect(state.cameraPosition, cameraState) {
-        snapshotFlow { cameraState.isCameraMoving to cameraState.moveReason }
-            .distinctUntilChanged()
-            .filter { (isCameraMoving, moveReason) ->
-                isCameraMoving && moveReason == CameraMoveReason.GESTURE
-            }
-            .collectLatest {
-                dispatch(
-                    MapIntent.CameraGestureStarted(
-                        position = cameraState.position.toCameraPositionState(),
-                    ),
-                )
-            }
-    }
-
-    LaunchedEffect(state.cameraPosition, cameraState) {
-        snapshotFlow {
-            cameraState.position
-            cameraState.projection?.queryVisibleBoundingBox()?.toGeoBounds()?.let { visibleBounds ->
-                CameraViewportSnapshot(
-                    visibleBounds = visibleBounds,
-                    isCameraMoving = cameraState.isCameraMoving,
-                    moveReason = cameraState.moveReason,
-                )
-            }
-        }.filterNotNull()
-            .filter(::shouldPublishCameraViewportSnapshot)
-            .map { it.visibleBounds }
-            .distinctUntilChanged(::areGeoBoundsEquivalent)
-            .collectLatest { visibleBounds ->
-                dispatch(
-                    MapIntent.CameraViewportChanged(
-                        visibleBounds = visibleBounds,
-                    ),
-                )
-            }
-    }
-
-    LaunchedEffect(state.cameraPosition, cameraState) {
-        snapshotFlow {
-            CameraSettledSnapshot(
-                position = cameraState.position,
-                origin = cameraState.moveReason.toCameraUpdateOrigin(),
-                isCameraMoving = cameraState.isCameraMoving,
-            )
-        }
-            .debounce(CAMERA_SETTLE_DEBOUNCE_MS)
-            .filter { !it.isCameraMoving }
-            .distinctUntilChanged(::areCameraSettledSnapshotsEquivalent)
-            .collectLatest { settled ->
-                dispatch(
-                    MapIntent.CameraSettled(
-                        position = settled.position.toCameraPositionState(),
-                        origin = settled.origin,
-                    ),
-                )
-            }
-    }
-
-    LaunchedEffect(state.northResetRequestToken) {
-        val requestToken = state.northResetRequestToken
-        if (requestToken <= 0) {
-            return@LaunchedEffect
-        }
-
-        activeNorthResetToken = requestToken
-
-        try {
-            val location = latestRecenterLocation ?: withTimeoutOrNull(USER_LOCATION_TIMEOUT) {
-                snapshotFlow { latestRecenterLocation }
-                    .filterNotNull()
-                    .first()
-            }
-
-            if (location == null) {
-                dispatch(MapIntent.CurrentLocationUnavailable)
-                return@LaunchedEffect
-            }
-
-            cameraState.animateTo(
-                finalPosition = cameraState.position.copy(
-                    target = Position(
-                        latitude = location.latitude,
-                        longitude = location.longitude,
-                    ),
-                    zoom = state.cameraPosition?.zoom ?: cameraState.position.zoom,
-                    bearing = DEFAULT_CAMERA_BEARING,
-                ),
-                duration = NORTH_RESET_ANIMATION_DURATION,
-            )
-        } finally {
-            if (activeNorthResetToken == requestToken) {
-                activeNorthResetToken = 0
-            }
+    val onCameraGestureStarted = remember(dispatch) {
+        { position: CameraPositionState ->
+            dispatch(MapIntent.CameraGestureStarted(position))
         }
     }
+    val onCameraSettled = remember(dispatch) {
+        { position: CameraPositionState, origin: CameraUpdateOrigin ->
+            dispatch(MapIntent.CameraSettled(position = position, origin = origin))
+        }
+    }
+
+    MapCameraCoordinator(
+        cameraState = cameraState,
+        target = state.cameraPosition,
+        origin = state.cameraUpdateOrigin,
+        northResetRequestToken = state.northResetRequestToken,
+        recenterTargetLocation = state.recenterTargetLocation(),
+        onCurrentLocationUnavailable = { dispatch(MapIntent.CurrentLocationUnavailable) },
+    )
+    MapCameraGestureReporter(
+        cameraState = cameraState,
+        restartKey = state.cameraPosition,
+        onGestureStarted = onCameraGestureStarted,
+    )
+    MapViewportReporter(
+        cameraState = cameraState,
+        restartKey = state.cameraPosition,
+        onViewportChanged = { visibleBounds ->
+            dispatch(MapIntent.CameraViewportChanged(visibleBounds = visibleBounds))
+        },
+    )
+    MapCameraSettledReporter(
+        cameraState = cameraState,
+        restartKey = state.cameraPosition,
+        onCameraSettled = onCameraSettled,
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .testTag(MAP_ROTATION_OVERLAY_TEST_TAG)
-            .motionEventSpy { motionEvent ->
-                val currentPosition = cameraState.position
-                val update = dragRotationTracker.onMotionEvent(
-                    action = motionEvent.actionMasked,
-                    x = motionEvent.x,
-                    y = motionEvent.y,
-                    pointerCount = motionEvent.pointerCount,
-                    currentBearing = currentPosition.bearing,
-                )
-
-                if (update.didStartInteraction || update.bearing != null) {
-                    dispatch(
-                        MapIntent.CameraGestureStarted(
-                            position = currentPosition.copy(
-                                bearing = update.bearing ?: currentPosition.bearing,
-                            ).toCameraPositionState(),
-                        ),
-                    )
-                }
-
-                if (update.bearing != null) {
-                    cameraState.position = currentPosition.copy(
-                        target = currentPosition.target,
-                        bearing = update.bearing,
-                    )
-                }
-
-                if (update.didEndInteraction) {
-                    dispatch(
-                        MapIntent.CameraSettled(
-                            position = cameraState.position.toCameraPositionState(),
-                            origin = CameraUpdateOrigin.USER,
-                        ),
-                    )
-                }
-            },
+            .mapRotationGestureHandler(
+                cameraState = cameraState,
+                onGestureStarted = onCameraGestureStarted,
+                onCameraSettled = onCameraSettled,
+            ),
     ) {
         state.selectedStyle?.let { style ->
             key(style) {
@@ -325,7 +166,7 @@ internal fun MapContent(
                         ),
                         ornamentOptions = OrnamentOptions.AllDisabled,
                     ),
-                    onMapClick = { position, _ ->
+                    onMapClick = { _, _ ->
                         dispatch(MapIntent.MapTapped)
                         org.maplibre.compose.util.ClickResult.Pass
                     },
@@ -375,7 +216,7 @@ internal fun MapContent(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .size(96.dp)
-                .padding(end = 16.dp, bottom =  16.dp),
+                .padding(end = 16.dp, bottom = 16.dp),
         )
     }
 
@@ -389,266 +230,6 @@ internal fun MapContent(
     }
 }
 
-private const val CAMERA_SETTLE_DEBOUNCE_MS = 100L
 internal const val MAP_ROTATION_OVERLAY_TEST_TAG = "map_rotation_overlay"
 
-private const val USER_LOCATION_PUCK_ID_PREFIX = "user-location"
-private const val CAMERA_SETTLE_COORDINATE_THRESHOLD = 0.0001
-private const val CAMERA_SETTLE_ZOOM_THRESHOLD = 0.01
-private const val CAMERA_SETTLE_BEARING_THRESHOLD = 0.1
-private const val CAMERA_SETTLE_TILT_THRESHOLD = 0.1
-private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
-private val USER_LOCATION_TIMEOUT = 5.seconds
-private val NORTH_RESET_ANIMATION_DURATION = 600.milliseconds
 private val CAMERA_ZOOM_BOUNDS = 14f..20f
-
-internal class MapUiLocationProvider(
-    initialLocation: Location?,
-) : LocationProvider {
-    private val locations = MutableStateFlow(initialLocation)
-
-    override val location: StateFlow<Location?> = locations
-
-    fun update(location: Location?) {
-        locations.value = location
-    }
-}
-
-internal fun resolveProgrammaticCameraFollowUpdate(
-    target: CameraPositionState?,
-    origin: CameraUpdateOrigin,
-    current: CameraPosition,
-    isCameraMoving: Boolean,
-    moveReason: CameraMoveReason,
-): CameraPosition? {
-    if (target == null || origin != CameraUpdateOrigin.PROGRAMMATIC) {
-        return null
-    }
-
-    if (isCameraMoving && moveReason == CameraMoveReason.GESTURE) {
-        return null
-    }
-
-    val targetPosition = current.copy(
-        target = Position(
-            latitude = target.target.latitude,
-            longitude = target.target.longitude,
-        ),
-        zoom = target.zoom,
-        bearing = target.bearing,
-    )
-
-    return targetPosition.takeUnless { areCameraPositionsEquivalent(current, it) }
-}
-
-internal fun shouldPublishCameraViewportSnapshot(snapshot: CameraViewportSnapshot): Boolean =
-    !snapshot.isCameraMoving || snapshot.moveReason == CameraMoveReason.GESTURE
-
-internal fun resolveInitialMapCameraPosition(position: CameraPositionState?): CameraPosition =
-    position?.toCameraPosition()
-        ?: CameraPosition(
-            zoom = DEFAULT_CAMERA_ZOOM,
-            bearing = DEFAULT_CAMERA_BEARING,
-        )
-
-private fun areCameraPositionsEquivalent(a: CameraPosition, b: CameraPosition): Boolean {
-    return abs(a.target.latitude - b.target.latitude) < CAMERA_SETTLE_COORDINATE_THRESHOLD
-        && abs(a.target.longitude - b.target.longitude) < CAMERA_SETTLE_COORDINATE_THRESHOLD
-        && abs(a.zoom - b.zoom) < CAMERA_SETTLE_ZOOM_THRESHOLD
-        && abs(a.bearing - b.bearing) < CAMERA_SETTLE_BEARING_THRESHOLD
-        && abs(a.tilt - b.tilt) < CAMERA_SETTLE_TILT_THRESHOLD
-}
-
-private fun areCameraSettledSnapshotsEquivalent(
-    a: CameraSettledSnapshot,
-    b: CameraSettledSnapshot,
-): Boolean {
-    return a.origin == b.origin &&
-        a.isCameraMoving == b.isCameraMoving &&
-        areCameraPositionsEquivalent(a.position, b.position)
-}
-
-private fun areGeoBoundsEquivalent(a: GeoBounds?, b: GeoBounds?): Boolean {
-    if (a == null || b == null) {
-        return a == b
-    }
-
-    return abs(a.south - b.south) < CAMERA_SETTLE_BOUNDS_THRESHOLD
-        && abs(a.west - b.west) < CAMERA_SETTLE_BOUNDS_THRESHOLD
-        && abs(a.north - b.north) < CAMERA_SETTLE_BOUNDS_THRESHOLD
-        && abs(a.east - b.east) < CAMERA_SETTLE_BOUNDS_THRESHOLD
-}
-
-private fun BoundingBox.toGeoBounds(): GeoBounds = GeoBounds(
-    south = south,
-    west = west,
-    north = north,
-    east = east,
-)
-
-private fun CameraPosition.toCameraPositionState(): CameraPositionState =
-    CameraPositionState(
-        target = LatLng(
-            latitude = target.latitude,
-            longitude = target.longitude,
-        ),
-        zoom = zoom,
-        bearing = bearing,
-    )
-
-private fun CameraPositionState.toCameraPosition(): CameraPosition = CameraPosition(
-    target = Position(
-        latitude = target.latitude,
-        longitude = target.longitude,
-    ),
-    zoom = zoom,
-    bearing = bearing,
-)
-
-internal fun MapUiState.Content.recenterTargetLocation(): LatLng? =
-    currentLocation?.position ?: cameraLocation
-
-internal fun CurrentLocationUiModel.toMapLibreLocation(
-    nowElapsedRealtimeNanos: () -> Long = SystemClock::elapsedRealtimeNanos,
-): Location =
-    Location(
-        position = Position(
-            latitude = position.latitude,
-            longitude = position.longitude,
-        ),
-        accuracy = horizontalAccuracyMeters ?: 0.0,
-        bearing = bearingDegrees,
-        bearingAccuracy = bearingAccuracyDegrees,
-        speed = speedMetersPerSecond,
-        speedAccuracy = null,
-        timestamp = elapsedRealtimeNanos.toTimeMark(nowElapsedRealtimeNanos),
-    )
-
-internal fun Long?.toTimeMark(
-    nowElapsedRealtimeNanos: () -> Long = SystemClock::elapsedRealtimeNanos,
-) = this
-    ?.let { elapsedRealtimeNanos ->
-        val age = (nowElapsedRealtimeNanos() - elapsedRealtimeNanos)
-            .coerceAtLeast(0L)
-            .nanoseconds
-        TimeSource.Monotonic.markNow() - age
-    }
-    ?: TimeSource.Monotonic.markNow()
-
-private fun CameraMoveReason.toCameraUpdateOrigin(): CameraUpdateOrigin =
-    if (this == CameraMoveReason.GESTURE) {
-        CameraUpdateOrigin.USER
-    } else {
-        CameraUpdateOrigin.PROGRAMMATIC
-    }
-
-private data class CameraSettledSnapshot(
-    val position: CameraPosition,
-    val origin: CameraUpdateOrigin,
-    val isCameraMoving: Boolean,
-)
-
-internal data class CameraViewportSnapshot(
-    val visibleBounds: GeoBounds,
-    val isCameraMoving: Boolean,
-    val moveReason: CameraMoveReason,
-)
-
-internal data class HorizontalDragRotationUpdate(
-    val bearing: Double? = null,
-    val didStartInteraction: Boolean = false,
-    val didEndInteraction: Boolean = false,
-)
-
-internal class HorizontalDragRotationTracker(
-    private val dragThresholdPx: Float = 12f,
-    private val degreesPerPixel: Double = 0.12,
-) {
-    private var activePointerCount: Int = 0
-    private var lastX: Float? = null
-    private var lastY: Float? = null
-    private var totalDx = 0f
-    private var totalDy = 0f
-    private var isRotating = false
-
-    fun onMotionEvent(
-        action: Int,
-        x: Float,
-        y: Float,
-        pointerCount: Int,
-        currentBearing: Double,
-    ): HorizontalDragRotationUpdate = when (action) {
-        MotionEvent.ACTION_DOWN -> {
-            activePointerCount = pointerCount
-            lastX = x
-            lastY = y
-            totalDx = 0f
-            totalDy = 0f
-            isRotating = false
-            HorizontalDragRotationUpdate()
-        }
-
-        MotionEvent.ACTION_POINTER_DOWN -> {
-            activePointerCount = pointerCount
-            endInteraction()
-        }
-
-        MotionEvent.ACTION_MOVE -> {
-            if (pointerCount != 1 || activePointerCount != 1) {
-                activePointerCount = pointerCount
-                return endInteraction()
-            }
-
-            val previousX = lastX ?: x
-            val previousY = lastY ?: y
-            val deltaX = x - previousX
-            val deltaY = y - previousY
-            lastX = x
-            lastY = y
-            totalDx += deltaX
-            totalDy += deltaY
-
-            if (!isRotating) {
-                val exceedsThreshold = abs(totalDx) >= dragThresholdPx
-                val isHorizontal = abs(totalDx) > abs(totalDy)
-                if (!exceedsThreshold || !isHorizontal) {
-                    return HorizontalDragRotationUpdate()
-                }
-                isRotating = true
-            }
-
-            HorizontalDragRotationUpdate(
-                bearing = normalizeBearing(currentBearing + deltaX * degreesPerPixel),
-                didStartInteraction = isRotating && abs(totalDx) - abs(deltaX) < dragThresholdPx,
-            )
-        }
-
-        MotionEvent.ACTION_POINTER_UP,
-        MotionEvent.ACTION_UP,
-        MotionEvent.ACTION_CANCEL -> {
-            activePointerCount = maxOf(0, pointerCount - 1)
-            endInteraction()
-        }
-
-        else -> HorizontalDragRotationUpdate()
-    }
-
-    private fun endInteraction(): HorizontalDragRotationUpdate {
-        val didEndInteraction = isRotating
-        lastX = null
-        lastY = null
-        totalDx = 0f
-        totalDy = 0f
-        isRotating = false
-        return HorizontalDragRotationUpdate(didEndInteraction = didEndInteraction)
-    }
-}
-
-internal fun normalizeBearing(bearing: Double): Double {
-    val normalized = bearing % 360.0
-    return if (normalized < 0.0) {
-        normalized + 360.0
-    } else {
-        normalized
-    }
-}

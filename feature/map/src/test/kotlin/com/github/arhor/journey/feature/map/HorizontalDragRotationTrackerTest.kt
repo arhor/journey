@@ -1,6 +1,9 @@
 package com.github.arhor.journey.feature.map
 
 import android.view.MotionEvent
+import com.github.arhor.journey.feature.map.gesture.HorizontalDragRotationTracker
+import com.github.arhor.journey.feature.map.gesture.HorizontalDragRotationUpdate
+import com.github.arhor.journey.feature.map.gesture.normalizeBearing
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.shouldBe
 import org.junit.Test
