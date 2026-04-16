@@ -151,6 +151,68 @@ class FogOfWarCalculatorTest {
     }
 
     @Test
+    fun `calculateUnexploredFogRanges should produce equivalent fog ranges when explored tiles are packed`() {
+        // Given
+        val tileRange = ExplorationTileRange(
+            zoom = 16,
+            minX = 0,
+            maxX = 4,
+            minY = 0,
+            maxY = 3,
+        )
+        val exploredTiles = setOf(
+            MapTile(zoom = 16, x = 0, y = 0),
+            MapTile(zoom = 16, x = 1, y = 0),
+            MapTile(zoom = 16, x = 1, y = 1),
+            MapTile(zoom = 16, x = 3, y = 2),
+            MapTile(zoom = 17, x = 3, y = 2),
+        )
+
+        // When
+        val unpacked = fogOfWarCalculator.calculateUnexploredFogRanges(
+            tileRange = tileRange,
+            exploredTiles = exploredTiles,
+        )
+        val packed = fogOfWarCalculator.calculateUnexploredFogRanges(
+            tileRange = tileRange,
+            exploredTileKeys = exploredTiles.toPackedLongArray(),
+        )
+
+        // Then
+        packed shouldContainExactly unpacked
+    }
+
+    @Test
+    fun `calculateUnexploredFogRanges should normalize unsorted duplicate packed tiles when scanning fog ranges`() {
+        // Given
+        val tileRange = ExplorationTileRange(
+            zoom = 16,
+            minX = 0,
+            maxX = 2,
+            minY = 0,
+            maxY = 1,
+        )
+        val exploredTileKeys = longArrayOf(
+            MapTile(zoom = 16, x = 1, y = 0).packedValue,
+            MapTile(zoom = 16, x = 0, y = 1).packedValue,
+            MapTile(zoom = 16, x = 1, y = 0).packedValue,
+        )
+
+        // When
+        val actual = fogOfWarCalculator.calculateUnexploredFogRanges(
+            tileRange = tileRange,
+            exploredTileKeys = exploredTileKeys,
+        )
+
+        // Then
+        actual shouldContainExactly listOf(
+            ExplorationTileRange(zoom = 16, minX = 0, maxX = 0, minY = 0, maxY = 0),
+            ExplorationTileRange(zoom = 16, minX = 2, maxX = 2, minY = 0, maxY = 0),
+            ExplorationTileRange(zoom = 16, minX = 1, maxX = 2, minY = 1, maxY = 1),
+        )
+    }
+
+    @Test
     fun `calculateExploredTileRanges should merge arbitrary explored tiles into stable rectangles`() {
         // Given
         val tileRange = ExplorationTileRange(
@@ -204,4 +266,39 @@ class FogOfWarCalculatorTest {
         // Then
         actual shouldContainExactly emptyList()
     }
+
+    @Test
+    fun `calculateExploredTileRanges should produce equivalent explored ranges when tiles are packed`() {
+        // Given
+        val tileRange = ExplorationTileRange(
+            zoom = 16,
+            minX = 0,
+            maxX = 4,
+            minY = 0,
+            maxY = 3,
+        )
+        val exploredTiles = setOf(
+            MapTile(zoom = 16, x = 0, y = 0),
+            MapTile(zoom = 16, x = 1, y = 0),
+            MapTile(zoom = 16, x = 1, y = 1),
+            MapTile(zoom = 16, x = 3, y = 2),
+            MapTile(zoom = 17, x = 3, y = 2),
+        )
+
+        // When
+        val unpacked = fogOfWarCalculator.calculateExploredTileRanges(
+            tileRange = tileRange,
+            exploredTiles = exploredTiles,
+        )
+        val packed = fogOfWarCalculator.calculateExploredTileRanges(
+            tileRange = tileRange,
+            exploredTileKeys = exploredTiles.toPackedLongArray(),
+        )
+
+        // Then
+        packed shouldContainExactly unpacked
+    }
+
+    private fun Set<MapTile>.toPackedLongArray(): LongArray =
+        map(MapTile::packedValue).toLongArray()
 }

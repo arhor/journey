@@ -28,14 +28,14 @@ import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
-import com.github.arhor.journey.domain.usecase.GetExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.GetPackedExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.ObserveClaimedWatchtowerRevealTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
-import com.github.arhor.journey.domain.usecase.ObserveExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
+import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
@@ -2138,7 +2138,7 @@ class MapViewModelTest {
                     ),
                 )
                 advanceUntilIdle()
-                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+                verify(exactly = 1) { fixture.observePackedExploredTiles.invoke(any()) }
 
                 // When
                 fixture.trackingSessionFlow.value = fixture.trackingSessionFlow.value.copy(
@@ -2150,7 +2150,7 @@ class MapViewModelTest {
                 advanceUntilIdle()
 
                 // Then
-                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+                verify(exactly = 1) { fixture.observePackedExploredTiles.invoke(any()) }
             } finally {
                 tearDownMainDispatcher(fixture.viewModel)
             }
@@ -2197,7 +2197,7 @@ class MapViewModelTest {
                     ),
                 )
                 advanceUntilIdle()
-                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+                verify(exactly = 1) { fixture.observePackedExploredTiles.invoke(any()) }
 
                 val initial = fixture.viewModel.awaitContent {
                     it.fogOfWar.visibleExploredTileCount == 1 &&
@@ -2216,7 +2216,7 @@ class MapViewModelTest {
                     it.fogOfWar.hiddenExploredRenderData != initialHiddenExploredRenderData
                 }
                 updated.fogOfWar.visibleExploredTileCount shouldBe 1
-                verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+                verify(exactly = 1) { fixture.observePackedExploredTiles.invoke(any()) }
             } finally {
                 tearDownMainDispatcher(fixture.viewModel)
             }
@@ -2270,7 +2270,7 @@ class MapViewModelTest {
             }
             actual.fogOfWar.activeRenderData.shouldNotBeNull()
             actual.fogOfWar.isRecomputing shouldBe false
-            verify(exactly = 1) { fixture.observeExploredTiles.invoke(any()) }
+            verify(exactly = 1) { fixture.observePackedExploredTiles.invoke(any()) }
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -2501,13 +2501,24 @@ class MapViewModelTest {
             x = shiftedVisibleRange.minX,
             y = shiftedVisibleRange.minY,
         )
-        val shiftedFlow = MutableStateFlow(emptySet<MapTile>())
+        val shiftedPackedTiles = longArrayOf(
+            shiftedTile.packedValue,
+            shiftedTile.packedValue,
+        )
+        val shiftedFlow = MutableStateFlow(LongArray(0))
         val fixture = createFixture(
-            observeExploredTilesFlowFactory = { range ->
+            observePackedExploredTilesFlowFactory = { range ->
                 when (range) {
-                    expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(emptySet())
+                    expectedFogBufferRange(initialVisibleRange) -> MutableStateFlow(LongArray(0))
                     expectedFogBufferRange(shiftedVisibleRange) -> shiftedFlow
-                    else -> MutableStateFlow(emptySet())
+                    else -> MutableStateFlow(LongArray(0))
+                }
+            },
+            getPackedExploredTilesOverride = { range ->
+                if (range == expectedFogBufferRange(shiftedVisibleRange)) {
+                    shiftedPackedTiles
+                } else {
+                    LongArray(0)
                 }
             },
         )
@@ -2529,7 +2540,7 @@ class MapViewModelTest {
             advanceUntilIdle()
 
             // When
-            shiftedFlow.value = setOf(shiftedTile)
+            shiftedFlow.value = shiftedPackedTiles
             advanceUntilIdle()
 
             // Then
@@ -2882,12 +2893,12 @@ class MapViewModelTest {
         val mapStyle: MapStyle,
         val trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>,
         val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
-        val observeExploredTiles: ObserveExploredTilesUseCase,
+        val observePackedExploredTiles: ObservePackedExploredTilesUseCase,
         val observeVisibleWatchtowers: ObserveVisibleWatchtowersUseCase,
         val claimWatchtower: ClaimWatchtowerUseCase,
         val upgradeWatchtower: UpgradeWatchtowerUseCase,
         val getWatchtower: GetWatchtowerUseCase,
-        val getExploredTiles: GetExploredTilesUseCase,
+        val getPackedExploredTiles: GetPackedExploredTilesUseCase,
         val startTrackingSession: StartExplorationTrackingSessionUseCase,
     )
 
@@ -2925,9 +2936,11 @@ class MapViewModelTest {
             ),
         ),
         mapLocationAnimatorFlowFactory: ((Flow<LocationStabilizationSnapshot>) -> Flow<MapLocationAnimationSnapshot>)? = null,
+        observePackedExploredTilesFlowFactory: ((ExplorationTileRange) -> Flow<LongArray>)? = null,
+        getPackedExploredTilesOverride: (suspend (ExplorationTileRange) -> LongArray)? = null,
     ): Fixture {
         val observeCollectibleResourceSpawns = mockk<ObserveCollectibleResourceSpawnsUseCase>()
-        val observeExploredTiles = mockk<ObserveExploredTilesUseCase>()
+        val observePackedExploredTiles = mockk<ObservePackedExploredTilesUseCase>()
         val observeClaimedWatchtowerRevealTiles = mockk<ObserveClaimedWatchtowerRevealTilesUseCase>()
         val observeVisibleWatchtowers = mockk<ObserveVisibleWatchtowersUseCase>()
         val observeHeroResourceAmount = mockk<ObserveHeroResourceAmountUseCase>()
@@ -2935,7 +2948,7 @@ class MapViewModelTest {
         val claimWatchtower = mockk<ClaimWatchtowerUseCase>()
         val upgradeWatchtower = mockk<UpgradeWatchtowerUseCase>()
         val getWatchtower = mockk<GetWatchtowerUseCase>()
-        val getExploredTiles = mockk<GetExploredTilesUseCase>()
+        val getPackedExploredTiles = mockk<GetPackedExploredTilesUseCase>()
         val getExplorationTileRuntimeConfig = mockk<GetExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
@@ -2950,9 +2963,10 @@ class MapViewModelTest {
         val trackingSessionFlow = MutableStateFlow(trackingSession)
 
         every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(Output.Success(resourceSpawns))
-        every { observeExploredTiles.invoke(any()) } answers {
-            observeExploredTilesFlowFactory?.invoke(arg(0))?.map { Output.Success(it) }
-                ?: MutableStateFlow(Output.Success(exploredTiles))
+        every { observePackedExploredTiles.invoke(any()) } answers {
+            observePackedExploredTilesFlowFactory?.invoke(arg(0))?.map { Output.Success(it) }
+                ?: observeExploredTilesFlowFactory?.invoke(arg(0))?.map { Output.Success(it.toPackedLongArray()) }
+                ?: MutableStateFlow(Output.Success(exploredTiles.toPackedLongArray()))
         }
         every { observeClaimedWatchtowerRevealTiles.invoke(any(), any()) } returns MutableStateFlow(Output.Success(watchtowerRevealSnapshot))
         every { observeVisibleWatchtowers.invoke(any()) } answers {
@@ -2978,11 +2992,14 @@ class MapViewModelTest {
         every { getExplorationTileRuntimeConfig.invoke() } returns Output.Success(tileRuntimeConfig)
         every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(Output.Success(tileRuntimeConfig))
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow.map { Output.Success(it) }
-        coEvery { getExploredTiles.invoke(any()) } coAnswers {
+        coEvery { getPackedExploredTiles.invoke(any()) } coAnswers {
             Output.Success(
-                getExploredTilesOverride?.invoke(arg(0))
-                    ?: observeExploredTilesFlowFactory?.invoke(arg(0))?.first()
-                    ?: exploredTiles,
+                getPackedExploredTilesOverride?.invoke(arg(0))
+                    ?: (
+                        getExploredTilesOverride?.invoke(arg(0))
+                            ?: observeExploredTilesFlowFactory?.invoke(arg(0))?.first()
+                            ?: exploredTiles
+                    ).toPackedLongArray(),
             )
         }
         coEvery { claimWatchtower.invoke(any(), any()) } returns claimWatchtowerResult
@@ -3013,9 +3030,9 @@ class MapViewModelTest {
                     FogOfWarController(
                         observeExplorationTileRuntimeConfig = observeExplorationTileRuntimeConfig,
                         observeExplorationTrackingSession = observeExplorationTrackingSession,
-                        observeExploredTiles = observeExploredTiles,
+                        observePackedExploredTiles = observePackedExploredTiles,
                         observeClaimedWatchtowerRevealTiles = observeClaimedWatchtowerRevealTiles,
-                        getExploredTiles = getExploredTiles,
+                        getPackedExploredTiles = getPackedExploredTiles,
                         renderDataFactory = FowRenderDataFactory(),
                         fogOfWarCalculator = FogOfWarCalculator(),
                         scope = scope,
@@ -3032,12 +3049,12 @@ class MapViewModelTest {
             mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
             observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
-            observeExploredTiles = observeExploredTiles,
+            observePackedExploredTiles = observePackedExploredTiles,
             observeVisibleWatchtowers = observeVisibleWatchtowers,
             claimWatchtower = claimWatchtower,
             upgradeWatchtower = upgradeWatchtower,
             getWatchtower = getWatchtower,
-            getExploredTiles = getExploredTiles,
+            getPackedExploredTiles = getPackedExploredTiles,
             startTrackingSession = startTrackingSession,
         )
     }
@@ -3138,6 +3155,9 @@ class MapViewModelTest {
                 lon = (tileBounds.west + tileBounds.east) / 2.0,
             )
         }
+
+    private fun Set<MapTile>.toPackedLongArray(): LongArray =
+        map(MapTile::packedValue).toLongArray()
 
     private fun expectedFogBufferRange(range: ExplorationTileRange): ExplorationTileRange {
         val widthInTiles = range.maxX - range.minX + 1
