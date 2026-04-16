@@ -44,6 +44,7 @@ import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
 import com.github.arhor.journey.feature.map.location.LocationStabilizationSnapshot
+import com.github.arhor.journey.feature.map.location.CurrentLocationPresenter
 import com.github.arhor.journey.feature.map.location.MapLocationAnimationSnapshot
 import com.github.arhor.journey.feature.map.location.MapLocationAnimator
 import com.github.arhor.journey.feature.map.location.LocationStabilizer
@@ -52,6 +53,8 @@ import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
+import com.github.arhor.journey.feature.map.presentation.MapWorldObjectPresenter
+import com.github.arhor.journey.feature.map.presentation.SelectedWatchtowerPresenter
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -3021,7 +3024,9 @@ class MapViewModelTest {
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 mapObjectQueryWindowPolicy = MapObjectQueryWindowPolicy(),
-                locationStabilizer = LocationStabilizer(LocationStabilizerConfig()),
+                mapWorldObjectPresenter = MapWorldObjectPresenter(),
+                selectedWatchtowerPresenter = SelectedWatchtowerPresenter(),
+                currentLocationPresenter = CurrentLocationPresenter(LocationStabilizer(LocationStabilizerConfig())),
                 mapLocationAnimator = mapLocationAnimator,
             ),
             mapStyle = mapStyle,

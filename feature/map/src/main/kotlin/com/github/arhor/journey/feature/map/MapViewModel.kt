@@ -10,20 +10,15 @@ import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.common.map
 import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
-import com.github.arhor.journey.domain.internal.tileAt
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
-import com.github.arhor.journey.domain.model.UserLocationFix
 import com.github.arhor.journey.domain.model.Watchtower
-import com.github.arhor.journey.domain.model.WatchtowerPhase
-import com.github.arhor.journey.domain.model.WatchtowerResourceCost
 import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
@@ -39,17 +34,17 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
+import com.github.arhor.journey.feature.map.location.CurrentLocationPresenter
 import com.github.arhor.journey.feature.map.location.LocationStabilizationSnapshot
 import com.github.arhor.journey.feature.map.location.MapLocationAnimationSnapshot
 import com.github.arhor.journey.feature.map.location.MapLocationAnimator
-import com.github.arhor.journey.feature.map.location.LocationStabilizer
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
-import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import com.github.arhor.journey.feature.map.model.MapViewportSize
-import com.github.arhor.journey.feature.map.model.WatchtowerMarkerState
+import com.github.arhor.journey.feature.map.presentation.MapWorldObjectPresenter
+import com.github.arhor.journey.feature.map.presentation.SelectedWatchtowerPresenter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,13 +58,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
-import kotlin.math.roundToInt
 import com.github.arhor.journey.core.common.combine as combineOutputs
-
-private val LOCATION_HIDDEN_STATUSES = setOf(
-    ExplorationTrackingStatus.PERMISSION_DENIED,
-    ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED,
-)
 
 @Immutable
 private data class State(
@@ -102,7 +91,9 @@ class MapViewModel @Inject constructor(
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
     private val mapObjectQueryWindowPolicy: MapObjectQueryWindowPolicy,
-    private val locationStabilizer: LocationStabilizer,
+    private val mapWorldObjectPresenter: MapWorldObjectPresenter,
+    private val selectedWatchtowerPresenter: SelectedWatchtowerPresenter,
+    private val currentLocationPresenter: CurrentLocationPresenter,
     private val mapLocationAnimator: MapLocationAnimator,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
@@ -218,16 +209,11 @@ class MapViewModel @Inject constructor(
                     .takeIf { it > 0 }
                     ?: initialTileRuntimeConfig.canonicalZoom
 
-                val visibilityTileMask = fogVisibility.visibilityTileMask
-
-                resourceDerivedData.resourceSpawns.map { resourceSpawn ->
-                    resourceSpawn.toUiModel(
-                        isHiddenByFog = resourceSpawn.isHiddenByFog(
-                            canonicalZoom = canonicalZoom,
-                            visibilityTileMask = visibilityTileMask,
-                        ),
-                    )
-                }
+                mapWorldObjectPresenter.presentResourceSpawns(
+                    resourceSpawns = resourceDerivedData.resourceSpawns,
+                    canonicalZoom = canonicalZoom,
+                    visibilityTileMask = fogVisibility.visibilityTileMask,
+                )
             }
         }
             .distinctUntilChanged()
@@ -262,7 +248,8 @@ class MapViewModel @Inject constructor(
                                 val trackingSessionValue = interactionContext.first
                                 val resourceAmounts = interactionContext.second
                                 val decoratedWatchtowers = watchtowers.map { watchtower ->
-                                    watchtower.withInteractionContext(
+                                    selectedWatchtowerPresenter.withInteractionContext(
+                                        watchtower = watchtower,
                                         actorLocation = trackingSessionValue.lastKnownLocation,
                                         resourceAmounts = resourceAmounts,
                                     )
@@ -270,7 +257,7 @@ class MapViewModel @Inject constructor(
 
                                 VisibleWatchtowerData(
                                     watchtowers = decoratedWatchtowers,
-                                    objects = decoratedWatchtowers.map { it.toUiModel() },
+                                    objects = decoratedWatchtowers.map(mapWorldObjectPresenter::presentWatchtower),
                                 )
                             }
                         }
@@ -327,36 +314,13 @@ class MapViewModel @Inject constructor(
         trackingSession
             .map { trackingSessionOutput ->
                 when (trackingSessionOutput) {
-                    is Output.Success -> resolveLocationStabilizationSnapshot(trackingSessionOutput.value)
-                    is Output.Failure -> {
-                        locationStabilizer.reset()
-                        LocationStabilizationSnapshot(
-                            visualLocation = null,
-                            cameraLocation = null,
-                        )
-                    }
+                    is Output.Success -> currentLocationPresenter.presentStabilizationTarget(
+                        trackingSessionOutput.value,
+                    )
+                    is Output.Failure -> currentLocationPresenter.presentUnavailableStabilizationTarget()
                 }
             }
             .distinctUntilChanged()
-
-    private fun resolveLocationStabilizationSnapshot(
-        trackingSession: ExplorationTrackingSession,
-    ): LocationStabilizationSnapshot {
-        val rawLocationFix = trackingSession.lastKnownLocationFix
-            ?: trackingSession.lastKnownLocation?.toUserLocationFix()
-        val shouldExposeLocation = trackingSession.status !in LOCATION_HIDDEN_STATUSES
-        val locationFix = rawLocationFix.takeIf { shouldExposeLocation }
-
-        if (locationFix == null) {
-            locationStabilizer.reset()
-            return LocationStabilizationSnapshot(
-                visualLocation = null,
-                cameraLocation = null,
-            )
-        }
-
-        return locationStabilizer.stabilize(locationFix)
-    }
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
@@ -454,12 +418,20 @@ class MapViewModel @Inject constructor(
                         .firstOrNull { it.id == selectedWatchtowerId }
                         ?: state.selectedWatchtowerSnapshot
                             ?.takeIf { it.id == selectedWatchtowerId }
-                            ?.withInteractionContext(
-                                actorLocation = trackingSession.lastKnownLocation,
-                                resourceAmounts = watchtowerResourceAmounts,
-                            )
+                            ?.let { watchtower ->
+                                selectedWatchtowerPresenter.withInteractionContext(
+                                    watchtower = watchtower,
+                                    actorLocation = trackingSession.lastKnownLocation,
+                                    resourceAmounts = watchtowerResourceAmounts,
+                                )
+                            }
                     )
-                    ?.toSheetUiState(watchtowerResourceAmounts)
+                    ?.let { watchtower ->
+                        selectedWatchtowerPresenter.present(
+                            watchtower = watchtower,
+                            resourceAmounts = watchtowerResourceAmounts,
+                        )
+                    }
             }
 
         MapBaseUiState.Content(
@@ -484,27 +456,20 @@ class MapViewModel @Inject constructor(
     ): MapUiState = when (this) {
         is MapBaseUiState.Failure -> MapUiState.Failure(errorMessage)
         is MapBaseUiState.Content -> {
-            val currentLocation = animatedLocationSnapshot.visualLocation?.toCurrentLocationUiModel()
-            val userLocation = currentLocation?.position
-            val cameraLocation = animatedLocationSnapshot.cameraLocation?.location?.toLatLng()
-            val resolvedCameraPosition = cameraLocation?.toCameraPosition(
-                zoom = cameraPosition?.zoom ?: DEFAULT_CAMERA_ZOOM,
-                bearing = cameraPosition?.bearing ?: DEFAULT_CAMERA_BEARING,
+            val locationPresentation = currentLocationPresenter.presentMapLocation(
+                animatedLocationSnapshot = animatedLocationSnapshot,
+                cameraPosition = cameraPosition,
+                cameraUpdateOrigin = cameraUpdateOrigin,
+                isUserInteractingCamera = isUserInteractingCamera,
             )
-                ?: cameraPosition
-            val resolvedCameraUpdateOrigin = if (userLocation != null && !isUserInteractingCamera) {
-                CameraUpdateOrigin.PROGRAMMATIC
-            } else {
-                cameraUpdateOrigin
-            }
 
             MapUiState.Content(
-                cameraPosition = resolvedCameraPosition,
-                cameraUpdateOrigin = resolvedCameraUpdateOrigin,
+                cameraPosition = locationPresentation.cameraPosition,
+                cameraUpdateOrigin = locationPresentation.cameraUpdateOrigin,
                 northResetRequestToken = northResetRequestToken,
-                currentLocation = currentLocation,
-                cameraLocation = cameraLocation,
-                userLocation = userLocation,
+                currentLocation = locationPresentation.currentLocation,
+                cameraLocation = locationPresentation.cameraLocation,
+                userLocation = locationPresentation.userLocation,
                 isExplorationTrackingActive = isExplorationTrackingActive,
                 explorationTrackingCadence = explorationTrackingCadence,
                 explorationTrackingStatus = explorationTrackingStatus,
@@ -651,7 +616,7 @@ class MapViewModel @Inject constructor(
         val objectUiModel = contentState.visibleObjects
             .firstOrNull { it.id == objectId }
             ?: return
-        val parsedId = parseMapObjectId(objectUiModel.id) ?: return
+        val parsedId = mapWorldObjectPresenter.parseObjectId(objectUiModel.id) ?: return
 
         val selectedWatchtowerSnapshot = if (parsedId.kind == MapObjectKind.Watchtower) {
             when (val result = getWatchtower(parsedId.rawId)) {
@@ -711,7 +676,11 @@ class MapViewModel @Inject constructor(
                 }
 
                 is ClaimWatchtowerError.InsufficientResources -> {
-                    emitEffect(MapEffect.ShowMessage(costRequirementMessage(error.resourceTypeId)))
+                    emitEffect(
+                        MapEffect.ShowMessage(
+                            selectedWatchtowerPresenter.resourceRequirementMessage(error.resourceTypeId),
+                        ),
+                    )
                 }
 
                 is ClaimWatchtowerError.Unexpected -> {
@@ -759,7 +728,11 @@ class MapViewModel @Inject constructor(
                 }
 
                 is UpgradeWatchtowerError.InsufficientResources -> {
-                    emitEffect(MapEffect.ShowMessage(costRequirementMessage(error.resourceTypeId)))
+                    emitEffect(
+                        MapEffect.ShowMessage(
+                            selectedWatchtowerPresenter.resourceRequirementMessage(error.resourceTypeId),
+                        ),
+                    )
                 }
 
                 is UpgradeWatchtowerError.Unexpected -> {
@@ -787,181 +760,11 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun ResourceSpawn.toUiModel(isHiddenByFog: Boolean): MapObjectUiModel {
-        val resourceType = ResourceType.fromTypeId(typeId)
-
-        return MapObjectUiModel(
-            id = mapObjectId(
-                kind = MapObjectKind.ResourceSpawn,
-                rawId = id,
-            ),
-            kind = MapObjectKind.ResourceSpawn,
-            title = resourceType?.displayName ?: typeId,
-            description = null,
-            position = position.toLatLng(),
-            radiusMeters = collectionRadiusMeters.toInt(),
-            isDiscovered = false,
-            isHiddenByFog = isHiddenByFog,
-            resourceType = resourceType,
-        )
-    }
-
-    private fun Watchtower.toUiModel(): MapObjectUiModel =
-        MapObjectUiModel(
-            id = mapObjectId(
-                kind = MapObjectKind.Watchtower,
-                rawId = id,
-            ),
-            kind = MapObjectKind.Watchtower,
-            title = name,
-            description = description,
-            position = location.toLatLng(),
-            radiusMeters = (revealRadiusMeters ?: interactionRadiusMeters).roundToInt(),
-            isDiscovered = true,
-            watchtowerMarkerState = toMarkerState(),
-            watchtowerLevel = level ?: 1,
-        )
-
-    private fun Watchtower.withInteractionContext(
-        actorLocation: GeoPoint?,
-        resourceAmounts: Map<String, Int>,
-    ): Watchtower {
-        val distanceMeters = actorLocation?.distanceTo(location)
-        val isInRange = distanceMeters != null && distanceMeters <= interactionRadiusMeters
-        val claimAffordable = claimCost?.isAffordable(resourceAmounts) ?: true
-        val upgradeAffordable = nextUpgradeCost?.isAffordable(resourceAmounts) ?: true
-
-        return copy(
-            canClaim = phase == WatchtowerPhase.DISCOVERED_DORMANT && isInRange && claimAffordable,
-            canUpgrade = phase == WatchtowerPhase.CLAIMED && nextUpgradeCost != null && isInRange && upgradeAffordable,
-            distanceMeters = distanceMeters,
-        )
-    }
-
-    private fun Watchtower.toSheetUiState(
-        resourceAmounts: Map<String, Int>,
-    ): WatchtowerSheetUiState {
-        val distanceMeters = distanceMeters
-        val nextUpgradeCost = nextUpgradeCost
-        val isInRange = distanceMeters != null && distanceMeters <= interactionRadiusMeters
-        val claimAffordable = claimCost?.isAffordable(resourceAmounts) ?: true
-        val upgradeAffordable = nextUpgradeCost?.isAffordable(resourceAmounts) ?: true
-
-        return WatchtowerSheetUiState(
-            id = id,
-            title = name,
-            description = description,
-            phase = when (phase) {
-                WatchtowerPhase.DISCOVERED_DORMANT -> WatchtowerSheetPhase.DISCOVERED_DORMANT
-                WatchtowerPhase.CLAIMED -> WatchtowerSheetPhase.CLAIMED
-            },
-            level = level,
-            revealRadiusMeters = revealRadiusMeters?.roundToInt(),
-            nextRevealRadiusMeters = nextRevealRadiusMeters?.roundToInt(),
-            distanceMeters = distanceMeters?.roundToInt(),
-            claimCostLabel = claimCost?.toDisplayLabel(),
-            upgradeCostLabel = nextUpgradeCost?.toDisplayLabel(),
-            canClaim = canClaim && claimAffordable,
-            canUpgrade = canUpgrade && upgradeAffordable,
-            claimDisabledReason = when {
-                phase != WatchtowerPhase.DISCOVERED_DORMANT -> null
-                isInRange && !claimAffordable -> costRequirementMessage(claimCost?.resourceTypeId)
-                isInRange -> null
-                distanceMeters != null -> WATCHTOWER_MOVE_CLOSER_MESSAGE
-                else -> CURRENT_LOCATION_UNAVAILABLE_MESSAGE
-            },
-            upgradeDisabledReason = when {
-                phase != WatchtowerPhase.CLAIMED || nextUpgradeCost == null -> null
-                isInRange && !upgradeAffordable -> costRequirementMessage(nextUpgradeCost.resourceTypeId)
-                isInRange -> null
-                distanceMeters != null -> WATCHTOWER_MOVE_CLOSER_MESSAGE
-                else -> CURRENT_LOCATION_UNAVAILABLE_MESSAGE
-            },
-            isAtMaxLevel = phase == WatchtowerPhase.CLAIMED && nextUpgradeCost == null,
-        )
-    }
-
-    private fun Watchtower.toMarkerState(): WatchtowerMarkerState = when {
-        phase == WatchtowerPhase.CLAIMED && canUpgrade -> WatchtowerMarkerState.UPGRADE_AVAILABLE
-        phase == WatchtowerPhase.CLAIMED -> WatchtowerMarkerState.CLAIMED
-        canClaim -> WatchtowerMarkerState.CLAIMABLE
-        else -> WatchtowerMarkerState.DISCOVERED_DORMANT
-    }
-
-    private fun WatchtowerResourceCost.toDisplayLabel(): String {
-        val resourceLabel = ResourceType.fromTypeId(resourceTypeId)?.displayName ?: resourceTypeId
-        return "$amount $resourceLabel"
-    }
-
-    private fun WatchtowerResourceCost.isAffordable(resourceAmounts: Map<String, Int>): Boolean =
-        (resourceAmounts[resourceTypeId] ?: 0) >= amount
-
-    private fun ResourceSpawn.isHiddenByFog(
-        canonicalZoom: Int,
-        visibilityTileMask: Set<MapTile>,
-    ): Boolean = tileAt(
-        point = position,
-        zoom = canonicalZoom,
-    ) !in visibilityTileMask
-
-    private fun parseMapObjectId(id: String): ParsedMapObjectId? {
-        val parts = id.split(MAP_OBJECT_ID_SEPARATOR, limit = 2)
-        if (parts.size != 2) {
-            return null
-        }
-
-        val kind = MapObjectKind.entries.firstOrNull { it.idPrefix == parts[0] } ?: return null
-        return ParsedMapObjectId(
-            kind = kind,
-            rawId = parts[1],
-        )
-    }
-
-    private fun mapObjectId(
-        kind: MapObjectKind,
-        rawId: String,
-    ): String = "${kind.idPrefix}$MAP_OBJECT_ID_SEPARATOR$rawId"
-
     private fun currentTrackingSession(): ExplorationTrackingSession? =
         when (val result = trackingSession.value) {
             is Output.Success -> result.value
             is Output.Failure -> null
         }
-
-    private fun costRequirementMessage(resourceTypeId: String?): String {
-        val fallbackTypeId = resourceTypeId ?: "materials"
-        val resourceLabel = ResourceType.fromTypeId(fallbackTypeId)?.displayName ?: fallbackTypeId
-        return "Not enough $resourceLabel."
-    }
-
-    private fun GeoPoint.toLatLng(): LatLng =
-        LatLng(
-            latitude = lat,
-            longitude = lon,
-        )
-
-    private fun GeoPoint.toUserLocationFix(): UserLocationFix =
-        UserLocationFix(location = this)
-
-    private fun UserLocationFix.toCurrentLocationUiModel(): CurrentLocationUiModel =
-        CurrentLocationUiModel(
-            position = location.toLatLng(),
-            horizontalAccuracyMeters = horizontalAccuracyMeters,
-            speedMetersPerSecond = speedMetersPerSecond,
-            bearingDegrees = bearingDegrees,
-            bearingAccuracyDegrees = bearingAccuracyDegrees,
-            elapsedRealtimeNanos = elapsedRealtimeNanos,
-        )
-
-    private fun LatLng.toCameraPosition(
-        zoom: Double = DEFAULT_CAMERA_ZOOM,
-        bearing: Double = DEFAULT_CAMERA_BEARING,
-    ): CameraPositionState =
-        CameraPositionState(
-            target = this,
-            zoom = zoom,
-            bearing = bearing,
-        )
 
     @Immutable
     private sealed interface MapBaseUiState {
@@ -1026,12 +829,6 @@ class MapViewModel @Inject constructor(
         val visibilityTileMask: Set<MapTile>,
     )
 
-    @Immutable
-    private data class ParsedMapObjectId(
-        val kind: MapObjectKind,
-        val rawId: String,
-    )
-
     private fun reuseVisibleObjects(visibleObjects: List<MapObjectUiModel>): List<MapObjectUiModel> {
         if (cachedVisibleObjects == visibleObjects) {
             return cachedVisibleObjects
@@ -1063,7 +860,5 @@ class MapViewModel @Inject constructor(
         const val WATCHTOWER_MAX_LEVEL_MESSAGE = "Watchtower is already at maximum level."
         const val WATCHTOWER_UPGRADED_MESSAGE_PREFIX = "Watchtower upgraded to level "
         const val WATCHTOWER_UPGRADE_FAILED_MESSAGE = "Failed to upgrade watchtower."
-        const val WATCHTOWER_MOVE_CLOSER_MESSAGE = "Move closer to interact."
-        const val MAP_OBJECT_ID_SEPARATOR = ":"
     }
 }
