@@ -10,11 +10,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
+import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.camera.MapCameraCoordinator
 import com.github.arhor.journey.feature.map.camera.MapCameraGestureReporter
@@ -41,6 +41,12 @@ import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.map.RenderOptions
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.style.rememberStyleState
+
+private val CAMERA_ZOOM_BOUNDS = 14f..20f
+private val ELIGIBLE_TRACKING_STATUSES = setOf(
+    ExplorationTrackingStatus.PERMISSION_DENIED,
+    ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED,
+)
 
 @Composable
 fun MapScreen(
@@ -80,19 +86,30 @@ internal fun MapContent(
     }
     val styleState = rememberStyleState()
     val currentUserLocation = userLocationState.location
+
+    val onCurrentLocationUnavailable = remember(dispatch) {
+        {
+            dispatch(MapIntent.CurrentLocationUnavailable)
+        }
+    }
     val onObjectTapped = remember(dispatch) {
         { objectId: String ->
-            dispatch(MapIntent.ObjectTapped(objectId))
+            dispatch(MapIntent.ObjectTapped(objectId = objectId))
         }
     }
     val onCameraGestureStarted = remember(dispatch) {
         { position: CameraPositionState ->
-            dispatch(MapIntent.CameraGestureStarted(position))
+            dispatch(MapIntent.CameraGestureStarted(position = position))
         }
     }
     val onCameraSettled = remember(dispatch) {
         { position: CameraPositionState, origin: CameraUpdateOrigin ->
             dispatch(MapIntent.CameraSettled(position = position, origin = origin))
+        }
+    }
+    val onViewportChanged = remember(dispatch) {
+        { bounds: GeoBounds ->
+            dispatch(MapIntent.CameraViewportChanged(visibleBounds = bounds))
         }
     }
 
@@ -102,7 +119,7 @@ internal fun MapContent(
         origin = state.cameraUpdateOrigin,
         northResetRequestToken = state.northResetRequestToken,
         recenterTargetLocation = state.recenterTargetLocation(),
-        onCurrentLocationUnavailable = { dispatch(MapIntent.CurrentLocationUnavailable) },
+        onCurrentLocationUnavailable = onCurrentLocationUnavailable,
     )
     MapCameraGestureReporter(
         cameraState = cameraState,
@@ -112,9 +129,7 @@ internal fun MapContent(
     MapViewportReporter(
         cameraState = cameraState,
         restartKey = state.cameraPosition,
-        onViewportChanged = { visibleBounds ->
-            dispatch(MapIntent.CameraViewportChanged(visibleBounds = visibleBounds))
-        },
+        onViewportChanged = onViewportChanged,
     )
     MapCameraSettledReporter(
         cameraState = cameraState,
@@ -125,7 +140,6 @@ internal fun MapContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .testTag(MAP_ROTATION_OVERLAY_TEST_TAG)
             .mapRotationGestureHandler(
                 cameraState = cameraState,
                 onGestureStarted = onCameraGestureStarted,
@@ -190,13 +204,7 @@ internal fun MapContent(
             }
         }
 
-        if (
-            state.cameraPosition == null &&
-            state.explorationTrackingStatus !in setOf(
-                ExplorationTrackingStatus.PERMISSION_DENIED,
-                ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED,
-            )
-        ) {
+        if (state.cameraPosition == null && state.explorationTrackingStatus !in ELIGIBLE_TRACKING_STATUSES) {
             LoadingIndicator(
                 modifier = Modifier.align(Alignment.Center),
             )
@@ -220,16 +228,12 @@ internal fun MapContent(
         )
     }
 
-    state.selectedWatchtower?.let { selectedWatchtower ->
+    state.selectedWatchtower?.let {
         WatchtowerBottomSheet(
-            state = selectedWatchtower,
+            state = it,
             onDismiss = { dispatch(MapIntent.DismissWatchtowerSheet) },
             onClaim = { dispatch(MapIntent.ClaimSelectedWatchtower) },
             onUpgrade = { dispatch(MapIntent.UpgradeSelectedWatchtower) },
         )
     }
 }
-
-internal const val MAP_ROTATION_OVERLAY_TEST_TAG = "map_rotation_overlay"
-
-private val CAMERA_ZOOM_BOUNDS = 14f..20f
