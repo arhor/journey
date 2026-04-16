@@ -17,7 +17,7 @@ data class FogOfWarUiState(
     val handoffRenderData: FogOfWarRenderData? = null,
     val visibleTileCount: Long = 0,
     val visibleExploredTileCount: Int = 0,
-    val isSuppressedByVisibleTileLimit: Boolean = false,
+    val isSuppressed: Boolean = false,
     val isRecomputing: Boolean = false,
 ) {
 
