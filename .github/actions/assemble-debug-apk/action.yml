@@ -19,6 +19,7 @@ runs:
         if-no-files-found: error
 
     - name: Find Comment
+      if: ${{ github.event_name == 'pull_request' }}
       uses: peter-evans/find-comment@v4
       id: find-comment
       with:
@@ -27,6 +28,7 @@ runs:
         body-includes: A debug APK is available for download
 
     - name: Share debug APK download link
+      if: ${{ github.event_name == 'pull_request' }}
       uses: peter-evans/create-or-update-comment@v5
       with:
         edit-mode: replace
