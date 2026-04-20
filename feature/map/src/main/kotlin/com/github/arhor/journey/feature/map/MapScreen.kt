@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.map
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,17 +22,15 @@ import com.github.arhor.journey.feature.map.camera.MapCameraGestureReporter
 import com.github.arhor.journey.feature.map.camera.MapCameraSettledReporter
 import com.github.arhor.journey.feature.map.camera.MapViewportReporter
 import com.github.arhor.journey.feature.map.camera.recenterTargetLocation
-import com.github.arhor.journey.feature.map.camera.resolveInitialMapCameraPosition
 import com.github.arhor.journey.feature.map.components.ResetCameraButton
 import com.github.arhor.journey.feature.map.fow.ui.FogOfWarOverlay
 import com.github.arhor.journey.feature.map.gesture.mapRotationGestureHandler
-import com.github.arhor.journey.feature.map.location.USER_LOCATION_PUCK_ID_PREFIX
-import com.github.arhor.journey.feature.map.location.rememberMapLocationProvider
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.renderer.MapObjectsRendererAdapter
 import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.gms.rememberFusedLocationProvider
 import org.maplibre.compose.location.LocationPuck
 import org.maplibre.compose.location.rememberUserLocationState
 import org.maplibre.compose.map.GestureOptions
@@ -39,6 +38,7 @@ import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.map.RenderOptions
+import org.maplibre.compose.material3.LocationPuckDefaults
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.style.rememberStyleState
 
@@ -69,6 +69,7 @@ fun MapScreen(
     }
 }
 
+@SuppressLint("MissingPermission")
 @Composable
 internal fun MapContent(
     state: MapUiState.Content,
@@ -77,15 +78,10 @@ internal fun MapContent(
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val userLocationProvider = rememberMapLocationProvider(state.currentLocation)
-    val userLocationState = rememberUserLocationState(userLocationProvider)
-    val cameraState = key(state.cameraPosition == null) {
-        rememberCameraState(
-            firstPosition = resolveInitialMapCameraPosition(state.cameraPosition),
-        )
-    }
+    val locationProvider = rememberFusedLocationProvider()
+    val locationState = rememberUserLocationState(locationProvider)
+    val cameraState = rememberCameraState()
     val styleState = rememberStyleState()
-    val currentUserLocation = userLocationState.location
 
     val onCurrentLocationUnavailable = remember(dispatch) {
         {
@@ -186,13 +182,13 @@ internal fun MapContent(
                     },
                     onMapLoadFailed = { dispatch(MapIntent.MapLoadFailed(it)) },
                 ) {
-                    if (currentUserLocation != null) {
-                        LocationPuck(
-                            idPrefix = USER_LOCATION_PUCK_ID_PREFIX,
-                            locationState = userLocationState,
-                            cameraState = cameraState,
-                        )
-                    }
+                    LocationPuck(
+                        idPrefix = "gms-location",
+                        locationState = locationState,
+                        cameraState = cameraState,
+                        accuracyThreshold = 0f,
+                        colors = LocationPuckDefaults.colors(),
+                    )
 
                     FogOfWarOverlay(state = state.fogOfWar.toRenderState())
 

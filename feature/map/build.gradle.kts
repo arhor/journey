@@ -51,6 +51,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.maplibre.compose)
+    implementation(libs.maplibre.compose.gms)
+    implementation(libs.maplibre.compose.material3)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
