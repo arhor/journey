@@ -190,3 +190,41 @@ Do not commit secrets, local machine configuration, or generated outputs such as
 - `google-services.json`
 - build outputs
 - temporary SDK/bootstrap artifacts
+
+## Implementation Swarm Orchestration
+
+For non-trivial implementation work that starts from an accepted repository-specific plan, prefer
+`orchestrate-implementation-swarm` as the top-level execution skill when the change is likely to:
+
+- touch multiple modules, layers, or responsibilities,
+- require more than one focused implementation thread,
+- benefit from separating implementation, integration, and verification concerns, or
+- produce enough tool or terminal output that the main thread context would become noisy.
+
+When this orchestration path is used:
+
+- The orchestrator owns strategy, decomposition, work assignment, and final synthesis.
+- Prefer partitioning work by ownership and file boundaries rather than by arbitrary numbered steps.
+- Cap parallel implementation agents at 4 unless the task is unusually broad and file ownership is still clean.
+- Implementation subagents should avoid running Gradle tasks directly.
+- A single designated verifier should own Gradle-based validation. Use `validate-android-change` for that stage.
+- Raw terminal output should be summarized with `summarize-execution-artifacts` before it reaches the orchestrator.
+- If multiple focused implementation outputs must be combined, use `integrate-subagent-patches` before final validation.
+- After validation, run `swarm-code-review` by default for non-trivial code changes unless the user explicitly asked to skip review.
+
+Accepted-plan execution should continue to reconstruct the implementation context from:
+- the accepted plan,
+- the original user request, and
+- the implementation handoff contract.
+
+When the accepted plan is implementation-ready and the expected patch is non-trivial, the orchestrator may activate
+repo-specific implementation skills for focused packets, such as:
+- `implement-compose-feature`
+- `add-android-tests`
+- `review-android-architecture`
+- `review-compose-ui`
+- `audit-compose-performance`
+
+The orchestrator should keep the main thread concise and strategic. It should not accumulate raw command logs, repeated
+compile output, or long step-by-step operational noise unless those details are directly needed to make a decision.
+
