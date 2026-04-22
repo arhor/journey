@@ -54,7 +54,7 @@ internal fun Flow<CameraViewportSnapshot>.cameraViewportEvents(): Flow<GeoBounds
 internal fun shouldPublishCameraViewportSnapshot(snapshot: CameraViewportSnapshot): Boolean =
     !snapshot.isCameraMoving || snapshot.moveReason == CameraMoveReason.GESTURE
 
-private fun areGeoBoundsEquivalent(a: GeoBounds, b: GeoBounds): Boolean {
+internal fun areGeoBoundsEquivalent(a: GeoBounds, b: GeoBounds): Boolean {
     return abs(a.south - b.south) < CAMERA_SETTLE_BOUNDS_THRESHOLD
         && abs(a.west - b.west) < CAMERA_SETTLE_BOUNDS_THRESHOLD
         && abs(a.north - b.north) < CAMERA_SETTLE_BOUNDS_THRESHOLD

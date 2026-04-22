@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
+import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.viewinterop.DEFAULT_VIEW_MAP_STYLE_URL
 import com.github.arhor.journey.feature.map.viewinterop.MapLibreViewMapScreen
 
@@ -45,8 +47,26 @@ internal fun MapContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
         MapLibreViewMapScreen(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { size ->
+                    dispatch(
+                        MapIntent.MapViewportSizeChanged(
+                            MapViewportSize(
+                                widthPx = size.width,
+                                heightPx = size.height,
+                            ),
+                        ),
+                    )
+                },
             styleUrl = resolvedStyle,
+            fogOfWar = state.fogOfWar.toRenderState(),
+            onViewportChanged = { visibleBounds ->
+                dispatch(MapIntent.CameraViewportChanged(visibleBounds))
+            },
+            onLocationPermissionGranted = {
+                dispatch(MapIntent.LocationPermissionResult(isGranted = true))
+            },
             onMapLoadFailed = { message ->
                 dispatch(MapIntent.MapLoadFailed(message))
             },

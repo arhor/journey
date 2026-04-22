@@ -33,6 +33,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,7 +47,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.R
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
 import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
 import org.maplibre.android.location.LocationComponentActivationOptions
@@ -76,22 +79,33 @@ private val LOCATION_PERMISSIONS = arrayOf(
 fun MapLibreViewMapScreen(
     modifier: Modifier = Modifier,
     styleUrl: String = DEFAULT_VIEW_MAP_STYLE_URL,
+    fogOfWar: FogOfWarRenderState = FogOfWarRenderState(),
+    onViewportChanged: (GeoBounds) -> Unit = {},
+    onLocationPermissionGranted: () -> Unit = {},
     onMapLoadFailed: (String?) -> Unit = {},
 ) {
-    LocationPermissionGate {
+    LocationPermissionGate(
+        onLocationPermissionGranted = onLocationPermissionGranted,
+    ) {
         LegacyMapLibreMap(
             modifier = modifier,
             styleUrl = styleUrl,
+            fogOfWar = fogOfWar,
+            onViewportChanged = onViewportChanged,
             onMapLoadFailed = onMapLoadFailed,
         )
     }
 }
 
 @Composable
-private fun LocationPermissionGate(content: @Composable () -> Unit) {
+private fun LocationPermissionGate(
+    onLocationPermissionGranted: () -> Unit,
+    content: @Composable () -> Unit,
+) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val currentOnLocationPermissionGranted by rememberUpdatedState(onLocationPermissionGranted)
     var hasRequestedPermission by rememberSaveable { mutableStateOf(false) }
     var isPermissionRequestInFlight by rememberSaveable { mutableStateOf(false) }
     var permissionStatus by remember {
@@ -104,6 +118,7 @@ private fun LocationPermissionGate(content: @Composable () -> Unit) {
         hasRequestedPermission = true
         isPermissionRequestInFlight = false
         permissionStatus = if (grants.values.any { it } || context.hasLocationPermission()) {
+            currentOnLocationPermissionGranted()
             LocationPermissionStatus.Granted
         } else {
             context.currentLocationPermissionStatus(activity, hasRequestedPermission = true)
@@ -111,7 +126,12 @@ private fun LocationPermissionGate(content: @Composable () -> Unit) {
     }
 
     fun refreshPermissionStatus() {
-        permissionStatus = context.currentLocationPermissionStatus(activity, hasRequestedPermission)
+        val previousStatus = permissionStatus
+        val nextStatus = context.currentLocationPermissionStatus(activity, hasRequestedPermission)
+        permissionStatus = nextStatus
+        if (previousStatus != LocationPermissionStatus.Granted && nextStatus == LocationPermissionStatus.Granted) {
+            currentOnLocationPermissionGranted()
+        }
     }
 
     LaunchedEffect(activity) {
@@ -210,9 +230,12 @@ private fun LocationPermissionDeniedScreen(
 private fun LegacyMapLibreMap(
     modifier: Modifier = Modifier,
     styleUrl: String,
+    fogOfWar: FogOfWarRenderState,
+    onViewportChanged: (GeoBounds) -> Unit,
     onMapLoadFailed: (String?) -> Unit,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
     val mapViewState = rememberSaveable { Bundle() }
     val mapViewHandles = remember { mutableStateMapOf<MapView, MapViewHandle>() }
     var isWaitingForLocation by remember { mutableStateOf(true) }
@@ -230,8 +253,17 @@ private fun LegacyMapLibreMap(
                 factory = { context ->
                     MapLibre.getInstance(context)
 
+                    val fogLayerController = NativeFogOfWarLayerController()
+                    val viewportReporter = NativeMapViewportReporter(
+                        onViewportChanged = { bounds ->
+                            currentOnViewportChanged(bounds)
+                        },
+                    )
                     val startupController = MapLocationStartupController(
-                        onFirstLocationFix = { isWaitingForLocation = false },
+                        onFirstLocationFix = {
+                            isWaitingForLocation = false
+                            viewportReporter.reportCurrentViewport()
+                        },
                     )
                     val loadFailureListener = MapView.OnDidFailLoadingMapListener { errorMessage ->
                         onMapLoadFailed(errorMessage)
@@ -242,19 +274,28 @@ private fun LegacyMapLibreMap(
                         mapViewHandles[mapView] = MapViewHandle(
                             lifecycleObserver = observer,
                             startupController = startupController,
+                            fogLayerController = fogLayerController,
+                            viewportReporter = viewportReporter,
                             loadFailureListener = loadFailureListener,
                         )
                         lifecycle.addObserver(observer)
                         mapView.addOnDidFailLoadingMapListener(loadFailureListener)
                         mapView.configureLocationAwareMap(
                             styleUrl = styleUrl,
+                            fogOfWar = fogOfWar,
                             startupController = startupController,
+                            fogLayerController = fogLayerController,
+                            viewportReporter = viewportReporter,
                         )
                     }
+                },
+                update = { mapView ->
+                    mapViewHandles[mapView]?.fogLayerController?.update(fogOfWar)
                 },
                 onRelease = { mapView ->
                     mapViewHandles.remove(mapView)?.let { handle ->
                         handle.startupController.cleanup()
+                        handle.viewportReporter.cleanup()
                         mapView.removeOnDidFailLoadingMapListener(handle.loadFailureListener)
                         lifecycle.removeObserver(handle.lifecycleObserver)
                         handle.lifecycleObserver.save()
@@ -287,13 +328,20 @@ private fun LegacyMapLibreMap(
 @SuppressLint("MissingPermission")
 private fun MapView.configureLocationAwareMap(
     styleUrl: String,
+    fogOfWar: FogOfWarRenderState,
     startupController: MapLocationStartupController,
+    fogLayerController: NativeFogOfWarLayerController,
+    viewportReporter: NativeMapViewportReporter,
 ) {
     getMapAsync { map ->
         if (startupController.isReleased) return@getMapAsync
 
         map.setStyleDefinition(styleUrl) { style ->
             if (startupController.isReleased) return@setStyleDefinition
+
+            fogLayerController.attach(style)
+            fogLayerController.update(fogOfWar)
+            viewportReporter.attach(map)
 
             val locationEngine = ForwardingLocationEngine(context)
             val locationRequest = context.locationEngineRequest()
@@ -336,6 +384,8 @@ private fun MapLibreMap.setStyleDefinition(
 private data class MapViewHandle(
     val lifecycleObserver: MapViewLifecycleObserver,
     val startupController: MapLocationStartupController,
+    val fogLayerController: NativeFogOfWarLayerController,
+    val viewportReporter: NativeMapViewportReporter,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,
 )
 

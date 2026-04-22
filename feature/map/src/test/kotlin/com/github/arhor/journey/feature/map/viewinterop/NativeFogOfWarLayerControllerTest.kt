@@ -1,11 +1,10 @@
-package com.github.arhor.journey.feature.map.fow.ui
+package com.github.arhor.journey.feature.map.viewinterop
 
-import com.github.arhor.journey.domain.model.ExplorationTileRange
-import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderData
+import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
 import com.github.arhor.journey.feature.map.fow.model.ACTIVE_FOG_OF_WAR_LAYER_ID
 import com.github.arhor.journey.feature.map.fow.model.ACTIVE_FOG_OF_WAR_OPACITY
 import com.github.arhor.journey.feature.map.fow.model.ACTIVE_FOG_OF_WAR_SOURCE_ID
-import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
 import com.github.arhor.journey.feature.map.fow.model.HANDOFF_FOG_OF_WAR_LAYER_ID
 import com.github.arhor.journey.feature.map.fow.model.HANDOFF_FOG_OF_WAR_SOURCE_ID
 import com.github.arhor.journey.feature.map.fow.model.HIDDEN_EXPLORED_LAYER_ID
@@ -14,43 +13,22 @@ import com.github.arhor.journey.feature.map.fow.model.HIDDEN_EXPLORED_SOURCE_ID
 import com.github.arhor.journey.feature.map.fow.model.fogOfWarLayerSpecs
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.types.shouldBeInstanceOf
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Test
 import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.spatialk.geojson.Feature
+import org.maplibre.spatialk.geojson.FeatureCollection
+import org.maplibre.spatialk.geojson.Point
 
-class FogOfWarMapOverlayTest {
+class NativeFogOfWarLayerControllerTest {
 
     @Test
-    fun `fogOfWarLayerSpecs should return hidden explored layer first then handoff and active fog layers`() {
+    fun `nativeFogOfWarLayerSpecs should return hidden explored layer first then handoff and active fog layers`() {
         // Given
-        val renderDataFactory = FowRenderDataFactory()
-        val hiddenExploredRenderData = renderDataFactory.createFullRange(
-            ExplorationTileRange(
-                zoom = 17,
-                minX = 6,
-                maxX = 7,
-                minY = 16,
-                maxY = 17,
-            ),
-        )
-        val handoffRenderData = renderDataFactory.createFullRange(
-            ExplorationTileRange(
-                zoom = 17,
-                minX = 8,
-                maxX = 9,
-                minY = 18,
-                maxY = 19,
-            ),
-        )
-        val activeRenderData = renderDataFactory.createFullRange(
-            ExplorationTileRange(
-                zoom = 17,
-                minX = 10,
-                maxX = 11,
-                minY = 20,
-                maxY = 21,
-            ),
-        )
+        val hiddenExploredRenderData = renderData("hidden")
+        val handoffRenderData = renderData("handoff")
+        val activeRenderData = renderData("active")
         val state = FogOfWarRenderState(
             hiddenExploredRenderData = hiddenExploredRenderData,
             handoffRenderData = handoffRenderData,
@@ -84,18 +62,9 @@ class FogOfWarMapOverlayTest {
     }
 
     @Test
-    fun `fogOfWarLayerSpecs should keep stable layer order when handoff is empty`() {
+    fun `nativeFogOfWarLayerSpecs should hide layers with null render data`() {
         // Given
-        val renderDataFactory = FowRenderDataFactory()
-        val activeRenderData = renderDataFactory.createFullRange(
-            ExplorationTileRange(
-                zoom = 17,
-                minX = 10,
-                maxX = 11,
-                minY = 20,
-                maxY = 21,
-            ),
-        )
+        val activeRenderData = renderData("active")
         val state = FogOfWarRenderState(
             activeRenderData = activeRenderData,
         )
@@ -104,23 +73,54 @@ class FogOfWarMapOverlayTest {
         val actual = state.fogOfWarLayerSpecs()
 
         // Then
-        actual.map { it.sourceId to it.layerId } shouldContainExactly listOf(
-            HIDDEN_EXPLORED_SOURCE_ID to HIDDEN_EXPLORED_LAYER_ID,
-            HANDOFF_FOG_OF_WAR_SOURCE_ID to HANDOFF_FOG_OF_WAR_LAYER_ID,
-            ACTIVE_FOG_OF_WAR_SOURCE_ID to ACTIVE_FOG_OF_WAR_LAYER_ID,
-        )
-        actual[0].renderData shouldBe null
-        actual[1].renderData shouldBe null
         actual.map { it.isVisible } shouldContainExactly listOf(
             false,
             false,
             true,
         )
+        actual.map { it.renderData } shouldContainExactly listOf(
+            null,
+            null,
+            activeRenderData,
+        )
     }
 
     @Test
-    fun `empty fog fallback should use raw json feature collection`() {
-        EMPTY_FOG_GEO_JSON_DATA.shouldBeInstanceOf<GeoJsonData.JsonString>()
-            .json shouldBe """{"type":"FeatureCollection","features":[]}"""
+    fun `toNativeFogGeoJson should use empty feature collection for null render data`() {
+        // When
+        val actual = null.toNativeFogGeoJson()
+
+        // Then
+        actual shouldBe EMPTY_NATIVE_FOG_GEO_JSON
     }
+
+    @Test
+    fun `toNativeFogGeoJson should convert render data features to json`() {
+        // Given
+        val renderData = renderData("active")
+
+        // When
+        val actual = renderData.toNativeFogGeoJson()
+
+        // Then
+        actual shouldBe """
+            |{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[30.0,10.0]},"properties":{"layer":"active"}}]}
+        """.trimMargin()
+    }
+
+    private fun renderData(layer: String): FogOfWarRenderData =
+        FogOfWarRenderData(
+            geoJsonData = GeoJsonData.Features(
+                FeatureCollection(
+                    listOf(
+                        Feature(
+                            geometry = Point(longitude = 30.0, latitude = 10.0),
+                            properties = buildJsonObject {
+                                put("layer", layer)
+                            },
+                        ),
+                    ),
+                ),
+            ),
+        )
 }

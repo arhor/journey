@@ -1374,6 +1374,37 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `dispatch should start exploration tracking after native permission grant from permission-required map open`() =
+        runTest {
+            Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+            // Given
+            val fixture = createFixture(
+                startTrackingResult = Output.Failure(StartExplorationTrackingSessionError.PermissionRequired),
+            )
+
+            try {
+                fixture.viewModel.awaitContent()
+                val effectDeferred = async { fixture.viewModel.effects.first() }
+                runCurrent()
+                fixture.viewModel.dispatch(MapIntent.MapOpened)
+                advanceUntilIdle()
+                effectDeferred.await() shouldBe MapEffect.RequestLocationPermission
+
+                coEvery { fixture.startTrackingSession.invoke() } returns Output.Success(Unit)
+
+                // When
+                fixture.viewModel.dispatch(MapIntent.LocationPermissionResult(isGranted = true))
+                advanceUntilIdle()
+
+                // Then
+                coVerify(exactly = 2) { fixture.startTrackingSession.invoke() }
+            } finally {
+                tearDownMainDispatcher(fixture.viewModel)
+            }
+        }
+
+    @Test
     fun `dispatch should show fallback message when map open tracking launch fails without message`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 

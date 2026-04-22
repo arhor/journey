@@ -6,6 +6,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 
 @Composable
 fun MapRoute(
@@ -19,15 +21,19 @@ fun MapRoute(
     val hudState by hudVm.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        vm.effects.collect { effect ->
-            when (effect) {
-                is MapEffect.ShowMessage -> {
-                    snackbarHostState.showSnackbar(effect.message)
-                }
+        launch(start = CoroutineStart.UNDISPATCHED) {
+            vm.effects.collect { effect ->
+                when (effect) {
+                    is MapEffect.ShowMessage -> {
+                        snackbarHostState.showSnackbar(effect.message)
+                    }
 
-                MapEffect.RequestLocationPermission -> Unit
+                    MapEffect.RequestLocationPermission -> Unit
+                }
             }
         }
+
+        vm.dispatch(MapIntent.MapOpened)
     }
 
     MapScreen(
