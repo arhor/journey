@@ -34,10 +34,6 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
-import com.github.arhor.journey.feature.map.location.CurrentLocationPresenter
-import com.github.arhor.journey.feature.map.location.LocationStabilizationSnapshot
-import com.github.arhor.journey.feature.map.location.MapLocationAnimationSnapshot
-import com.github.arhor.journey.feature.map.location.MapLocationAnimator
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.MapObjectKind
@@ -78,6 +74,7 @@ private data class State(
 
 @Stable
 @HiltViewModel
+@Suppress("CanBeParameter")
 class MapViewModel @Inject constructor(
     private val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
@@ -93,8 +90,6 @@ class MapViewModel @Inject constructor(
     private val mapObjectQueryWindowPolicy: MapObjectQueryWindowPolicy,
     private val mapWorldObjectPresenter: MapWorldObjectPresenter,
     private val selectedWatchtowerPresenter: SelectedWatchtowerPresenter,
-    private val currentLocationPresenter: CurrentLocationPresenter,
-    private val mapLocationAnimator: MapLocationAnimator,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -131,22 +126,12 @@ class MapViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = Output.Success(VisibleWatchtowerData()),
         )
-    private val animatedLocationSnapshot = mapLocationAnimator
-        .animate(observeLocationStabilizationTargets())
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Eagerly,
-            initialValue = MapLocationAnimationSnapshot(),
-        )
+
     private var cachedVisibleObjects: List<MapObjectUiModel> = emptyList()
 
     override fun buildUiState(): Flow<MapUiState> =
-        combine(
-            observeBaseUiState(),
-            animatedLocationSnapshot,
-        ) { baseUiState, animatedLocationSnapshot ->
-            baseUiState.toUiState(animatedLocationSnapshot)
-        }
+        observeBaseUiState()
+            .map { it.toUiState() }
             .distinctUntilChanged()
 
     private fun observeBaseUiState(): Flow<MapBaseUiState> =
@@ -310,18 +295,6 @@ class MapViewModel @Inject constructor(
             }
         }.distinctUntilChanged()
 
-    private fun observeLocationStabilizationTargets(): Flow<LocationStabilizationSnapshot> =
-        trackingSession
-            .map { trackingSessionOutput ->
-                when (trackingSessionOutput) {
-                    is Output.Success -> currentLocationPresenter.presentStabilizationTarget(
-                        trackingSessionOutput.value,
-                    )
-                    is Output.Failure -> currentLocationPresenter.presentUnavailableStabilizationTarget()
-                }
-            }
-            .distinctUntilChanged()
-
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
             is MapIntent.MapOpened -> onMapOpened()
@@ -340,6 +313,7 @@ class MapViewModel @Inject constructor(
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
+
     private fun observeVisibleResourceSpawns(
         queryBounds: GeoBounds?,
     ): Flow<Output<List<ResourceSpawn>, DomainError>> = queryBounds
@@ -451,25 +425,11 @@ class MapViewModel @Inject constructor(
         MapBaseUiState.Failure(errorMessage = state.failureMessage)
     }
 
-    private fun MapBaseUiState.toUiState(
-        animatedLocationSnapshot: MapLocationAnimationSnapshot,
-    ): MapUiState = when (this) {
+    private fun MapBaseUiState.toUiState(): MapUiState = when (this) {
         is MapBaseUiState.Failure -> MapUiState.Failure(errorMessage)
         is MapBaseUiState.Content -> {
-            val locationPresentation = currentLocationPresenter.presentMapLocation(
-                animatedLocationSnapshot = animatedLocationSnapshot,
-                cameraPosition = cameraPosition,
-                cameraUpdateOrigin = cameraUpdateOrigin,
-                isUserInteractingCamera = isUserInteractingCamera,
-            )
-
             MapUiState.Content(
-                cameraPosition = locationPresentation.cameraPosition,
-                cameraUpdateOrigin = locationPresentation.cameraUpdateOrigin,
                 northResetRequestToken = northResetRequestToken,
-                currentLocation = locationPresentation.currentLocation,
-                cameraLocation = locationPresentation.cameraLocation,
-                userLocation = locationPresentation.userLocation,
                 isExplorationTrackingActive = isExplorationTrackingActive,
                 explorationTrackingCadence = explorationTrackingCadence,
                 explorationTrackingStatus = explorationTrackingStatus,
@@ -840,7 +800,6 @@ class MapViewModel @Inject constructor(
 
     private companion object {
         const val MAP_LOADING_FAILED_MESSAGE = "Failed to load map state."
-        const val SETTINGS_LOADING_FAILED_MESSAGE = "Failed to load settings state."
         const val MAP_STYLE_LOADING_FAILED_MESSAGE = "Failed to load map style."
         const val TRACKING_PERMISSION_REQUIRED_MESSAGE =
             "Location permission is required to start exploration tracking."
