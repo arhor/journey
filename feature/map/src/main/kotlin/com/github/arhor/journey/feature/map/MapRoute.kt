@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.github.arhor.journey.feature.map.viewinterop.MapLibreViewMapScreen
 
 private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -58,13 +59,16 @@ fun MapRoute(
         }
     }
 
-    MapScreen(
-        state = state,
-        hudState = hudState,
-        dispatch = vm::dispatch,
-        onOpenHero = onOpenHero,
-        onOpenSettings = onOpenSettings,
-    )
+    // TODO: final goal is to completely replace maplibre-compose library with native view
+//    MapScreen(
+//        state = state,
+//        hudState = hudState,
+//        dispatch = vm::dispatch,
+//        onOpenHero = onOpenHero,
+//        onOpenSettings = onOpenSettings,
+//    )
+
+    MapLibreViewMapScreen()
 }
 
 private fun Context.hasLocationPermission(): Boolean {

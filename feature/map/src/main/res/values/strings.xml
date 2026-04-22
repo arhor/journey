@@ -9,6 +9,11 @@
     <string name="map_hud_xp_label">XP %1$d / %2$d</string>
     <string name="map_weather_content_description">Weather conditions</string>
     <string name="map_nav_label">Map</string>
+    <string name="map_view_location_permission_title">Location permission needed</string>
+    <string name="map_view_location_permission_message">This map needs location access to follow your current position.</string>
+    <string name="map_view_location_permission_retry">Retry</string>
+    <string name="map_view_location_permission_settings">Open settings</string>
+    <string name="map_view_location_loading_message">Waiting for your location...</string>
     <string name="watchtower_status_dormant">Dormant watchtower</string>
     <string name="watchtower_status_claimed">Claimed watchtower</string>
     <string name="watchtower_distance_label">Distance</string>
