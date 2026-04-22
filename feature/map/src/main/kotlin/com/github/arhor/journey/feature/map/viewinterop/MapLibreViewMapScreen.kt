@@ -336,6 +336,7 @@ private fun MapView.configureLocationAwareMap(
     getMapAsync { map ->
         if (startupController.isReleased) return@getMapAsync
 
+        map.disablePanGestures()
         map.setStyleDefinition(styleUrl) { style ->
             if (startupController.isReleased) return@setStyleDefinition
 
@@ -366,6 +367,11 @@ private fun MapView.configureLocationAwareMap(
             startupController.start(map, locationEngine, locationRequest)
         }
     }
+}
+
+private fun MapLibreMap.disablePanGestures() {
+    uiSettings.isScrollGesturesEnabled = false
+    uiSettings.isHorizontalScrollGesturesEnabled = false
 }
 
 private fun MapLibreMap.setStyleDefinition(
