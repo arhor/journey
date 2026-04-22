@@ -1,9 +1,11 @@
 package com.github.arhor.journey.feature.map.viewinterop
 
 import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.feature.map.camera.areGeoBoundsEquivalent
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapLibreMap
+import kotlin.math.abs
+
+private const val CAMERA_SETTLE_BOUNDS_THRESHOLD = 0.0001
 
 internal class NativeMapViewportReporter(
     private val onViewportChanged: (GeoBounds) -> Unit,
@@ -51,3 +53,10 @@ private fun LatLngBounds.toGeoBounds(): GeoBounds =
         north = latitudeNorth,
         east = longitudeEast,
     )
+
+private fun areGeoBoundsEquivalent(a: GeoBounds, b: GeoBounds): Boolean {
+    return abs(a.south - b.south) < CAMERA_SETTLE_BOUNDS_THRESHOLD
+        && abs(a.west - b.west) < CAMERA_SETTLE_BOUNDS_THRESHOLD
+        && abs(a.north - b.north) < CAMERA_SETTLE_BOUNDS_THRESHOLD
+        && abs(a.east - b.east) < CAMERA_SETTLE_BOUNDS_THRESHOLD
+}

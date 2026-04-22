@@ -1,62 +1,7 @@
 package com.github.arhor.journey.feature.map.gesture
 
 import android.view.MotionEvent
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.input.pointer.motionEventSpy
-import com.github.arhor.journey.feature.map.camera.toCameraPositionState
-import com.github.arhor.journey.feature.map.model.CameraPositionState
-import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
-import org.maplibre.compose.camera.CameraState
 import kotlin.math.abs
-
-internal fun Modifier.mapRotationGestureHandler(
-    cameraState: CameraState,
-    onGestureStarted: (CameraPositionState) -> Unit,
-    onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit,
-): Modifier = composed {
-    val tracker = remember {
-        HorizontalDragRotationTracker()
-    }
-    val latestOnGestureStarted by rememberUpdatedState(onGestureStarted)
-    val latestOnCameraSettled by rememberUpdatedState(onCameraSettled)
-
-    motionEventSpy { motionEvent ->
-        val currentPosition = cameraState.position
-        val update = tracker.onMotionEvent(
-            action = motionEvent.actionMasked,
-            x = motionEvent.x,
-            y = motionEvent.y,
-            pointerCount = motionEvent.pointerCount,
-            currentBearing = currentPosition.bearing,
-        )
-
-        if (update.didStartInteraction || update.bearing != null) {
-            latestOnGestureStarted(
-                currentPosition.copy(
-                    bearing = update.bearing ?: currentPosition.bearing,
-                ).toCameraPositionState(),
-            )
-        }
-
-        if (update.bearing != null) {
-            cameraState.position = currentPosition.copy(
-                target = currentPosition.target,
-                bearing = update.bearing,
-            )
-        }
-
-        if (update.didEndInteraction) {
-            latestOnCameraSettled(
-                cameraState.position.toCameraPositionState(),
-                CameraUpdateOrigin.USER,
-            )
-        }
-    }
-}
 
 internal data class HorizontalDragRotationUpdate(
     val bearing: Double? = null,

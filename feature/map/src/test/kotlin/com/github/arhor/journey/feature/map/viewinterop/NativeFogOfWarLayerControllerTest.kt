@@ -16,7 +16,6 @@ import io.kotest.matchers.shouldBe
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Test
-import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Point
@@ -110,15 +109,13 @@ class NativeFogOfWarLayerControllerTest {
 
     private fun renderData(layer: String): FogOfWarRenderData =
         FogOfWarRenderData(
-            geoJsonData = GeoJsonData.Features(
-                FeatureCollection(
-                    listOf(
-                        Feature(
-                            geometry = Point(longitude = 30.0, latitude = 10.0),
-                            properties = buildJsonObject {
-                                put("layer", layer)
-                            },
-                        ),
+            featureCollection = FeatureCollection(
+                listOf(
+                    Feature(
+                        geometry = Point(longitude = 30.0, latitude = 10.0),
+                        properties = buildJsonObject {
+                            put("layer", layer)
+                        },
                     ),
                 ),
             ),

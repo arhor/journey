@@ -50,9 +50,8 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.maplibre.compose)
-    implementation(libs.maplibre.compose.gms)
-    implementation(libs.maplibre.compose.material3)
+    implementation(libs.maplibre.android)
+    implementation(libs.maplibre.spatialk.geojson)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)

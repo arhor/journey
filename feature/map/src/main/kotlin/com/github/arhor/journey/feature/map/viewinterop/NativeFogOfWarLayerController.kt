@@ -73,4 +73,4 @@ internal class NativeFogOfWarLayerController {
 }
 
 internal fun FogOfWarRenderData?.toNativeFogGeoJson(): String =
-    this?.geoJsonData?.geoJson?.toJson() ?: EMPTY_NATIVE_FOG_GEO_JSON
+    this?.featureCollection?.toJson() ?: EMPTY_NATIVE_FOG_GEO_JSON

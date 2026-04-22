@@ -11,7 +11,6 @@ import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderKey
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderMode
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Polygon
@@ -95,7 +94,7 @@ class FowRenderDataFactory @Inject constructor() {
 
         val featureCollection = geometryResult.geometries.toPolygonFeatureCollection()
         val cacheEntry = FogOfWarRenderCacheEntry(
-            renderData = FogOfWarRenderData(geoJsonData = GeoJsonData.Features(featureCollection)),
+            renderData = FogOfWarRenderData(featureCollection = featureCollection),
             renderMode = FogOfWarRenderMode.SMOOTHED,
             expandedFogCellCount = geometryResult.metrics.expandedCellCount,
             connectedRegionCount = geometryResult.metrics.connectedRegionCount,
@@ -128,27 +127,25 @@ class FowRenderDataFactory @Inject constructor() {
 
     private fun createFowRenderDataFromRanges(key: FogOfWarRenderKey): FogOfWarRenderData {
         val renderData = FogOfWarRenderData(
-            geoJsonData = GeoJsonData.Features(
-                FeatureCollection(
-                    features = key.ranges.mapIndexed { index, fogRange ->
-                        val bounds = bounds(fogRange)
-                        Feature(
-                            geometry = Polygon(
-                                coordinates = listOf(
-                                    listOf(
-                                        Position(longitude = bounds.west, latitude = bounds.north),
-                                        Position(longitude = bounds.east, latitude = bounds.north),
-                                        Position(longitude = bounds.east, latitude = bounds.south),
-                                        Position(longitude = bounds.west, latitude = bounds.south),
-                                        Position(longitude = bounds.west, latitude = bounds.north),
-                                    ),
+            featureCollection = FeatureCollection(
+                features = key.ranges.mapIndexed { index, fogRange ->
+                    val bounds = bounds(fogRange)
+                    Feature(
+                        geometry = Polygon(
+                            coordinates = listOf(
+                                listOf(
+                                    Position(longitude = bounds.west, latitude = bounds.north),
+                                    Position(longitude = bounds.east, latitude = bounds.north),
+                                    Position(longitude = bounds.east, latitude = bounds.south),
+                                    Position(longitude = bounds.west, latitude = bounds.south),
+                                    Position(longitude = bounds.west, latitude = bounds.north),
                                 ),
                             ),
-                            properties = buildJsonObject { },
-                            id = JsonPrimitive("${fogRange.zoom}:full#$index"),
-                        )
-                    },
-                ),
+                        ),
+                        properties = buildJsonObject { },
+                        id = JsonPrimitive("${fogRange.zoom}:full#$index"),
+                    )
+                },
             ),
         )
         return renderData
@@ -157,24 +154,22 @@ class FowRenderDataFactory @Inject constructor() {
     private fun createFowRenderDataFromRange(key: ExplorationTileRange): FogOfWarRenderData {
         val bounds = bounds(key)
         val renderData = FogOfWarRenderData(
-            geoJsonData = GeoJsonData.Features(
-                FeatureCollection(
-                    features = listOf(
-                        Feature(
-                            geometry = Polygon(
-                                coordinates = listOf(
-                                    listOf(
-                                        Position(longitude = bounds.west, latitude = bounds.north),
-                                        Position(longitude = bounds.east, latitude = bounds.north),
-                                        Position(longitude = bounds.east, latitude = bounds.south),
-                                        Position(longitude = bounds.west, latitude = bounds.south),
-                                        Position(longitude = bounds.west, latitude = bounds.north),
-                                    ),
+            featureCollection = FeatureCollection(
+                features = listOf(
+                    Feature(
+                        geometry = Polygon(
+                            coordinates = listOf(
+                                listOf(
+                                    Position(longitude = bounds.west, latitude = bounds.north),
+                                    Position(longitude = bounds.east, latitude = bounds.north),
+                                    Position(longitude = bounds.east, latitude = bounds.south),
+                                    Position(longitude = bounds.west, latitude = bounds.south),
+                                    Position(longitude = bounds.west, latitude = bounds.north),
                                 ),
                             ),
-                            properties = buildJsonObject { },
-                            id = JsonPrimitive("${key.zoom}:full"),
                         ),
+                        properties = buildJsonObject { },
+                        id = JsonPrimitive("${key.zoom}:full"),
                     ),
                 ),
             ),

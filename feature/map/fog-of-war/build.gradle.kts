@@ -47,7 +47,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.maplibre.compose)
+    implementation(libs.maplibre.spatialk.geojson)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotest.assertions.core)

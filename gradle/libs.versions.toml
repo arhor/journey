@@ -17,7 +17,8 @@ kotlinxCoroutinesAndroid = "1.10.2"
 kotlinxSerializationJson = "1.11.0"
 ksp = "2.3.4"
 lifecycleRuntimeKtx = "2.10.0"
-maplibreCompose = "0.12.1"
+maplibreAndroid = "12.0.1"
+maplibreSpatialk = "0.6.0"
 materialIconsExtended = "1.7.8"
 mockk = "1.14.9"
 navigationCompose = "2.9.7"
@@ -60,9 +61,8 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesAndroid" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesAndroid" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
-maplibre-compose = { module = "org.maplibre.compose:maplibre-compose", version.ref = "maplibreCompose" }
-maplibre-compose-gms = { module = "org.maplibre.compose:maplibre-compose-gms", version.ref = "maplibreCompose" }
-maplibre-compose-material3 = { module = "org.maplibre.compose:maplibre-compose-material3", version.ref = "maplibreCompose" }
+maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibreAndroid" }
+maplibre-spatialk-geojson = { module = "org.maplibre.spatialk:geojson", version.ref = "maplibreSpatialk" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
 
