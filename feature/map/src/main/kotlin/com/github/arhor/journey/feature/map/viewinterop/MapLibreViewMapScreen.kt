@@ -58,6 +58,7 @@ import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
 
 const val DEFAULT_VIEW_MAP_STYLE_URL: String = "https://tiles.openfreemap.org/styles/liberty"
 
@@ -75,11 +76,13 @@ private val LOCATION_PERMISSIONS = arrayOf(
 fun MapLibreViewMapScreen(
     modifier: Modifier = Modifier,
     styleUrl: String = DEFAULT_VIEW_MAP_STYLE_URL,
+    onMapLoadFailed: (String?) -> Unit = {},
 ) {
     LocationPermissionGate {
         LegacyMapLibreMap(
             modifier = modifier,
             styleUrl = styleUrl,
+            onMapLoadFailed = onMapLoadFailed,
         )
     }
 }
@@ -207,6 +210,7 @@ private fun LocationPermissionDeniedScreen(
 private fun LegacyMapLibreMap(
     modifier: Modifier = Modifier,
     styleUrl: String,
+    onMapLoadFailed: (String?) -> Unit,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val mapViewState = rememberSaveable { Bundle() }
@@ -229,11 +233,19 @@ private fun LegacyMapLibreMap(
                     val startupController = MapLocationStartupController(
                         onFirstLocationFix = { isWaitingForLocation = false },
                     )
+                    val loadFailureListener = MapView.OnDidFailLoadingMapListener { errorMessage ->
+                        onMapLoadFailed(errorMessage)
+                    }
 
                     MapView(context).also { mapView ->
                         val observer = MapViewLifecycleObserver(mapView, mapViewState)
-                        mapViewHandles[mapView] = MapViewHandle(observer, startupController)
+                        mapViewHandles[mapView] = MapViewHandle(
+                            lifecycleObserver = observer,
+                            startupController = startupController,
+                            loadFailureListener = loadFailureListener,
+                        )
                         lifecycle.addObserver(observer)
+                        mapView.addOnDidFailLoadingMapListener(loadFailureListener)
                         mapView.configureLocationAwareMap(
                             styleUrl = styleUrl,
                             startupController = startupController,
@@ -243,6 +255,7 @@ private fun LegacyMapLibreMap(
                 onRelease = { mapView ->
                     mapViewHandles.remove(mapView)?.let { handle ->
                         handle.startupController.cleanup()
+                        mapView.removeOnDidFailLoadingMapListener(handle.loadFailureListener)
                         lifecycle.removeObserver(handle.lifecycleObserver)
                         handle.lifecycleObserver.save()
                         handle.lifecycleObserver.destroy()
@@ -279,8 +292,8 @@ private fun MapView.configureLocationAwareMap(
     getMapAsync { map ->
         if (startupController.isReleased) return@getMapAsync
 
-        map.setStyle(styleUrl) { style ->
-            if (startupController.isReleased) return@setStyle
+        map.setStyleDefinition(styleUrl) { style ->
+            if (startupController.isReleased) return@setStyleDefinition
 
             val locationEngine = ForwardingLocationEngine(context)
             val locationRequest = context.locationEngineRequest()
@@ -307,9 +320,23 @@ private fun MapView.configureLocationAwareMap(
     }
 }
 
+private fun MapLibreMap.setStyleDefinition(
+    style: String,
+    onStyleLoaded: Style.OnStyleLoaded,
+) {
+    val builder = if (style.trimStart().startsWith("{")) {
+        Style.Builder().fromJson(style)
+    } else {
+        Style.Builder().fromUri(style)
+    }
+
+    setStyle(builder, onStyleLoaded)
+}
+
 private data class MapViewHandle(
     val lifecycleObserver: MapViewLifecycleObserver,
     val startupController: MapLocationStartupController,
+    val loadFailureListener: MapView.OnDidFailLoadingMapListener,
 )
 
 private class MapLocationStartupController(
