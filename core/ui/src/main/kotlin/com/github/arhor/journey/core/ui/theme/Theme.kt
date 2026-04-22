@@ -1,4 +1,4 @@
-package com.github.arhor.journey.ui.theme
+package com.github.arhor.journey.core.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
