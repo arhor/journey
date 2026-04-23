@@ -1,5 +1,8 @@
 @file:Suppress("UnstableApiUsage")
 
+include(":feature:mini-game")
+
+
 pluginManagement {
     repositories {
         google {

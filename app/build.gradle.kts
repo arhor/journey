@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":feature:exploration"))
     implementation(project(":feature:hero"))
     implementation(project(":feature:map"))
+    implementation(project(":feature:mini-game"))
     implementation(project(":feature:settings"))
 
     implementation(platform(libs.androidx.compose.bom))
@@ -75,7 +76,6 @@ dependencies {
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.godot)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
