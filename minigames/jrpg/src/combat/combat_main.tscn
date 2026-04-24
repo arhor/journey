@@ -1,0 +1,25 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://src/combat/combat.gd" id="1_8ubll"]
+[ext_resource type="PackedScene" path="res://combat/arenas/test_combat_arena.tscn" id="2_rk45o"]
+[ext_resource type="PackedScene" path="res://src/combat/ui/ui_combat.tscn" id="3_eay1y"]
+
+[node name="CombatMain" type="Node"]
+
+[node name="Combat" type="CanvasLayer" parent="."]
+script = ExtResource("1_8ubll")
+initial_arena = ExtResource("2_rk45o")
+
+[node name="CenterContainer" type="CenterContainer" parent="Combat"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+
+[node name="UI" parent="Combat" instance=ExtResource("3_eay1y")]
+
+[node name="TransitionDelay" type="Timer" parent="Combat/UI"]
+wait_time = 0.5
+one_shot = true
