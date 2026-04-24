@@ -6,7 +6,7 @@ plugins {
 val godotBinaryPath = providers.environmentVariable("GODOT_BIN")
 val godotProjectDir = layout.projectDirectory.dir("src/main/godot")
 val godotOutputAssetsDir = layout.buildDirectory.dir("generated/godot/assets")
-val godotOutputPckBundle = layout.buildDirectory.file("generated/godot/assets/minigame.pck")
+val godotOutputPckBundle = layout.buildDirectory.file("generated/godot/assets/data.pck")
 
 idea {
     module {
