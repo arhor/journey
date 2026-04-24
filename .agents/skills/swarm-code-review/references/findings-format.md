@@ -25,3 +25,5 @@ suggested_direction: Wrap the related writes in one transaction or move them beh
 - Prefer 0 to 3 strong findings over a long list of weak ones.
 - Do not file style-only comments unless they clearly hide a maintainability or correctness risk.
 - Tie every finding to evidence in the patch or directly adjacent code.
+- Cover the full assigned reviewer lane. For example, correctness review also includes test adequacy, and architecture
+  review also includes changed-path mapping and risk hotspots.

@@ -2,7 +2,7 @@
 name: swarm-code-review
 description: >-
   Automatically use this skill for substantive implementation tasks that modify repository code. Implement the
-  change, run the configured local multi-agent review in parallel, resolve every reasonable finding, and summarize
+  change, run the configured local two-reviewer review in parallel, resolve every reasonable finding, and summarize
   what was fixed or rebutted. Do not use for pure explanation tasks, trivial no-code edits, or when the user
   explicitly asks to skip review.
 ---
@@ -52,39 +52,34 @@ Before spawning reviewers, make sure you have:
 - identified the likely affected files and code paths
 - made the code changes
 - run at least the most targeted validation you can reasonably run for the changed area
+- prepared a compact patch map for reviewers: files touched, behavior changed, tests or commands run, and known risks
 
 ### 2) Spawn the review subagents in parallel
 
-After the implementation exists, explicitly spawn these read-only subagents in parallel:
+After the implementation exists, explicitly spawn exactly these two read-only subagents in parallel:
 
-- `change_mapper`
 - `correctness_reviewer`
-- `test_reviewer`
 - `architecture_reviewer`
 
-If one of these agents is unavailable, continue with the others and report the gap.
+Do not add extra reviewers by default. If one of these agents is unavailable, continue with the other and report the
+gap.
 
-### 3) Give each subagent a narrow job
+### 3) Give each subagent a broad, complementary job
 
-#### `change_mapper`
-
-Ask it to map the changed execution path and identify assumptions, touched layers, and risk hotspots. It should not
-propose broad refactors.
+Give both reviewers the user's request, the patch map, the relevant diff or changed files, validation already run, and
+explicit instructions to stay in read-only review mode.
 
 #### `correctness_reviewer`
 
 Ask it to look for concrete correctness, regression, security, concurrency, data integrity, performance, and
-API-contract problems introduced by the patch.
-
-#### `test_reviewer`
-
-Ask it to inspect what tests exist, what changed behavior is still untested, and whether the current tests are fragile,
-incomplete, or misleading.
+API-contract problems introduced by the patch. It should also inspect what tests exist, what changed behavior is still
+untested, and whether the current tests are fragile, incomplete, or misleading.
 
 #### `architecture_reviewer`
 
 Ask it to inspect maintainability, layering, coupling, naming clarity, interface design, and consistency with repository
-conventions. It should avoid style-only nitpicks unless they hide a real maintenance hazard.
+conventions. It should also map the changed execution path, identify assumptions, touched layers, and risk hotspots,
+without proposing broad refactors. It should avoid style-only nitpicks unless they hide a real maintenance hazard.
 
 ### 4) Require structured findings
 
@@ -131,7 +126,7 @@ After applying warranted fixes:
 
 Your final task summary must include a compact swarm code review section with:
 
-- which reviewer agents ran
+- which of the two reviewer agents ran
 - how many findings were raised
 - how many were fixed, rebutted, or deferred
 - the most important fixes made during review
@@ -159,8 +154,8 @@ relevant constraint or evidence.
 
 Use wording close to this:
 
-> Review the current patch only. Return only strong, actionable findings. Do not suggest broad rewrites. If you think
-> the patch is fine in your area, say `no_findings`.
+> Review the current patch only within your assigned lane. Return only strong, actionable findings. Do not suggest
+> broad rewrites. If you think the patch is fine in your area, say `no_findings`.
 
 ## Notes
 

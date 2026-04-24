@@ -25,6 +25,16 @@ For accepted-plan execution:
 - If the plan handoff marks the plan as non-implementation or investigation-only, do not start coding from acceptance
   alone.
 
+## Swarm Review Skill Shape
+Repository-local swarm review skills use exactly two reviewer agents per skill.
+
+- `swarm-plan-review` uses `requirements-critic` and `architecture-planner`.
+- `swarm-code-review` uses `correctness_reviewer` and `architecture_reviewer`.
+
+Keep the repo-local agent definitions in `.codex/agents` aligned with those skill roles. Validation/test review is
+part of `requirements-critic` for plans and `correctness_reviewer` for patches. Risk/migration review is part of
+`architecture-planner`; changed-path mapping is part of `architecture_reviewer`.
+
 ## Project Structure & Module Organization
 This repository is a multi-module Android app built with Kotlin, Jetpack Compose, Hilt, Room, and DataStore.
 
@@ -227,4 +237,3 @@ repo-specific implementation skills for focused packets, such as:
 
 The orchestrator should keep the main thread concise and strategic. It should not accumulate raw command logs, repeated
 compile output, or long step-by-step operational noise unless those details are directly needed to make a decision.
-

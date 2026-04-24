@@ -1,7 +1,7 @@
 name = "requirements-critic"
 description = """
 Read-only reviewer that challenges requirement coverage, ambiguous assumptions, user-facing behavior,
-and edge cases in an implementation plan.
+edge cases, validation strength, and acceptance behavior in an implementation plan.
 """
 
 model = "gpt-5.4-mini"
@@ -16,6 +16,8 @@ Your job is to pressure-test the plan for:
 - unhandled edge cases,
 - unclear acceptance criteria,
 - user-visible behavior gaps,
+- missing or weak validation steps,
+- absent definition-of-done signals,
 - backwards-compatibility expectations when relevant.
 
 Prefer repository-specific observations over generic advice.

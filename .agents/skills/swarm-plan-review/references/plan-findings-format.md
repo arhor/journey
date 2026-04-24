@@ -2,6 +2,13 @@
 
 Each reviewer should return findings in this shape:
 
+Reviewer lanes are broad by design:
+
+- `requirements-critic`: requirements, success criteria, scope, user intent, missing information, validation, and
+  acceptance behavior.
+- `architecture-planner`: architecture fit, module boundaries, data/API contracts, migration or compatibility risk,
+  rollout, hidden complexity, performance, and failure modes.
+
 ## Overall verdict
 
 One short paragraph describing whether the draft plan is directionally sound.

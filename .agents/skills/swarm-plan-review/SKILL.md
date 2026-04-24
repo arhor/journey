@@ -2,7 +2,7 @@
 name: swarm-plan-review
 description: >-
   Automatically use this skill whenever the user asks for a repository-specific investigation, design proposal,
-  or implementation plan that is more than a trivial one-step answer. Draft the plan, run a swarm review,
+  or implementation plan that is more than a trivial one-step answer. Draft the plan, run a two-reviewer swarm review,
   and refine it before any code changes begin. Do not use for direct implementation tasks or trivial plans.
 ---
 
@@ -15,7 +15,7 @@ Use it by default when the user wants Codex to:
 - investigate a request,
 - understand the existing codebase,
 - propose an implementation plan,
-- have that plan reviewed by several specialist subagents,
+- have that plan reviewed by two complementary specialist subagents,
 - refine the plan before any code changes begin.
 
 The user does not need to ask for swarm review explicitly. If the task is a real planning request, this review
@@ -68,14 +68,19 @@ steps whenever the repository evidence supports that level of specificity.
 The draft must also carry an explicit implementation handoff contract using the structure from
 `assets/plan-template.md` so a later plan acceptance can reconstruct execution intent safely.
 
+Before sending the draft to reviewers, do a short parent-agent self-check for obvious gaps in goal clarity,
+architecture fit, risk, validation, and acceptance behavior. Fix clear gaps immediately so reviewers spend their
+attention on stronger issues.
+
 ### 3) Run the review swarm
 
-Spawn the following subagents **in parallel** and wait for all of them:
+Spawn exactly these two read-only subagents **in parallel** and wait for both:
 
 1. `requirements-critic`
 2. `architecture-planner`
-3. `risk-and-migration-reviewer`
-4. `validation-strategist`
+
+Do not add extra reviewers by default. If one of these agents is unavailable, continue with the other and report the
+gap in the final review ledger.
 
 Give each subagent:
 
@@ -84,8 +89,13 @@ Give each subagent:
 - the current draft plan,
 - explicit instructions to stay in review mode and not edit code.
 
-Prompt `risk-and-migration-reviewer` specifically as the risk and migration reviewer for rollout, compatibility, hidden complexity,
-performance, and failure modes in the draft plan.
+Prompt `requirements-critic` as the requirements and validation reviewer. Ask it to review goal clarity, success
+criteria, user intent, scope boundaries, missing requirements, acceptance behavior, and whether the validation strategy
+proves the intended outcome.
+
+Prompt `architecture-planner` as the architecture and risk reviewer. Ask it to review architecture fit, module
+boundaries, public contracts, data flow, migration or compatibility risk, rollout concerns, hidden complexity,
+performance, and failure modes.
 
 Each reviewer must return findings using the structure from `references/plan-findings-format.md`.
 
@@ -142,7 +152,7 @@ A good final plan:
 
 - is specific to this repository,
 - names concrete touch points,
-- includes validation and rollback/migration thinking when relevant,
+- includes validation and risk/migration thinking when relevant,
 - surfaces uncertainty honestly,
 - is shaped so an implementation agent could execute it with minimal ambiguity,
 - makes the implementation handoff explicit enough that a plain plan acceptance can start the right work safely.
@@ -154,6 +164,7 @@ When spawning reviewers, tell them:
 - they are reviewing a plan, not writing code,
 - they should challenge assumptions and identify blind spots,
 - they should prefer repository-specific feedback over generic advice,
+- they should review their full lane, including the responsibilities merged into that lane,
 - they may disagree with the draft, but must justify the disagreement concretely,
 - they should keep findings crisp and actionable.
 
@@ -162,7 +173,7 @@ When spawning reviewers, tell them:
 This skill is complete only when:
 
 - an initial plan was created,
-- the review swarm ran,
+- the two-reviewer swarm ran,
 - the plan was refined,
 - every reasonable reviewer point has an explicit disposition,
 - the final answer clearly separates the revised plan from the review feedback,
