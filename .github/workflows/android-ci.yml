@@ -1,4 +1,4 @@
-name: Build
+name: Android CI
 
 on:
   pull_request:
@@ -24,9 +24,13 @@ concurrency:
   group: android-build-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  JAVA_VERSION: '17'
+  GODOT_VERSION: '4.6.2'
+
 jobs:
   build:
-    name: Lint, unit test, and release assemble
+    name: Lint, unit test, and debug assemble
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -34,14 +38,37 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up JDK 17
+      - name: Setup JDK
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: 17
+          java-version: ${{ env.JAVA_VERSION }}
 
-      - name: Set up Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Setup Godot
+        shell: bash
+        run: |
+          set -euxo pipefail
+          
+          GODOT_BINARY_NAME="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          GODOT_ARCHIVE_NAME="${GODOT_BINARY_NAME}.zip"
+          
+          GODOT_DIR="$RUNNER_TEMP/godot"
+          GODOT_ZIP="$RUNNER_TEMP/$GODOT_ARCHIVE_NAME"
+          GODOT_BIN_PATH="$GODOT_DIR/$GODOT_BINARY_NAME"
+          
+          mkdir -p "$GODOT_DIR"
+          
+          curl -L \
+            "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=linux.x86_64.zip&platform=linux.64" \
+            -o "$GODOT_ZIP"
+          
+          unzip -q "$GODOT_ZIP" -d "$GODOT_DIR"
+          chmod +x "$GODOT_BIN_PATH"
+          
+          echo "GODOT_BIN=$GODOT_BIN_PATH" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
@@ -49,9 +76,39 @@ jobs:
           cache-read-only: ${{ !startsWith(github.ref, 'refs/heads/master') && !startsWith(github.ref, 'refs/heads/stable') }}
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
-      - name: Lint, unit test, and release assemble
-        run: ./gradlew lintDebug test testDebugUnitTest assembleRelease --stacktrace
+      - name: Lint, unit test
+        run: ./gradlew lintDebug test testDebugUnitTest
 
-      - name: Assemble debug APK
-        uses: ./.github/actions/assemble-debug-apk
+      - name: Assemble debug
+        shell: bash
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Upload debug APK
+        id: upload_debug_apk
+        uses: actions/upload-artifact@v5
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Find Comment
         if: ${{ github.event_name == 'pull_request' }}
+        uses: peter-evans/find-comment@v4
+        id: find-comment
+        with:
+          comment-author: 'github-actions[bot]'
+          issue-number: ${{ github.event.pull_request.number }}
+          body-includes: A debug APK is available for download
+
+      - name: Share debug APK download link
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: peter-evans/create-or-update-comment@v5
+        with:
+          edit-mode: replace
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            A debug APK is available for download:  
+            [Download app-debug.apk](${{ steps.upload_debug_apk.outputs.artifact-url }})
