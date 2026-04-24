@@ -1,3 +1,5 @@
+@file:Suppress("ChromeOsAbiSupport")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.android.hilt)
@@ -10,18 +12,20 @@ android {
     namespace = "com.github.arhor.journey"
 
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
         applicationId = "com.github.arhor.journey"
         minSdk = 35
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     buildTypes {

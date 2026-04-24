@@ -8,10 +8,9 @@ plugins {
 
 android {
     namespace = "com.github.arhor.journey.feature.map.fow"
+
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
