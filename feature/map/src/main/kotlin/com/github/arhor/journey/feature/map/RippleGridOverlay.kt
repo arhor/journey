@@ -1,7 +1,6 @@
 package com.github.arhor.journey.feature.map
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -9,13 +8,11 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
@@ -35,6 +32,10 @@ private const val REVEAL_LEAD_MS = 340f
 private const val MOTION_DURATION_MS = 300f
 private const val FADE_DURATION_MS = 420f
 private val RIPPLE_COLOR = Color(0xFF63FF9C)
+
+internal data class RippleLaunchRequest(
+    val id: Long,
+)
 
 private data class Wave(
     val center: Offset,
@@ -62,12 +63,13 @@ private data class NodeState(
 
 @Composable
 internal fun RippleGridOverlay(
+    launchRequest: RippleLaunchRequest?,
     modifier: Modifier = Modifier,
 ) {
     val activeWaves = remember { mutableStateListOf<Wave>() }
     var animationTimeMs by remember { mutableLongStateOf(0L) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    val latestAnimationTimeMs by rememberUpdatedState(animationTimeMs)
+    var lastHandledRequestId by remember { mutableLongStateOf(-1L) }
     val density = LocalDensity.current
 
     val spacingPx = with(density) { 18.dp.toPx() }
@@ -86,25 +88,34 @@ internal fun RippleGridOverlay(
         while (true) {
             withFrameNanos { frameTimeNanos ->
                 animationTimeMs = frameTimeNanos / 1_000_000L
-                val now = animationTimeMs
                 activeWaves.removeAll { wave ->
-                    now - wave.startedAtMs > WAVE_LIFETIME_MS
+                    animationTimeMs - wave.startedAtMs > WAVE_LIFETIME_MS
                 }
             }
         }
     }
 
+    LaunchedEffect(launchRequest, canvasSize) {
+        if (launchRequest == null || launchRequest.id == lastHandledRequestId) {
+            return@LaunchedEffect
+        }
+        if (canvasSize.width == 0 || canvasSize.height == 0) {
+            return@LaunchedEffect
+        }
+
+        val center = Offset(
+            x = canvasSize.width / 2f,
+            y = canvasSize.height / 2f,
+        )
+        activeWaves += Wave(
+            center = center,
+            startedAtMs = animationTimeMs,
+        )
+        lastHandledRequestId = launchRequest.id
+    }
+
     Canvas(
-        modifier = modifier
-            .onSizeChanged { canvasSize = it }
-            .pointerInput(Unit) {
-                detectTapGestures { tapOffset ->
-                    activeWaves += Wave(
-                        center = tapOffset,
-                        startedAtMs = latestAnimationTimeMs,
-                    )
-                }
-            },
+        modifier = modifier.onSizeChanged { canvasSize = it },
     ) {
         if (activeWaves.isEmpty() || gridLayout.nodes.isEmpty() || waveSpeedPxPerMs <= 0f) {
             return@Canvas

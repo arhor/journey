@@ -4,6 +4,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
@@ -44,6 +49,8 @@ internal fun MapContent(
     onOpenSettings: () -> Unit,
 ) {
     val resolvedStyle = state.selectedStyle?.value ?: DEFAULT_VIEW_MAP_STYLE_URL
+    var launchRequestId by remember { mutableLongStateOf(0L) }
+    var rippleLaunchRequest by remember { mutableStateOf<RippleLaunchRequest?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         MapLibreViewMapScreen(
@@ -71,7 +78,20 @@ internal fun MapContent(
                 dispatch(MapIntent.MapLoadFailed(message))
             },
         )
-        RippleGridOverlay(modifier = Modifier.fillMaxSize())
+        RippleGridOverlay(
+            launchRequest = rippleLaunchRequest,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        MapLocatorSkillButton(
+            onClick = {
+                launchRequestId += 1L
+                rippleLaunchRequest = RippleLaunchRequest(id = launchRequestId)
+            },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(16.dp),
+        )
 
         MapPlayerHud(
             state = hudState,
