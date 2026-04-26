@@ -64,6 +64,7 @@ private data class NodeState(
 @Composable
 internal fun RippleGridOverlay(
     launchRequest: RippleLaunchRequest?,
+    waveOrigin: Offset?,
     modifier: Modifier = Modifier,
 ) {
     val activeWaves = remember { mutableStateListOf<Wave>() }
@@ -103,7 +104,7 @@ internal fun RippleGridOverlay(
             return@LaunchedEffect
         }
 
-        val center = Offset(
+        val center = waveOrigin ?: Offset(
             x = canvasSize.width / 2f,
             y = canvasSize.height / 2f,
         )
