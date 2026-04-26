@@ -259,6 +259,7 @@ private fun LegacyMapLibreMap(
                     MapLibre.getInstance(context)
 
                     val fogLayerController = NativeFogOfWarLayerController()
+                    val customLayerController = NativeCustomLayerController()
                     val viewportReporter = NativeMapViewportReporter(
                         onViewportChanged = { bounds ->
                             currentOnViewportChanged(bounds)
@@ -284,6 +285,7 @@ private fun LegacyMapLibreMap(
                             lifecycleObserver = observer,
                             startupController = startupController,
                             fogLayerController = fogLayerController,
+                            customLayerController = customLayerController,
                             viewportReporter = viewportReporter,
                             currentLocationScreenPointReporter = currentLocationScreenPointReporter,
                             loadFailureListener = loadFailureListener,
@@ -295,6 +297,7 @@ private fun LegacyMapLibreMap(
                             fogOfWar = fogOfWar,
                             startupController = startupController,
                             fogLayerController = fogLayerController,
+                            customLayerController = customLayerController,
                             viewportReporter = viewportReporter,
                             currentLocationScreenPointReporter = currentLocationScreenPointReporter,
                         )
@@ -306,6 +309,7 @@ private fun LegacyMapLibreMap(
                 onRelease = { mapView ->
                     mapViewHandles.remove(mapView)?.let { handle ->
                         handle.startupController.cleanup()
+                        handle.customLayerController.cleanup()
                         handle.viewportReporter.cleanup()
                         handle.currentLocationScreenPointReporter.cleanup()
                         mapView.removeOnDidFailLoadingMapListener(handle.loadFailureListener)
@@ -343,6 +347,7 @@ private fun MapView.configureLocationAwareMap(
     fogOfWar: FogOfWarRenderState,
     startupController: MapLocationStartupController,
     fogLayerController: NativeFogOfWarLayerController,
+    customLayerController: NativeCustomLayerController,
     viewportReporter: NativeMapViewportReporter,
     currentLocationScreenPointReporter: NativeCurrentLocationScreenPointReporter,
 ) {
@@ -355,6 +360,7 @@ private fun MapView.configureLocationAwareMap(
 
             fogLayerController.attach(style)
             fogLayerController.update(fogOfWar)
+            customLayerController.attach(map, style)
             viewportReporter.attach(map)
             currentLocationScreenPointReporter.attach(mapView = this, map = map)
 
@@ -408,6 +414,7 @@ private data class MapViewHandle(
     val lifecycleObserver: MapViewLifecycleObserver,
     val startupController: MapLocationStartupController,
     val fogLayerController: NativeFogOfWarLayerController,
+    val customLayerController: NativeCustomLayerController,
     val viewportReporter: NativeMapViewportReporter,
     val currentLocationScreenPointReporter: NativeCurrentLocationScreenPointReporter,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,
