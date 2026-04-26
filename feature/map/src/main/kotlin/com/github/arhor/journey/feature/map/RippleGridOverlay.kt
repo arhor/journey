@@ -34,6 +34,7 @@ private const val WAVE_LIFETIME_MS = 4200f
 private const val REVEAL_LEAD_MS = 340f
 private const val MOTION_DURATION_MS = 300f
 private const val FADE_DURATION_MS = 420f
+private val RIPPLE_COLOR = Color(0xFF63FF9C)
 
 private data class Wave(
     val center: Offset,
@@ -72,7 +73,7 @@ internal fun RippleGridOverlay(
     val spacingPx = with(density) { 18.dp.toPx() }
     val baseDotRadius = with(density) { 0.75.dp.toPx() }
     val maxDotGrowth = with(density) { 3.0.dp.toPx() }
-    val jumpHeight = with(density) { 5.2.dp.toPx() }
+    val jumpHeight = with(density) { 25.dp.toPx() }
     val gridLineWidth = with(density) { 0.7.dp.toPx() }
     val waveSpeedPxPerMs = with(density) { 0.22.dp.toPx() }
     val warpStrength = with(density) { 1.4.dp.toPx() }
@@ -200,7 +201,7 @@ internal fun RippleGridOverlay(
                     val alpha = min(from.gridAlpha, right.gridAlpha)
                     if (alpha >= 0.002f) {
                         drawLine(
-                            color = Color.White.copy(alpha = alpha),
+                            color = RIPPLE_COLOR.copy(alpha = alpha),
                             start = from.displacedPosition,
                             end = right.displacedPosition,
                             strokeWidth = gridLineWidth,
@@ -213,7 +214,7 @@ internal fun RippleGridOverlay(
                     val alpha = min(from.gridAlpha, down.gridAlpha)
                     if (alpha >= 0.002f) {
                         drawLine(
-                            color = Color.White.copy(alpha = alpha),
+                            color = RIPPLE_COLOR.copy(alpha = alpha),
                             start = from.displacedPosition,
                             end = down.displacedPosition,
                             strokeWidth = gridLineWidth,
@@ -228,7 +229,7 @@ internal fun RippleGridOverlay(
                 continue
             }
             drawCircle(
-                color = Color.White.copy(alpha = state.dotAlpha),
+                color = RIPPLE_COLOR.copy(alpha = state.dotAlpha),
                 radius = state.dotRadius,
                 center = state.displacedPosition,
             )
