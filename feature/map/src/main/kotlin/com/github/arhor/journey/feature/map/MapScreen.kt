@@ -71,6 +71,7 @@ internal fun MapContent(
                 dispatch(MapIntent.MapLoadFailed(message))
             },
         )
+        RippleGridOverlay(modifier = Modifier.fillMaxSize())
 
         MapPlayerHud(
             state = hudState,
