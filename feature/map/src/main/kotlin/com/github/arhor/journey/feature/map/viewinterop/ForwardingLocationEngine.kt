@@ -15,7 +15,10 @@ import org.maplibre.android.location.engine.LocationEngineRequest
 import org.maplibre.android.location.engine.LocationEngineResult
 import java.util.concurrent.ConcurrentHashMap
 
-internal class ForwardingLocationEngine(context: Context) : LocationEngine {
+internal class ForwardingLocationEngine(
+    context: Context,
+    private val onLocationUpdated: ((Location) -> Unit)? = null,
+) : LocationEngine {
 
     private val appContext = context.applicationContext
     private val locationManager = requireNotNull(appContext.getSystemService(LocationManager::class.java))
@@ -45,7 +48,10 @@ internal class ForwardingLocationEngine(context: Context) : LocationEngine {
         requireLocationPermission()
         removeLocationUpdates(callback)
 
-        val listener = ForwardingLocationListener(callback)
+        val listener = ForwardingLocationListener(
+            callback = callback,
+            onLocationUpdated = onLocationUpdated,
+        )
         val callbackLooper = looper ?: Looper.getMainLooper()
         var hasRegisteredProvider = false
         var securityException: SecurityException? = null
@@ -172,10 +178,12 @@ internal class ForwardingLocationEngine(context: Context) : LocationEngine {
 
     private class ForwardingLocationListener(
         private val callback: LocationEngineCallback<LocationEngineResult>,
+        private val onLocationUpdated: ((Location) -> Unit)?,
     ) : LocationListener {
 
         override fun onLocationChanged(location: Location) {
             callback.onSuccess(LocationEngineResult.create(location))
+            onLocationUpdated?.invoke(location)
         }
     }
 }
