@@ -53,7 +53,6 @@ public:
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         glUseProgram(program);
-        glUniform4f(colorUniform, 0.10f, 0.70f, 1.00f, 0.30f);
 
         glEnableVertexAttribArray(positionAttribute);
         glVertexAttribPointer(positionAttribute, 2, GL_FLOAT, GL_FALSE, 0, kQuadVertices.data());
@@ -74,30 +73,38 @@ public:
 
 private:
     static constexpr std::array<GLfloat, 8> kQuadVertices = {
-        -0.45f, -0.45f,
-         0.45f, -0.45f,
-        -0.45f,  0.45f,
-         0.45f,  0.45f,
+        -0.70f, -0.70f,
+         0.70f, -0.70f,
+        -0.70f,  0.70f,
+         0.70f,  0.70f,
     };
 
     static constexpr const char* kVertexShader = R"(
 attribute vec2 a_position;
+varying vec2 v_position;
 void main() {
+  v_position = a_position;
   gl_Position = vec4(a_position, 0.0, 1.0);
 }
 )";
 
     static constexpr const char* kFragmentShader = R"(
 precision mediump float;
-uniform vec4 u_color;
+varying vec2 v_position;
 void main() {
-  gl_FragColor = u_color;
+  float radius = 0.45;
+  float distanceToCenter = length(v_position);
+  float edgeSoftness = 0.01;
+  float alpha = 1.0 - smoothstep(radius - edgeSoftness, radius, distanceToCenter);
+  if (alpha <= 0.0) {
+    discard;
+  }
+  gl_FragColor = vec4(1.0, 0.0, 0.0, 0.75 * alpha);
 }
 )";
 
     GLuint program = 0;
     GLint positionAttribute = -1;
-    GLint colorUniform = -1;
 
     void initializeProgram() {
         const GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
@@ -126,7 +133,6 @@ void main() {
 
         program = createdProgram;
         positionAttribute = glGetAttribLocation(program, "a_position");
-        colorUniform = glGetUniformLocation(program, "u_color");
     }
 
     void releaseProgram() {
@@ -135,7 +141,6 @@ void main() {
             program = 0;
         }
         positionAttribute = -1;
-        colorUniform = -1;
     }
 
     static GLuint compileShader(GLenum type, const char* source) {
