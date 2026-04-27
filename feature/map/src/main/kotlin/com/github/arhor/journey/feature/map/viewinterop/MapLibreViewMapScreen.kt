@@ -37,7 +37,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -82,7 +81,6 @@ fun MapLibreViewMapScreen(
     styleUrl: String = DEFAULT_VIEW_MAP_STYLE_URL,
     fogOfWar: FogOfWarRenderState = FogOfWarRenderState(),
     onViewportChanged: (GeoBounds) -> Unit = {},
-    onUserLocationScreenPointChanged: (Offset) -> Unit = {},
     onLocationPermissionGranted: () -> Unit = {},
     onMapLoadFailed: (String?) -> Unit = {},
 ) {
@@ -94,7 +92,6 @@ fun MapLibreViewMapScreen(
             styleUrl = styleUrl,
             fogOfWar = fogOfWar,
             onViewportChanged = onViewportChanged,
-            onUserLocationScreenPointChanged = onUserLocationScreenPointChanged,
             onMapLoadFailed = onMapLoadFailed,
         )
     }
@@ -235,12 +232,10 @@ private fun LegacyMapLibreMap(
     styleUrl: String,
     fogOfWar: FogOfWarRenderState,
     onViewportChanged: (GeoBounds) -> Unit,
-    onUserLocationScreenPointChanged: (Offset) -> Unit,
     onMapLoadFailed: (String?) -> Unit,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
-    val currentOnUserLocationScreenPointChanged by rememberUpdatedState(onUserLocationScreenPointChanged)
     val mapViewState = rememberSaveable { Bundle() }
     val mapViewHandles = remember { mutableStateMapOf<MapView, MapViewHandle>() }
     var isWaitingForLocation by remember { mutableStateOf(true) }
@@ -264,14 +259,10 @@ private fun LegacyMapLibreMap(
                             currentOnViewportChanged(bounds)
                         },
                     )
-                    val currentLocationScreenPointReporter = NativeCurrentLocationScreenPointReporter(
-                        onOriginChanged = currentOnUserLocationScreenPointChanged,
-                    )
                     val startupController = MapLocationStartupController(
                         onFirstLocationFix = {
                             isWaitingForLocation = false
                             viewportReporter.reportCurrentViewport()
-                            currentLocationScreenPointReporter.reportCurrentOrigin()
                         },
                     )
                     val loadFailureListener = MapView.OnDidFailLoadingMapListener { errorMessage ->
@@ -285,7 +276,6 @@ private fun LegacyMapLibreMap(
                             startupController = startupController,
                             fogLayerController = fogLayerController,
                             viewportReporter = viewportReporter,
-                            currentLocationScreenPointReporter = currentLocationScreenPointReporter,
                             loadFailureListener = loadFailureListener,
                         )
                         lifecycle.addObserver(observer)
@@ -296,7 +286,6 @@ private fun LegacyMapLibreMap(
                             startupController = startupController,
                             fogLayerController = fogLayerController,
                             viewportReporter = viewportReporter,
-                            currentLocationScreenPointReporter = currentLocationScreenPointReporter,
                         )
                     }
                 },
@@ -307,7 +296,6 @@ private fun LegacyMapLibreMap(
                     mapViewHandles.remove(mapView)?.let { handle ->
                         handle.startupController.cleanup()
                         handle.viewportReporter.cleanup()
-                        handle.currentLocationScreenPointReporter.cleanup()
                         mapView.removeOnDidFailLoadingMapListener(handle.loadFailureListener)
                         lifecycle.removeObserver(handle.lifecycleObserver)
                         handle.lifecycleObserver.save()
@@ -344,7 +332,6 @@ private fun MapView.configureLocationAwareMap(
     startupController: MapLocationStartupController,
     fogLayerController: NativeFogOfWarLayerController,
     viewportReporter: NativeMapViewportReporter,
-    currentLocationScreenPointReporter: NativeCurrentLocationScreenPointReporter,
 ) {
     getMapAsync { map ->
         if (startupController.isReleased) return@getMapAsync
@@ -356,10 +343,8 @@ private fun MapView.configureLocationAwareMap(
             fogLayerController.attach(style)
             fogLayerController.update(fogOfWar)
             viewportReporter.attach(map)
-            currentLocationScreenPointReporter.attach(mapView = this, map = map)
 
-            val locationEngine = ForwardingLocationEngine(context) { location ->
-                currentLocationScreenPointReporter.onLocationUpdated(location)
+            val locationEngine = ForwardingLocationEngine(context) { _ ->
             }
             val locationRequest = context.locationEngineRequest()
             val locationComponent = map.locationComponent
@@ -381,7 +366,6 @@ private fun MapView.configureLocationAwareMap(
             )
 
             startupController.start(map, locationEngine, locationRequest)
-            currentLocationScreenPointReporter.reportCurrentOrigin()
         }
     }
 }
@@ -409,7 +393,6 @@ private data class MapViewHandle(
     val startupController: MapLocationStartupController,
     val fogLayerController: NativeFogOfWarLayerController,
     val viewportReporter: NativeMapViewportReporter,
-    val currentLocationScreenPointReporter: NativeCurrentLocationScreenPointReporter,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,
 )
 
