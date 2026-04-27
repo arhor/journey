@@ -3,10 +3,23 @@ plugins {
     idea
 }
 
-val godotBinaryPath = providers.environmentVariable("GODOT_BIN")
+import org.gradle.api.GradleException
+import org.gradle.api.tasks.Exec
+import java.util.Properties
+
 val godotProjectDir = layout.projectDirectory.dir("src/main/godot")
 val godotOutputAssetsDir = layout.buildDirectory.dir("generated/godot/assets")
-val godotOutputPckBundle = layout.buildDirectory.file("generated/godot/assets/data.pck")
+val godotOutputPckBundle = layout.buildDirectory.file("generated/godot/assets/minigame.pck")
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) {
+        file.inputStream().use(::load)
+    }
+}
+val godotBinaryPath = providers.provider {
+    providers.environmentVariable("GODOT_BIN").orNull?.trim()?.takeIf(String::isNotEmpty)
+        ?: localProperties.getProperty("godot.bin")?.trim()?.takeIf(String::isNotEmpty)
+}
 
 idea {
     module {
@@ -64,17 +77,22 @@ tasks {
         outputs.dir(godotOutputAssetsDir)
 
         doFirst {
-            godotOutputAssetsDir.get().asFile.mkdirs()
-        }
+            val godotBinary = godotBinaryPath.orNull
+                ?: throw GradleException(
+                    "Godot binary is not configured. Set GODOT_BIN or add godot.bin to local.properties.",
+                )
 
-        commandLine(
-            godotBinaryPath.get(),
-            "--headless",
-            "--path", godotProjectDir.asFile,
-            "--export-pack",
-            "Android",
-            godotOutputPckBundle.get().asFile.absolutePath,
-        )
+            godotOutputAssetsDir.get().asFile.mkdirs()
+
+            commandLine(
+                godotBinary,
+                "--headless",
+                "--path", godotProjectDir.asFile,
+                "--export-pack",
+                "Android",
+                godotOutputPckBundle.get().asFile.absolutePath,
+            )
+        }
     }
 
     preBuild {
