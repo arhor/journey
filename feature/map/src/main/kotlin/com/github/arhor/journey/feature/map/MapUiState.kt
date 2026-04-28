@@ -3,7 +3,6 @@ package com.github.arhor.journey.feature.map
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
@@ -26,7 +25,6 @@ sealed interface MapUiState {
         val isExplorationTrackingActive: Boolean,
         val explorationTrackingCadence: ExplorationTrackingCadence,
         val explorationTrackingStatus: ExplorationTrackingStatus,
-        val selectedStyle: MapStyle?,
         val visibleObjects: List<MapObjectUiModel>,
         val selectedWatchtower: WatchtowerSheetUiState?,
         val fogOfWar: FogOfWarUiState,

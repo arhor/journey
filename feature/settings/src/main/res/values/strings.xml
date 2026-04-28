@@ -1,12 +1,5 @@
 <resources>
     <string name="settings_title">Settings</string>
-    <string name="settings_map_style_title">Map Style</string>
-    <string name="settings_map_style_default">Default</string>
-    <string name="settings_map_style_classic">Classic</string>
-    <string name="settings_map_style_dark">Dark</string>
-    <string name="settings_map_style_satellite">Satellite</string>
-    <string name="settings_map_style_terrain">Terrain</string>
-    <string name="settings_updating">Updating…</string>
     <string name="settings_map_credits_title">Map Credits</string>
     <string name="settings_map_credits_maplibre">Maps powered by MapLibre.</string>
     <string name="settings_map_credits_openfreemap">OpenFreeMap © OpenMapTiles Data from OpenStreetMap</string>

@@ -11,7 +11,6 @@ import androidx.compose.ui.unit.dp
 import com.github.arhor.journey.core.ui.components.ErrorMessage
 import com.github.arhor.journey.core.ui.components.LoadingIndicator
 import com.github.arhor.journey.feature.map.model.MapViewportSize
-import com.github.arhor.journey.feature.map.viewinterop.DEFAULT_VIEW_MAP_STYLE_URL
 import com.github.arhor.journey.feature.map.viewinterop.MapLibreViewMapScreen
 
 @Composable
@@ -43,8 +42,6 @@ internal fun MapContent(
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    val resolvedStyle = state.selectedStyle?.value ?: DEFAULT_VIEW_MAP_STYLE_URL
-
     Box(modifier = Modifier.fillMaxSize()) {
         MapLibreViewMapScreen(
             modifier = Modifier
@@ -59,7 +56,6 @@ internal fun MapContent(
                         ),
                     )
                 },
-            styleUrl = resolvedStyle,
             fogOfWar = state.fogOfWar.toRenderState(),
             onViewportChanged = { visibleBounds ->
                 dispatch(MapIntent.CameraViewportChanged(visibleBounds))

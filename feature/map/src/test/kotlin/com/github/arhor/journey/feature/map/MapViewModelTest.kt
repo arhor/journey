@@ -14,7 +14,6 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
-import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.Watchtower
@@ -36,7 +35,6 @@ import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConf
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
 import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
@@ -1216,28 +1214,6 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should emit failure when selected map style output fails with message`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-
-        // Given
-        val fixture = createFixture(
-            mapStyleOutput = Output.Failure(
-                error = TestDomainError(message = "Map styles unavailable."),
-            ),
-        )
-
-        try {
-            // When
-            val actual = fixture.viewModel.awaitFailure()
-
-            // Then
-            actual shouldBe MapUiState.Failure(errorMessage = "Map styles unavailable.")
-        } finally {
-            tearDownMainDispatcher(fixture.viewModel)
-        }
-    }
-
-    @Test
     fun `dispatch should start exploration tracking automatically when map opens`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
@@ -2226,7 +2202,6 @@ class MapViewModelTest {
 
     private data class Fixture(
         val viewModel: MapViewModel,
-        val mapStyle: MapStyle,
         val trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>,
         val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
         val observePackedExploredTiles: ObservePackedExploredTilesUseCase,
@@ -2239,7 +2214,6 @@ class MapViewModelTest {
     )
 
     private fun createFixture(
-        mapStyleOutput: Output<MapStyle?, DomainError>? = null,
         resourceSpawns: List<ResourceSpawn> = emptyList(),
         exploredTiles: Set<MapTile> = emptySet(),
         watchtowerRevealSnapshot: WatchtowerRevealSnapshot = WatchtowerRevealSnapshot(emptySet()),
@@ -2279,7 +2253,6 @@ class MapViewModelTest {
         val observeClaimedWatchtowerRevealTiles = mockk<ObserveClaimedWatchtowerRevealTilesUseCase>()
         val observeVisibleWatchtowers = mockk<ObserveVisibleWatchtowersUseCase>()
         val observeHeroResourceAmount = mockk<ObserveHeroResourceAmountUseCase>()
-        val observeSelectedMapStyle = mockk<ObserveSelectedMapStyleUseCase>()
         val claimWatchtower = mockk<ClaimWatchtowerUseCase>()
         val upgradeWatchtower = mockk<UpgradeWatchtowerUseCase>()
         val getWatchtower = mockk<GetWatchtowerUseCase>()
@@ -2289,11 +2262,6 @@ class MapViewModelTest {
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
 
-        val mapStyle = MapStyle.remote(
-            id = "style-remote",
-            name = "Remote",
-            value = "https://example.com/style.json",
-        )
         val trackingSessionFlow = MutableStateFlow(trackingSession)
 
         every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(Output.Success(resourceSpawns))
@@ -2310,9 +2278,6 @@ class MapViewModelTest {
         every { observeHeroResourceAmount.invoke(any()) } answers {
             MutableStateFlow(Output.Success(resourceAmountsByType[arg(0)] ?: 0))
         }
-        every { observeSelectedMapStyle.invoke() } returns MutableStateFlow(
-            mapStyleOutput ?: Output.Success(mapStyle),
-        )
         coEvery { getWatchtower.invoke(any()) } answers {
             watchtowers.firstOrNull { it.id == arg(0) }
                 ?.let { Output.Success(it) }
@@ -2343,7 +2308,6 @@ class MapViewModelTest {
         return Fixture(
             viewModel = MapViewModel(
                 observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
-                observeSelectedMapStyle = observeSelectedMapStyle,
                 observeVisibleWatchtowers = observeVisibleWatchtowers,
                 observeHeroResourceAmount = observeHeroResourceAmount,
                 claimWatchtower = claimWatchtower,
@@ -2368,7 +2332,6 @@ class MapViewModelTest {
                 mapWorldObjectPresenter = MapWorldObjectPresenter(),
                 selectedWatchtowerPresenter = SelectedWatchtowerPresenter(),
             ),
-            mapStyle = mapStyle,
             trackingSessionFlow = trackingSessionFlow,
             observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
             observePackedExploredTiles = observePackedExploredTiles,

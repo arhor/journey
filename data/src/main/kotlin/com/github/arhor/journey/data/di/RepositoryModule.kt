@@ -3,10 +3,8 @@ package com.github.arhor.journey.data.di
 import com.github.arhor.journey.data.mapobject.LocalGeneratedMapObjectAreaSource
 import com.github.arhor.journey.data.mapobject.MapObjectAreaSource
 import com.github.arhor.journey.data.mapobject.WatchtowerDefinitionTileSource
-import com.github.arhor.journey.data.repository.DataStoreSettingsRepositoryImpl
 import com.github.arhor.journey.data.repository.DeterministicResourceSpawnRepository
 import com.github.arhor.journey.data.repository.DeterministicWatchtowerRepository
-import com.github.arhor.journey.data.repository.MapStylesRepositoryImpl
 import com.github.arhor.journey.data.repository.RoomCollectedResourceSpawnRepository
 import com.github.arhor.journey.data.repository.RoomExplorationTileRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
@@ -15,9 +13,7 @@ import com.github.arhor.journey.domain.repository.CollectedResourceSpawnReposito
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import com.github.arhor.journey.domain.repository.HeroRepository
-import com.github.arhor.journey.domain.repository.MapStylesRepository
 import com.github.arhor.journey.domain.repository.ResourceSpawnRepository
-import com.github.arhor.journey.domain.repository.SettingsRepository
 import com.github.arhor.journey.domain.repository.WatchtowerRepository
 import dagger.Binds
 import dagger.Module
@@ -60,11 +56,4 @@ interface RepositoryModule {
     fun bindWatchtowerRepository(impl: DeterministicWatchtowerRepository)
         : WatchtowerRepository
 
-    @Binds
-    fun bindMapStylesRepository(impl: MapStylesRepositoryImpl)
-        : MapStylesRepository
-
-    @Binds
-    fun bindSettingsRepository(impl: DataStoreSettingsRepositoryImpl)
-        : SettingsRepository
 }

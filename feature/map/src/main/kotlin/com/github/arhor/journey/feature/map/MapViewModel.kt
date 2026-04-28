@@ -15,7 +15,6 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.Watchtower
@@ -28,7 +27,6 @@ import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
-import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
@@ -77,7 +75,6 @@ private data class State(
 @Suppress("CanBeParameter")
 class MapViewModel @Inject constructor(
     private val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
-    private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val observeVisibleWatchtowers: ObserveVisibleWatchtowersUseCase,
     private val observeHeroResourceAmount: ObserveHeroResourceAmountUseCase,
     private val claimWatchtower: ClaimWatchtowerUseCase,
@@ -140,13 +137,11 @@ class MapViewModel @Inject constructor(
                 _state,
                 fogOfWarController.uiState,
                 trackingSession,
-                observeSelectedMapStyle(),
-            ) { state, fogOfWar, session, mapStyleOutput ->
+            ) { state, fogOfWar, session ->
                 UiStateInputs(
                     state = state,
                     fogOfWar = fogOfWar,
                     trackingSessionOutput = session,
-                    mapStyleOutput = mapStyleOutput,
                 )
             },
             watchtowerResourceAmounts,
@@ -155,7 +150,6 @@ class MapViewModel @Inject constructor(
             intoBaseUiState(
                 state = inputs.state,
                 trackingSessionOutput = inputs.trackingSessionOutput,
-                mapStyleOutput = inputs.mapStyleOutput,
                 fogOfWar = inputs.fogOfWar,
                 visibleWorldObjectsOutput = visibleWorldObjects,
                 watchtowerResourceAmountsOutput = watchtowerResourceAmounts,
@@ -346,7 +340,6 @@ class MapViewModel @Inject constructor(
     private fun intoBaseUiState(
         state: State,
         trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
-        mapStyleOutput: Output<MapStyle?, DomainError>,
         fogOfWar: FogOfWarUiState,
         visibleWorldObjectsOutput: Output<VisibleWorldObjects, DomainError>,
         watchtowerResourceAmountsOutput: Output<Map<String, Int>, DomainError>,
@@ -356,14 +349,6 @@ class MapViewModel @Inject constructor(
             is Output.Failure -> {
                 return MapBaseUiState.Failure(
                     errorMessage = trackingSessionOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
-                )
-            }
-        }
-        val selectedMapStyle = when (mapStyleOutput) {
-            is Output.Success -> mapStyleOutput.value
-            is Output.Failure -> {
-                return MapBaseUiState.Failure(
-                    errorMessage = mapStyleOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
                 )
             }
         }
@@ -416,7 +401,6 @@ class MapViewModel @Inject constructor(
             isExplorationTrackingActive = trackingSession.isActive,
             explorationTrackingCadence = trackingSession.cadence,
             explorationTrackingStatus = trackingSession.status,
-            selectedStyle = selectedMapStyle,
             visibleObjects = resolvedVisibleObjects,
             selectedWatchtower = selectedWatchtower,
             fogOfWar = fogOfWar,
@@ -433,7 +417,6 @@ class MapViewModel @Inject constructor(
                 isExplorationTrackingActive = isExplorationTrackingActive,
                 explorationTrackingCadence = explorationTrackingCadence,
                 explorationTrackingStatus = explorationTrackingStatus,
-                selectedStyle = selectedStyle,
                 visibleObjects = visibleObjects,
                 selectedWatchtower = selectedWatchtower,
                 fogOfWar = fogOfWar,
@@ -743,7 +726,6 @@ class MapViewModel @Inject constructor(
             val isExplorationTrackingActive: Boolean,
             val explorationTrackingCadence: ExplorationTrackingCadence,
             val explorationTrackingStatus: ExplorationTrackingStatus,
-            val selectedStyle: MapStyle?,
             val visibleObjects: List<MapObjectUiModel>,
             val selectedWatchtower: WatchtowerSheetUiState?,
             val fogOfWar: FogOfWarUiState,
@@ -755,7 +737,6 @@ class MapViewModel @Inject constructor(
         val state: State,
         val fogOfWar: FogOfWarUiState,
         val trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
-        val mapStyleOutput: Output<MapStyle?, DomainError>,
     )
 
     @Immutable

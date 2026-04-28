@@ -25,6 +25,5 @@ fun SettingsRoute(
 
     SettingsScreen(
         state = state,
-        dispatch = vm::dispatch,
     )
 }
