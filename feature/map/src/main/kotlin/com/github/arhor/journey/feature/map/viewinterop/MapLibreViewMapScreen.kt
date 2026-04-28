@@ -331,7 +331,7 @@ private fun MapView.configureLocationAwareMap(
     getMapAsync { map ->
         if (startupController.isReleased) return@getMapAsync
 
-        map.disablePanGestures()
+        map.configureUiSettings()
         map.setStyleDefinition(DEFAULT_VIEW_MAP_STYLE_ASSET_URI) { style ->
             if (startupController.isReleased) return@setStyleDefinition
 
@@ -365,9 +365,20 @@ private fun MapView.configureLocationAwareMap(
     }
 }
 
-private fun MapLibreMap.disablePanGestures() {
-    uiSettings.isScrollGesturesEnabled = false
-    uiSettings.isHorizontalScrollGesturesEnabled = false
+private fun MapLibreMap.configureUiSettings() {
+    with(uiSettings) {
+        isCompassEnabled = false
+        isAttributionEnabled = false
+        isLogoEnabled = false
+
+        isScrollGesturesEnabled = true
+        isHorizontalScrollGesturesEnabled = true
+        isRotateGesturesEnabled = true
+        isTiltGesturesEnabled = true
+        isZoomGesturesEnabled = true
+        isDoubleTapGesturesEnabled = true
+        isQuickZoomGesturesEnabled = true
+    }
 }
 
 private fun MapLibreMap.setStyleDefinition(
