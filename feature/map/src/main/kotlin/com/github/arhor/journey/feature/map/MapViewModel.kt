@@ -68,7 +68,19 @@ private data class State(
     val selectedWatchtowerId: String? = null,
     val selectedWatchtowerSnapshot: Watchtower? = null,
     val failureMessage: String? = null,
+    val startupGate: MapStartupGateState = MapStartupGateState(),
 )
+
+@Immutable
+private data class MapStartupGateState(
+    val sessionId: Long? = null,
+    val isLocationReady: Boolean = false,
+    val isFirstFrameRendered: Boolean = false,
+    val hasTimedOut: Boolean = false,
+) {
+    val isSplashVisible: Boolean
+        get() = sessionId != null && !hasTimedOut && !(isLocationReady && isFirstFrameRendered)
+}
 
 @Stable
 @HiltViewModel
@@ -292,6 +304,10 @@ class MapViewModel @Inject constructor(
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
             is MapIntent.MapOpened -> onMapOpened()
+            is MapIntent.MapSurfaceSessionStarted -> onMapSurfaceSessionStarted(intent)
+            is MapIntent.FirstLocationFixAcquired -> onFirstLocationFixAcquired(intent)
+            is MapIntent.FirstMapFrameRendered -> onFirstMapFrameRendered(intent)
+            is MapIntent.StartupGateTimeoutElapsed -> onStartupGateTimeoutElapsed(intent)
             is MapIntent.CameraViewportChanged -> onCameraViewportChanged(intent)
             is MapIntent.MapViewportSizeChanged -> onMapViewportSizeChanged(intent)
             is MapIntent.CameraGestureStarted -> onCameraGestureStarted(intent)
@@ -316,6 +332,38 @@ class MapViewModel @Inject constructor(
 
     private suspend fun onMapOpened() {
         startTrackingSessionIfNeeded()
+    }
+
+    private fun onMapSurfaceSessionStarted(intent: MapIntent.MapSurfaceSessionStarted) {
+        _state.update { state ->
+            state.copy(
+                startupGate = MapStartupGateState(
+                    sessionId = intent.sessionId,
+                ),
+            )
+        }
+    }
+
+    private fun onFirstLocationFixAcquired(intent: MapIntent.FirstLocationFixAcquired) {
+        _state.updateStartupGateForSession(intent.sessionId) { startupGate ->
+            startupGate.copy(isLocationReady = true)
+        }
+    }
+
+    private fun onFirstMapFrameRendered(intent: MapIntent.FirstMapFrameRendered) {
+        _state.updateStartupGateForSession(intent.sessionId) { startupGate ->
+            startupGate.copy(isFirstFrameRendered = true)
+        }
+    }
+
+    private fun onStartupGateTimeoutElapsed(intent: MapIntent.StartupGateTimeoutElapsed) {
+        _state.updateStartupGateForSession(intent.sessionId) { startupGate ->
+            if (startupGate.isLocationReady && startupGate.isFirstFrameRendered) {
+                startupGate
+            } else {
+                startupGate.copy(hasTimedOut = true)
+            }
+        }
     }
 
     private suspend fun startTrackingSessionIfNeeded() {
@@ -401,6 +449,8 @@ class MapViewModel @Inject constructor(
             isExplorationTrackingActive = trackingSession.isActive,
             explorationTrackingCadence = trackingSession.cadence,
             explorationTrackingStatus = trackingSession.status,
+            isStartupSplashVisible = state.startupGate.isSplashVisible,
+            startupSplashMessage = R.string.map_view_startup_loading_message,
             visibleObjects = resolvedVisibleObjects,
             selectedWatchtower = selectedWatchtower,
             fogOfWar = fogOfWar,
@@ -417,6 +467,8 @@ class MapViewModel @Inject constructor(
                 isExplorationTrackingActive = isExplorationTrackingActive,
                 explorationTrackingCadence = explorationTrackingCadence,
                 explorationTrackingStatus = explorationTrackingStatus,
+                isStartupSplashVisible = isStartupSplashVisible,
+                startupSplashMessage = startupSplashMessage,
                 visibleObjects = visibleObjects,
                 selectedWatchtower = selectedWatchtower,
                 fogOfWar = fogOfWar,
@@ -426,7 +478,10 @@ class MapViewModel @Inject constructor(
 
     private fun onMapLoadFailed(intent: MapIntent.MapLoadFailed) {
         _state.update {
-            it.copy(failureMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE)
+            it.copy(
+                failureMessage = intent.message ?: MAP_STYLE_LOADING_FAILED_MESSAGE,
+                startupGate = MapStartupGateState(),
+            )
         }
     }
 
@@ -709,6 +764,19 @@ class MapViewModel @Inject constructor(
             is Output.Failure -> null
         }
 
+    private fun MutableStateFlow<State>.updateStartupGateForSession(
+        sessionId: Long,
+        transform: (MapStartupGateState) -> MapStartupGateState,
+    ) {
+        update { state ->
+            if (state.startupGate.sessionId != sessionId) {
+                state
+            } else {
+                state.copy(startupGate = transform(state.startupGate))
+            }
+        }
+    }
+
     @Immutable
     private sealed interface MapBaseUiState {
 
@@ -726,6 +794,8 @@ class MapViewModel @Inject constructor(
             val isExplorationTrackingActive: Boolean,
             val explorationTrackingCadence: ExplorationTrackingCadence,
             val explorationTrackingStatus: ExplorationTrackingStatus,
+            val isStartupSplashVisible: Boolean,
+            val startupSplashMessage: Int,
             val visibleObjects: List<MapObjectUiModel>,
             val selectedWatchtower: WatchtowerSheetUiState?,
             val fogOfWar: FogOfWarUiState,

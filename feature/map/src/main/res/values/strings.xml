@@ -15,6 +15,8 @@
     <string name="map_view_location_permission_retry">Retry</string>
     <string name="map_view_location_permission_settings">Open settings</string>
     <string name="map_view_location_loading_message">Waiting for your location...</string>
+    <string name="map_view_startup_loading_message">Preparing map view and acquiring your location...</string>
+    <string name="map_view_startup_timeout_message">Map startup is taking longer than expected. Continuing...</string>
     <string name="watchtower_status_dormant">Dormant watchtower</string>
     <string name="watchtower_status_claimed">Claimed watchtower</string>
     <string name="watchtower_distance_label">Distance</string>

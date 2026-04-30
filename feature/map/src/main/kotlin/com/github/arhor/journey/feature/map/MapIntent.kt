@@ -8,6 +8,22 @@ import com.github.arhor.journey.feature.map.model.MapViewportSize
 sealed interface MapIntent {
     data object MapOpened : MapIntent
 
+    data class MapSurfaceSessionStarted(
+        val sessionId: Long,
+    ) : MapIntent
+
+    data class FirstLocationFixAcquired(
+        val sessionId: Long,
+    ) : MapIntent
+
+    data class FirstMapFrameRendered(
+        val sessionId: Long,
+    ) : MapIntent
+
+    data class StartupGateTimeoutElapsed(
+        val sessionId: Long,
+    ) : MapIntent
+
     data class CameraViewportChanged(
         val visibleBounds: GeoBounds,
     ) : MapIntent

@@ -1,5 +1,6 @@
 package com.github.arhor.journey.feature.map
 
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Immutable
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
@@ -25,6 +26,8 @@ sealed interface MapUiState {
         val isExplorationTrackingActive: Boolean,
         val explorationTrackingCadence: ExplorationTrackingCadence,
         val explorationTrackingStatus: ExplorationTrackingStatus,
+        val isStartupSplashVisible: Boolean,
+        @StringRes val startupSplashMessage: Int,
         val visibleObjects: List<MapObjectUiModel>,
         val selectedWatchtower: WatchtowerSheetUiState?,
         val fogOfWar: FogOfWarUiState,

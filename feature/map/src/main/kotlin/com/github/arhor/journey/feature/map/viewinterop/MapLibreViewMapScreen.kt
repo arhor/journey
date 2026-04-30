@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -50,7 +49,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.feature.map.R
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
-import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.engine.LocationEngine
@@ -62,11 +60,12 @@ import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import java.util.concurrent.atomic.AtomicLong
 
 private const val DEFAULT_VIEW_MAP_STYLE_ASSET_URI: String = "asset://map/styles/style.json"
 
 private const val DEFAULT_LOCATION_ZOOM = 18.0
-private const val LOCATION_FIX_TIMEOUT_MILLIS = 5_000L
+private const val STARTUP_GATE_TIMEOUT_MILLIS = 5_000L
 private const val LOCATION_UPDATE_INTERVAL_MILLIS = 1_000L
 private const val LOCATION_UPDATE_FASTEST_INTERVAL_MILLIS = 500L
 
@@ -82,6 +81,10 @@ fun MapLibreViewMapScreen(
     onViewportChanged: (GeoBounds) -> Unit = {},
     onLocationPermissionGranted: () -> Unit = {},
     onMapLoadFailed: (String?) -> Unit = {},
+    onMapSurfaceSessionStarted: (Long) -> Unit = {},
+    onFirstLocationFix: (Long) -> Unit = {},
+    onFirstMapFrameRendered: (Long) -> Unit = {},
+    onStartupTimeout: (Long) -> Unit = {},
 ) {
     LocationPermissionGate(
         onLocationPermissionGranted = onLocationPermissionGranted,
@@ -91,6 +94,10 @@ fun MapLibreViewMapScreen(
             fogOfWar = fogOfWar,
             onViewportChanged = onViewportChanged,
             onMapLoadFailed = onMapLoadFailed,
+            onMapSurfaceSessionStarted = onMapSurfaceSessionStarted,
+            onFirstLocationFix = onFirstLocationFix,
+            onFirstMapFrameRendered = onFirstMapFrameRendered,
+            onStartupTimeout = onStartupTimeout,
         )
     }
 }
@@ -230,18 +237,20 @@ private fun LegacyMapLibreMap(
     fogOfWar: FogOfWarRenderState,
     onViewportChanged: (GeoBounds) -> Unit,
     onMapLoadFailed: (String?) -> Unit,
+    onMapSurfaceSessionStarted: (Long) -> Unit,
+    onFirstLocationFix: (Long) -> Unit,
+    onFirstMapFrameRendered: (Long) -> Unit,
+    onStartupTimeout: (Long) -> Unit,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
+    val currentOnMapLoadFailed by rememberUpdatedState(onMapLoadFailed)
+    val currentOnMapSurfaceSessionStarted by rememberUpdatedState(onMapSurfaceSessionStarted)
+    val currentOnFirstLocationFix by rememberUpdatedState(onFirstLocationFix)
+    val currentOnFirstMapFrameRendered by rememberUpdatedState(onFirstMapFrameRendered)
+    val currentOnStartupTimeout by rememberUpdatedState(onStartupTimeout)
     val mapViewState = rememberSaveable { Bundle() }
     val mapViewHandles = remember { mutableStateMapOf<MapView, MapViewHandle>() }
-    var isWaitingForLocation by remember { mutableStateOf(true) }
-
-    LaunchedEffect(DEFAULT_VIEW_MAP_STYLE_ASSET_URI) {
-        isWaitingForLocation = true
-        delay(LOCATION_FIX_TIMEOUT_MILLIS)
-        isWaitingForLocation = false
-    }
 
     Box(modifier = modifier) {
         key(DEFAULT_VIEW_MAP_STYLE_ASSET_URI) {
@@ -256,21 +265,51 @@ private fun LegacyMapLibreMap(
                             currentOnViewportChanged(bounds)
                         },
                     )
-                    val startupController = MapLocationStartupController(
-                        onFirstLocationFix = {
-                            isWaitingForLocation = false
-                            viewportReporter.reportCurrentViewport()
-                        },
-                    )
-                    val loadFailureListener = MapView.OnDidFailLoadingMapListener { errorMessage ->
-                        onMapLoadFailed(errorMessage)
-                    }
+                    val sessionId = nextMapSurfaceSessionId()
 
                     MapView(context).also { mapView ->
+                        val startupGateController = MapStartupGateController(
+                            sessionId = sessionId,
+                            onMapSurfaceSessionStarted = { callbackSessionId ->
+                                currentOnMapSurfaceSessionStarted(callbackSessionId)
+                            },
+                            onFirstLocationFix = { callbackSessionId ->
+                                currentOnFirstLocationFix(callbackSessionId)
+                            },
+                            onFirstMapFrameRendered = { callbackSessionId ->
+                                currentOnFirstMapFrameRendered(callbackSessionId)
+                            },
+                            onStartupTimeout = { callbackSessionId ->
+                                currentOnStartupTimeout(callbackSessionId)
+                            },
+                            scheduleTimeout = { delayMillis, runnable ->
+                                mapView.postDelayed(runnable, delayMillis)
+                            },
+                            cancelTimeout = { runnable ->
+                                mapView.removeCallbacks(runnable)
+                            },
+                        )
+                        val startupController = MapLocationStartupController(
+                            onFirstLocationFix = {
+                                startupGateController.onFirstLocationFixAcquired()
+                                viewportReporter.reportCurrentViewport()
+                            },
+                        )
+                        val loadFailureListener = MapView.OnDidFailLoadingMapListener { errorMessage ->
+                            currentOnMapLoadFailed(errorMessage)
+                        }
                         val observer = MapViewLifecycleObserver(mapView, mapViewState)
+                        startupGateController.attachToMapView(
+                            timeoutMillis = STARTUP_GATE_TIMEOUT_MILLIS,
+                        )
+                        val renderReadinessListeners = mapView.attachRenderReadinessListeners(
+                            onFirstFrameRendered = startupGateController::onFirstMapFrameRendered,
+                        )
                         mapViewHandles[mapView] = MapViewHandle(
                             lifecycleObserver = observer,
                             startupController = startupController,
+                            startupGateController = startupGateController,
+                            renderReadinessListeners = renderReadinessListeners,
                             fogLayerController = fogLayerController,
                             viewportReporter = viewportReporter,
                             loadFailureListener = loadFailureListener,
@@ -291,6 +330,8 @@ private fun LegacyMapLibreMap(
                 onRelease = { mapView ->
                     mapViewHandles.remove(mapView)?.let { handle ->
                         handle.startupController.cleanup()
+                        handle.startupGateController.cleanup()
+                        mapView.detachRenderReadinessListeners(handle.renderReadinessListeners)
                         handle.viewportReporter.cleanup()
                         mapView.removeOnDidFailLoadingMapListener(handle.loadFailureListener)
                         lifecycle.removeObserver(handle.lifecycleObserver)
@@ -299,24 +340,6 @@ private fun LegacyMapLibreMap(
                     }
                 },
             )
-        }
-
-        if (isWaitingForLocation) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background,
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.map_view_location_loading_message),
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
         }
     }
 }
@@ -397,10 +420,104 @@ private fun MapLibreMap.setStyleDefinition(
 private data class MapViewHandle(
     val lifecycleObserver: MapViewLifecycleObserver,
     val startupController: MapLocationStartupController,
+    val startupGateController: MapStartupGateController,
+    val renderReadinessListeners: MapRenderReadinessListeners,
     val fogLayerController: NativeFogOfWarLayerController,
     val viewportReporter: NativeMapViewportReporter,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,
 )
+
+private data class MapRenderReadinessListeners(
+    val frameListener: MapView.OnDidFinishRenderingFrameListener,
+)
+
+private val mapSurfaceSessionCounter = AtomicLong(1L)
+
+private fun nextMapSurfaceSessionId(): Long = mapSurfaceSessionCounter.getAndIncrement()
+
+internal class MapStartupGateController(
+    private val sessionId: Long,
+    private val onMapSurfaceSessionStarted: (Long) -> Unit,
+    private val onFirstLocationFix: (Long) -> Unit,
+    private val onFirstMapFrameRendered: (Long) -> Unit,
+    private val onStartupTimeout: (Long) -> Unit,
+    private val scheduleTimeout: (Long, Runnable) -> Unit,
+    private val cancelTimeout: (Runnable) -> Unit,
+) {
+    private var isReleased = false
+    private var hasFirstLocationFix = false
+    private var hasFirstFrameRendered = false
+    private var hasTimedOut = false
+    private var timeoutRunnable: Runnable? = null
+
+    init {
+        onMapSurfaceSessionStarted(sessionId)
+    }
+
+    fun attachToMapView(timeoutMillis: Long) {
+        if (isReleased) return
+
+        val runnable = Runnable { onTimeout() }
+        timeoutRunnable = runnable
+        scheduleTimeout(timeoutMillis, runnable)
+    }
+
+    fun cleanup() {
+        if (isReleased) return
+
+        isReleased = true
+        timeoutRunnable?.let(cancelTimeout)
+        timeoutRunnable = null
+    }
+
+    fun onFirstLocationFixAcquired() {
+        if (isReleased || hasFirstLocationFix) return
+
+        hasFirstLocationFix = true
+        onFirstLocationFix(sessionId)
+        maybeCancelTimeoutAfterReadiness()
+    }
+
+    fun onFirstMapFrameRendered() {
+        if (isReleased || hasFirstFrameRendered) return
+
+        hasFirstFrameRendered = true
+        onFirstMapFrameRendered(sessionId)
+        maybeCancelTimeoutAfterReadiness()
+    }
+
+    private fun onTimeout() {
+        if (isReleased || hasTimedOut || (hasFirstLocationFix && hasFirstFrameRendered)) return
+
+        hasTimedOut = true
+        onStartupTimeout(sessionId)
+    }
+
+    private fun maybeCancelTimeoutAfterReadiness() {
+        if (hasFirstLocationFix && hasFirstFrameRendered) {
+            timeoutRunnable?.let(cancelTimeout)
+            timeoutRunnable = null
+        }
+    }
+}
+
+private fun MapView.attachRenderReadinessListeners(
+    onFirstFrameRendered: () -> Unit,
+): MapRenderReadinessListeners {
+    val frameListener = MapView.OnDidFinishRenderingFrameListener { _, _, _ ->
+        onFirstFrameRendered()
+    }
+
+    addOnDidFinishRenderingFrameListener(frameListener)
+
+    return MapRenderReadinessListeners(
+        frameListener = frameListener,
+    )
+}
+
+private fun MapView.detachRenderReadinessListeners(listeners: MapRenderReadinessListeners) {
+    removeOnDidFinishRenderingFrameListener(listeners.frameListener)
+}
 
 private class MapLocationStartupController(
     private val onFirstLocationFix: () -> Unit,

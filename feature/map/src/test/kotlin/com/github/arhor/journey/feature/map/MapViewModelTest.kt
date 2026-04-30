@@ -1214,6 +1214,158 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `dispatch should show startup splash when a new map surface session starts`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.MapSurfaceSessionStarted(sessionId = 101L))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent()
+            actual.isStartupSplashVisible shouldBe true
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should keep startup splash visible when only one readiness signal is received`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.MapSurfaceSessionStarted(sessionId = 7L))
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.FirstLocationFixAcquired(sessionId = 7L))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent()
+            actual.isStartupSplashVisible shouldBe true
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should hide startup splash only after both readiness signals arrive for the active session`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.MapSurfaceSessionStarted(sessionId = 12L))
+            fixture.viewModel.dispatch(MapIntent.FirstLocationFixAcquired(sessionId = 12L))
+            advanceUntilIdle()
+            fixture.viewModel.awaitContent().isStartupSplashVisible shouldBe true
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.FirstMapFrameRendered(sessionId = 12L))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent()
+            actual.isStartupSplashVisible shouldBe false
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should ignore stale startup readiness callbacks from a previous map session`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.MapSurfaceSessionStarted(sessionId = 1L))
+            fixture.viewModel.dispatch(MapIntent.MapSurfaceSessionStarted(sessionId = 2L))
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.FirstLocationFixAcquired(sessionId = 1L))
+            fixture.viewModel.dispatch(MapIntent.FirstMapFrameRendered(sessionId = 1L))
+            advanceUntilIdle()
+
+            // Then
+            fixture.viewModel.awaitContent().isStartupSplashVisible shouldBe true
+
+            fixture.viewModel.dispatch(MapIntent.FirstLocationFixAcquired(sessionId = 2L))
+            fixture.viewModel.dispatch(MapIntent.FirstMapFrameRendered(sessionId = 2L))
+            advanceUntilIdle()
+            fixture.viewModel.awaitContent().isStartupSplashVisible shouldBe false
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should fail open startup gate when timeout elapses for active map session`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.MapSurfaceSessionStarted(sessionId = 88L))
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.StartupGateTimeoutElapsed(sessionId = 88L))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                !content.isStartupSplashVisible
+            }
+            actual.isStartupSplashVisible shouldBe false
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `dispatch should surface map failure and dismiss startup splash when map load fails`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture()
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.MapSurfaceSessionStarted(sessionId = 5L))
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.MapLoadFailed("Style failed"))
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitFailure()
+            actual.errorMessage shouldBe "Style failed"
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
     fun `dispatch should start exploration tracking automatically when map opens`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
