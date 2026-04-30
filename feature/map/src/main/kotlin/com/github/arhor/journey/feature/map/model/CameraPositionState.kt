@@ -7,4 +7,6 @@ data class CameraPositionState(
     val target: LatLng,
     val zoom: Double,
     val bearing: Double = 0.0,
+    val tilt: Double = 0.0,
+    val centerAltitudeMeters: Double? = null,
 )

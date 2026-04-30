@@ -12,6 +12,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
+import android.view.MotionEvent
+import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -47,9 +49,21 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.github.arhor.journey.domain.model.GeoBounds
+import com.github.arhor.journey.feature.map.BEARING_DEGREES_PER_PIXEL
+import com.github.arhor.journey.feature.map.DEFAULT_CAMERA_MAX_TILT
+import com.github.arhor.journey.feature.map.DEFAULT_CAMERA_MIN_TILT
 import com.github.arhor.journey.feature.map.R
+import com.github.arhor.journey.feature.map.TILT_DEGREES_PER_PIXEL
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
+import com.github.arhor.journey.feature.map.gesture.PlayerCenteredCameraGestureTracker
+import com.github.arhor.journey.feature.map.model.CameraPositionState
+import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
+import com.github.arhor.journey.feature.map.model.LatLng as FeatureLatLng
+import com.github.arhor.journey.feature.map.gesture.normalizeBearing
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.MapLibre
+import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.engine.LocationEngine
 import org.maplibre.android.location.engine.LocationEngineCallback
@@ -79,6 +93,8 @@ fun MapLibreViewMapScreen(
     modifier: Modifier = Modifier,
     fogOfWar: FogOfWarRenderState = FogOfWarRenderState(),
     onViewportChanged: (GeoBounds) -> Unit = {},
+    onCameraGestureStarted: (CameraPositionState) -> Unit = {},
+    onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit = { _, _ -> },
     onLocationPermissionGranted: () -> Unit = {},
     onMapLoadFailed: (String?) -> Unit = {},
     onMapSurfaceSessionStarted: (Long) -> Unit = {},
@@ -93,6 +109,8 @@ fun MapLibreViewMapScreen(
             modifier = modifier,
             fogOfWar = fogOfWar,
             onViewportChanged = onViewportChanged,
+            onCameraGestureStarted = onCameraGestureStarted,
+            onCameraSettled = onCameraSettled,
             onMapLoadFailed = onMapLoadFailed,
             onMapSurfaceSessionStarted = onMapSurfaceSessionStarted,
             onFirstLocationFix = onFirstLocationFix,
@@ -236,6 +254,8 @@ private fun LegacyMapLibreMap(
     modifier: Modifier = Modifier,
     fogOfWar: FogOfWarRenderState,
     onViewportChanged: (GeoBounds) -> Unit,
+    onCameraGestureStarted: (CameraPositionState) -> Unit,
+    onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit,
     onMapLoadFailed: (String?) -> Unit,
     onMapSurfaceSessionStarted: (Long) -> Unit,
     onFirstLocationFix: (Long) -> Unit,
@@ -244,6 +264,8 @@ private fun LegacyMapLibreMap(
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
+    val currentOnCameraGestureStarted by rememberUpdatedState(onCameraGestureStarted)
+    val currentOnCameraSettled by rememberUpdatedState(onCameraSettled)
     val currentOnMapLoadFailed by rememberUpdatedState(onMapLoadFailed)
     val currentOnMapSurfaceSessionStarted by rememberUpdatedState(onMapSurfaceSessionStarted)
     val currentOnFirstLocationFix by rememberUpdatedState(onFirstLocationFix)
@@ -263,6 +285,14 @@ private fun LegacyMapLibreMap(
                     val viewportReporter = NativeMapViewportReporter(
                         onViewportChanged = { bounds ->
                             currentOnViewportChanged(bounds)
+                        },
+                    )
+                    val cameraGestureController = NativeCameraGestureController(
+                        onCameraGestureStarted = { position ->
+                            currentOnCameraGestureStarted(position)
+                        },
+                        onCameraSettled = { position, origin ->
+                            currentOnCameraSettled(position, origin)
                         },
                     )
                     val sessionId = nextMapSurfaceSessionId()
@@ -290,6 +320,9 @@ private fun LegacyMapLibreMap(
                             },
                         )
                         val startupController = MapLocationStartupController(
+                            onLocationUpdated = { location ->
+                                cameraGestureController.onLocationUpdated(location)
+                            },
                             onFirstLocationFix = {
                                 startupGateController.onFirstLocationFixAcquired()
                                 viewportReporter.reportCurrentViewport()
@@ -312,6 +345,7 @@ private fun LegacyMapLibreMap(
                             renderReadinessListeners = renderReadinessListeners,
                             fogLayerController = fogLayerController,
                             viewportReporter = viewportReporter,
+                            cameraGestureController = cameraGestureController,
                             loadFailureListener = loadFailureListener,
                         )
                         lifecycle.addObserver(observer)
@@ -321,11 +355,14 @@ private fun LegacyMapLibreMap(
                             startupController = startupController,
                             fogLayerController = fogLayerController,
                             viewportReporter = viewportReporter,
+                            cameraGestureController = cameraGestureController,
                         )
                     }
                 },
                 update = { mapView ->
-                    mapViewHandles[mapView]?.fogLayerController?.update(fogOfWar)
+                    mapViewHandles[mapView]?.let { handle ->
+                        handle.fogLayerController.update(fogOfWar)
+                    }
                 },
                 onRelease = { mapView ->
                     mapViewHandles.remove(mapView)?.let { handle ->
@@ -333,6 +370,7 @@ private fun LegacyMapLibreMap(
                         handle.startupGateController.cleanup()
                         mapView.detachRenderReadinessListeners(handle.renderReadinessListeners)
                         handle.viewportReporter.cleanup()
+                        handle.cameraGestureController.cleanup()
                         mapView.removeOnDidFailLoadingMapListener(handle.loadFailureListener)
                         lifecycle.removeObserver(handle.lifecycleObserver)
                         handle.lifecycleObserver.save()
@@ -350,6 +388,7 @@ private fun MapView.configureLocationAwareMap(
     startupController: MapLocationStartupController,
     fogLayerController: NativeFogOfWarLayerController,
     viewportReporter: NativeMapViewportReporter,
+    cameraGestureController: NativeCameraGestureController,
 ) {
     getMapAsync { map ->
         if (startupController.isReleased) return@getMapAsync
@@ -362,7 +401,8 @@ private fun MapView.configureLocationAwareMap(
             fogLayerController.update(fogOfWar)
             viewportReporter.attach(map)
 
-            val locationEngine = ForwardingLocationEngine(context) { _ ->
+            val locationEngine = ForwardingLocationEngine(context) { location ->
+                cameraGestureController.onLocationUpdated(location)
             }
             val locationRequest = context.locationEngineRequest()
             val locationComponent = map.locationComponent
@@ -382,6 +422,10 @@ private fun MapView.configureLocationAwareMap(
                 null,
                 null,
             )
+            cameraGestureController.attach(
+                mapView = this,
+                map = map,
+            )
 
             startupController.start(map, locationEngine, locationRequest)
         }
@@ -394,10 +438,10 @@ private fun MapLibreMap.configureUiSettings() {
         isAttributionEnabled = false
         isLogoEnabled = false
 
-        isScrollGesturesEnabled = true
-        isHorizontalScrollGesturesEnabled = true
-        isRotateGesturesEnabled = true
-        isTiltGesturesEnabled = true
+        isScrollGesturesEnabled = false
+        isHorizontalScrollGesturesEnabled = false
+        isRotateGesturesEnabled = false
+        isTiltGesturesEnabled = false
         isZoomGesturesEnabled = true
         isDoubleTapGesturesEnabled = true
         isQuickZoomGesturesEnabled = true
@@ -424,6 +468,7 @@ private data class MapViewHandle(
     val renderReadinessListeners: MapRenderReadinessListeners,
     val fogLayerController: NativeFogOfWarLayerController,
     val viewportReporter: NativeMapViewportReporter,
+    val cameraGestureController: NativeCameraGestureController,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,
 )
 
@@ -519,7 +564,171 @@ private fun MapView.detachRenderReadinessListeners(listeners: MapRenderReadiness
     removeOnDidFinishRenderingFrameListener(listeners.frameListener)
 }
 
+private class NativeCameraGestureController(
+    private val onCameraGestureStarted: (CameraPositionState) -> Unit,
+    private val onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit,
+) {
+    private var mapView: MapView? = null
+    private var map: MapLibreMap? = null
+    private var latestUserLocation: LatLng? = null
+    private var lastCameraMoveOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC
+    private var isCustomCameraGestureActive = false
+
+    private val cameraGestureTracker = PlayerCenteredCameraGestureTracker(
+        bearingDegreesPerPixel = BEARING_DEGREES_PER_PIXEL,
+        tiltDegreesPerPixel = TILT_DEGREES_PER_PIXEL,
+        minTilt = DEFAULT_CAMERA_MIN_TILT,
+        maxTilt = DEFAULT_CAMERA_MAX_TILT,
+    )
+
+    private val cameraMoveStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
+        lastCameraMoveOrigin = if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+            CameraUpdateOrigin.USER
+        } else {
+            CameraUpdateOrigin.PROGRAMMATIC
+        }
+
+        if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE && !isCustomCameraGestureActive) {
+            map?.readCurrentCameraState()?.let(onCameraGestureStarted)
+        }
+    }
+
+    private val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
+        if (isCustomCameraGestureActive) {
+            return@OnCameraIdleListener
+        }
+
+        map?.readCurrentCameraState()?.let { position ->
+            onCameraSettled(position, lastCameraMoveOrigin)
+        }
+    }
+
+    private val touchListener = View.OnTouchListener { _, event ->
+        val map = map ?: return@OnTouchListener false
+        val currentPosition = map.cameraPosition
+        val update = cameraGestureTracker.onMotionEvent(
+            action = event.actionMasked,
+            x = event.x,
+            y = event.y,
+            pointerCount = event.pointerCount,
+            currentBearing = currentPosition.bearing,
+            currentTilt = currentPosition.tilt,
+        )
+
+        if (update.didStartInteraction) {
+            map.locationComponent.setCameraMode(CameraMode.NONE)
+            isCustomCameraGestureActive = true
+            map.readCurrentCameraState()?.let(onCameraGestureStarted)
+        }
+
+        if (update.bearing != null && update.tilt != null) {
+            map.moveCameraToUserCenteredPosition(
+                target = latestUserLocation ?: currentPosition.target,
+                bearing = update.bearing,
+                tilt = update.tilt,
+            )
+        }
+
+        if (update.didEndInteraction && isCustomCameraGestureActive) {
+            isCustomCameraGestureActive = false
+            val settledPosition = map.readCurrentCameraState()
+            restoreTrackingCameraMode(map)
+            settledPosition?.let { position ->
+                onCameraSettled(position, CameraUpdateOrigin.USER)
+            }
+        }
+
+        if (isCustomCameraGestureActive) {
+            true
+        } else {
+            false
+        }
+    }
+
+    fun attach(
+        mapView: MapView,
+        map: MapLibreMap,
+    ) {
+        cleanup()
+
+        this.mapView = mapView
+        this.map = map
+        mapView.setOnTouchListener(touchListener)
+        map.addOnCameraMoveStartedListener(cameraMoveStartedListener)
+        map.addOnCameraIdleListener(cameraIdleListener)
+    }
+
+    fun cleanup() {
+        map?.removeOnCameraMoveStartedListener(cameraMoveStartedListener)
+        map?.removeOnCameraIdleListener(cameraIdleListener)
+
+        mapView?.setOnTouchListener(null)
+        mapView = null
+        map = null
+        latestUserLocation = null
+        isCustomCameraGestureActive = false
+        lastCameraMoveOrigin = CameraUpdateOrigin.PROGRAMMATIC
+    }
+
+    fun onLocationUpdated(location: Location) {
+        val mapTarget = LatLng(location.latitude, location.longitude)
+        latestUserLocation = mapTarget
+
+        val map = map ?: return
+        if (isCustomCameraGestureActive || map.locationComponent.cameraMode == CameraMode.NONE) {
+            map.moveCameraToUserCenteredPosition(target = mapTarget)
+        }
+    }
+
+    private fun restoreTrackingCameraMode(map: MapLibreMap) {
+        map.locationComponent.setCameraMode(
+            CameraMode.TRACKING,
+            0L,
+            null,
+            null,
+            null,
+            null,
+        )
+    }
+}
+
+private fun MapLibreMap.readCurrentCameraState(): CameraPositionState? {
+    val target = cameraPosition.target ?: return null
+    return CameraPositionState(
+        target = FeatureLatLng(
+            latitude = target.latitude,
+            longitude = target.longitude,
+        ),
+        zoom = cameraPosition.zoom,
+        bearing = normalizeBearing(cameraPosition.bearing),
+        tilt = cameraPosition.tilt.coerceIn(DEFAULT_CAMERA_MIN_TILT, DEFAULT_CAMERA_MAX_TILT),
+        centerAltitudeMeters = normalizeCenterAltitudeMeters(cameraPosition.centerAltitude),
+    )
+}
+
+private fun MapLibreMap.moveCameraToUserCenteredPosition(
+    target: LatLng? = cameraPosition.target,
+    bearing: Double = cameraPosition.bearing,
+    tilt: Double = cameraPosition.tilt,
+) {
+    val resolvedTarget = target ?: return
+    val currentPosition = cameraPosition
+    val updatedPosition = CameraPosition.Builder(currentPosition)
+        .target(resolvedTarget)
+        .bearing(normalizeBearing(bearing))
+        .tilt(tilt.coerceIn(DEFAULT_CAMERA_MIN_TILT, DEFAULT_CAMERA_MAX_TILT))
+        .zoom(currentPosition.zoom)
+        .build()
+
+    moveCamera(CameraUpdateFactory.newCameraPosition(updatedPosition))
+}
+
+internal fun normalizeCenterAltitudeMeters(centerAltitudeMeters: Double): Double? {
+    return centerAltitudeMeters.takeIf(Double::isFinite)
+}
+
 private class MapLocationStartupController(
+    private val onLocationUpdated: (Location) -> Unit,
     private val onFirstLocationFix: () -> Unit,
 ) {
     var isReleased = false
@@ -597,6 +806,7 @@ private class MapLocationStartupController(
 
         hasFirstFix = true
         removeTemporaryCallback()
+        onLocationUpdated(location)
         map?.moveToUserLocation(location)
         onFirstLocationFix()
     }

@@ -191,7 +191,24 @@ class MapTileCoverageCalculator @Inject constructor() {
         target = from.target.lerp(to.target, fraction),
         zoom = from.zoom + (to.zoom - from.zoom) * fraction,
         bearing = from.bearing + (to.bearing - from.bearing) * fraction,
+        tilt = from.tilt + (to.tilt - from.tilt) * fraction,
+        centerAltitudeMeters = interpolateCenterAltitude(from, to, fraction),
     )
+
+    private fun interpolateCenterAltitude(
+        from: CameraPositionState,
+        to: CameraPositionState,
+        fraction: Double,
+    ): Double? {
+        val fromAltitude = from.centerAltitudeMeters
+        val toAltitude = to.centerAltitudeMeters
+        return when {
+            fromAltitude == null && toAltitude == null -> null
+            fromAltitude == null -> toAltitude
+            toAltitude == null -> fromAltitude
+            else -> fromAltitude + (toAltitude - fromAltitude) * fraction
+        }
+    }
 
     private fun transformBounds(
         baseBounds: GeoBounds,

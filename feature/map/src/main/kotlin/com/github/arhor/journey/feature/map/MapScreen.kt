@@ -62,6 +62,17 @@ internal fun MapContent(
             onViewportChanged = { visibleBounds ->
                 mapDispatch(MapIntent.CameraViewportChanged(visibleBounds))
             },
+            onCameraGestureStarted = { cameraPosition ->
+                mapDispatch(MapIntent.CameraGestureStarted(cameraPosition))
+            },
+            onCameraSettled = { cameraPosition, origin ->
+                mapDispatch(
+                    MapIntent.CameraSettled(
+                        position = cameraPosition,
+                        origin = origin,
+                    ),
+                )
+            },
             onLocationPermissionGranted = {
                 mapDispatch(MapIntent.LocationPermissionResult(isGranted = true))
             },

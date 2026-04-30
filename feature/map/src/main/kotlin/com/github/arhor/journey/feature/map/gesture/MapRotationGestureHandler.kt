@@ -3,22 +3,28 @@ package com.github.arhor.journey.feature.map.gesture
 import android.view.MotionEvent
 import kotlin.math.abs
 
-internal data class HorizontalDragRotationUpdate(
+internal data class PlayerCenteredCameraGestureUpdate(
     val bearing: Double? = null,
+    val tilt: Double? = null,
     val didStartInteraction: Boolean = false,
     val didEndInteraction: Boolean = false,
 )
 
-internal class HorizontalDragRotationTracker(
+internal class PlayerCenteredCameraGestureTracker(
     private val dragThresholdPx: Float = 12f,
-    private val degreesPerPixel: Double = 0.12,
+    private val bearingDegreesPerPixel: Double,
+    private val tiltDegreesPerPixel: Double,
+    private val minTilt: Double,
+    private val maxTilt: Double,
 ) {
     private var activePointerCount: Int = 0
-    private var lastX: Float? = null
-    private var lastY: Float? = null
+    private var startX: Float? = null
+    private var startY: Float? = null
+    private var startBearing: Double = 0.0
+    private var startTilt: Double = 0.0
     private var totalDx = 0f
     private var totalDy = 0f
-    private var isRotating = false
+    private var isAdjustingCamera = false
 
     fun onMotionEvent(
         action: Int,
@@ -26,15 +32,18 @@ internal class HorizontalDragRotationTracker(
         y: Float,
         pointerCount: Int,
         currentBearing: Double,
-    ): HorizontalDragRotationUpdate = when (action) {
+        currentTilt: Double,
+    ): PlayerCenteredCameraGestureUpdate = when (action) {
         MotionEvent.ACTION_DOWN -> {
             activePointerCount = pointerCount
-            lastX = x
-            lastY = y
+            startX = x
+            startY = y
+            startBearing = currentBearing
+            startTilt = currentTilt
             totalDx = 0f
             totalDy = 0f
-            isRotating = false
-            HorizontalDragRotationUpdate()
+            isAdjustingCamera = false
+            PlayerCenteredCameraGestureUpdate()
         }
 
         MotionEvent.ACTION_POINTER_DOWN -> {
@@ -48,27 +57,24 @@ internal class HorizontalDragRotationTracker(
                 return endInteraction()
             }
 
-            val previousX = lastX ?: x
-            val previousY = lastY ?: y
-            val deltaX = x - previousX
-            val deltaY = y - previousY
-            lastX = x
-            lastY = y
-            totalDx += deltaX
-            totalDy += deltaY
+            val originX = startX ?: x
+            val originY = startY ?: y
+            totalDx = x - originX
+            totalDy = y - originY
 
-            if (!isRotating) {
-                val exceedsThreshold = abs(totalDx) >= dragThresholdPx
-                val isHorizontal = abs(totalDx) > abs(totalDy)
-                if (!exceedsThreshold || !isHorizontal) {
-                    return HorizontalDragRotationUpdate()
+            val didStartInteraction = !isAdjustingCamera
+            if (!isAdjustingCamera) {
+                val exceedsThreshold = abs(totalDx) >= dragThresholdPx || abs(totalDy) >= dragThresholdPx
+                if (!exceedsThreshold) {
+                    return PlayerCenteredCameraGestureUpdate()
                 }
-                isRotating = true
+                isAdjustingCamera = true
             }
 
-            HorizontalDragRotationUpdate(
-                bearing = normalizeBearing(currentBearing + deltaX * degreesPerPixel),
-                didStartInteraction = isRotating && abs(totalDx) - abs(deltaX) < dragThresholdPx,
+            PlayerCenteredCameraGestureUpdate(
+                bearing = normalizeBearing(startBearing + totalDx * bearingDegreesPerPixel),
+                tilt = (startTilt - totalDy * tiltDegreesPerPixel).coerceIn(minTilt, maxTilt),
+                didStartInteraction = didStartInteraction,
             )
         }
 
@@ -79,17 +85,17 @@ internal class HorizontalDragRotationTracker(
             endInteraction()
         }
 
-        else -> HorizontalDragRotationUpdate()
+        else -> PlayerCenteredCameraGestureUpdate()
     }
 
-    private fun endInteraction(): HorizontalDragRotationUpdate {
-        val didEndInteraction = isRotating
-        lastX = null
-        lastY = null
+    private fun endInteraction(): PlayerCenteredCameraGestureUpdate {
+        val didEndInteraction = isAdjustingCamera
+        startX = null
+        startY = null
         totalDx = 0f
         totalDy = 0f
-        isRotating = false
-        return HorizontalDragRotationUpdate(didEndInteraction = didEndInteraction)
+        isAdjustingCamera = false
+        return PlayerCenteredCameraGestureUpdate(didEndInteraction = didEndInteraction)
     }
 }
 
