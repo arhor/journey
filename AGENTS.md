@@ -6,8 +6,8 @@ unless a more deeply nested `AGENTS.md` overrides it.
 ## Project Overview
 
 - `journey` is a single-module Android app in `:app`.
-- Primary app code is Kotlin under `app/src/main/kotlin/com/github/arhor/journey`.
-- Some shared Java-package code remains under `app/src/main/java/com/github/arhor/journey`.
+- Primary app code is Kotlin under `app/src/main/java/com/github/arhor/journey`.
+- Kotlin source files intentionally live in the Android `java` source sets.
 - UI is Jetpack Compose with Material 3.
 - Dependency injection uses Hilt.
 - Persistence uses Room and DataStore.
@@ -21,12 +21,12 @@ unless a more deeply nested `AGENTS.md` overrides it.
 - `build.gradle.kts`: shared Kotlin compiler options and test defaults.
 - `gradle/libs.versions.toml`: dependency and plugin versions.
 - `app/build.gradle.kts`: Android, Compose, Hilt, Room, MapLibre, and Godot export configuration.
-- `app/src/main/kotlin/com/github/arhor/journey/core`: shared app primitives, UI components, and navigation.
-- `app/src/main/kotlin/com/github/arhor/journey/data`: Room, DataStore, repositories, mappers, local generation.
-- `app/src/main/kotlin/com/github/arhor/journey/domain`: models, repository contracts, use cases, domain policies.
-- `app/src/main/kotlin/com/github/arhor/journey/feature`: screen and feature implementations.
-- `app/src/test`: JVM unit tests.
-- `app/src/androidTest`: instrumentation and Compose UI tests.
+- `app/src/main/java/com/github/arhor/journey/core`: shared app primitives, UI components, and navigation.
+- `app/src/main/java/com/github/arhor/journey/data`: Room, DataStore, repositories, mappers, local generation.
+- `app/src/main/java/com/github/arhor/journey/domain`: models, repository contracts, use cases, domain policies.
+- `app/src/main/java/com/github/arhor/journey/feature`: screen and feature implementations.
+- `app/src/test/java`: JVM unit tests.
+- `app/src/androidTest/java`: instrumentation and Compose UI tests.
 - `docs/superpowers`: planning and design documents used by the Superpowers workflow.
 
 ## Build And Validation Commands
