@@ -60,7 +60,7 @@ class SelectedWatchtowerPresenter @Inject constructor() {
             canUpgrade = watchtower.canUpgrade && upgradeAffordable,
             claimDisabledReason = when {
                 watchtower.phase != WatchtowerPhase.DISCOVERED_DORMANT -> null
-                isInRange && !claimAffordable -> resourceRequirementMessage(watchtower.claimCost?.resourceTypeId)
+                isInRange && !claimAffordable -> resourceRequirementMessage(watchtower.claimCost.resourceTypeId)
                 isInRange -> null
                 distanceMeters != null -> WATCHTOWER_MOVE_CLOSER_MESSAGE
                 else -> CURRENT_LOCATION_UNAVAILABLE_MESSAGE
