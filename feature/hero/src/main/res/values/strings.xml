@@ -1,8 +1,0 @@
-<resources>
-    <string name="hero_hero_summary_title">Hero Summary</string>
-    <string name="hero_hero_level_value">Level %1$d</string>
-    <string name="hero_progress_title">Progression</string>
-    <string name="hero_progress_xp_value">XP: %1$d / %2$d</string>
-    <string name="hero_resources_title">Resources</string>
-    <string name="hero_nav_label">Hero</string>
-</resources>

@@ -1,8 +1,5 @@
 @file:Suppress("UnstableApiUsage")
 
-include(":feature:mini-game")
-
-
 pluginManagement {
     repositories {
         google {
@@ -29,15 +26,4 @@ rootProject.name = "journey"
 
 include(
     ":app",
-    ":data",
-    ":core:common",
-    ":core:domain",
-    ":core:navigation",
-    ":core:testing",
-    ":core:ui",
-    ":feature:exploration",
-    ":feature:hero",
-    ":feature:map",
-    ":feature:map:fog-of-war",
-    ":feature:settings",
 )

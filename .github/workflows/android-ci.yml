@@ -77,7 +77,7 @@ jobs:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       - name: Lint, unit test
-        run: ./gradlew lintDebug test testDebugUnitTest
+        run: ./gradlew lintDebug testDebugUnitTest
 
       - name: Assemble debug
         shell: bash

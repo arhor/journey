@@ -36,33 +36,25 @@ part of `requirements-critic` for plans and `correctness_reviewer` for patches. 
 `architecture-planner`; changed-path mapping is part of `architecture_reviewer`.
 
 ## Project Structure & Module Organization
-This repository is a multi-module Android app built with Kotlin, Jetpack Compose, Hilt, Room, and DataStore.
+This repository is a single-module Android app built with Kotlin, Jetpack Compose, Hilt, Room, and DataStore.
 
 Gradle modules:
 
-- `:app` - application shell, `MainActivity`, app scaffold, root navigation graph, and app-level Hilt modules.
-- `:core:domain` - pure Kotlin/JVM domain layer with models, repository contracts, use cases, and progression logic.
-- `:data` - Android data layer with Room database/DAOs/entities, DataStore-backed repositories, mappers, and seeds.
-- `:core:common` - shared non-UI primitives such as `Output`, `DomainError`, and qualifiers.
-- `:core:navigation` - shared navigation types such as `BottomNavDestination`.
-- `:core:ui` - shared UI architecture support; currently mainly `MviViewModel`.
-- `:feature:exploration` - foreground exploration tracking runtime, services, and location orchestration.
-- `:feature:hero` - hero screen, route, navigation contract, and view model.
-- `:feature:map` - map flow, map rendering integration, tracking session UI, and related view models.
-- `:feature:map:fog-of-war` - fog-of-war state, buffering, render-data preparation, diagnostics, and map overlay application.
-- `:feature:settings` - settings screen, navigation contract, Health Connect entry points, and view model.
+- `:app` - the only Gradle module. It contains the application shell, domain layer, data layer, shared core code,
+  feature packages, fog-of-war implementation, Godot mini-game launch surface, resources, and tests.
 
 Primary source locations:
 
-- App: `app/src/main/kotlin/com/github/arhor/journey`
-- Domain: `core/domain/src/main/kotlin/com/github/arhor/journey/domain`
-- Data: `data/src/main/kotlin/com/github/arhor/journey/data`
-- Core common: `core/common/src/main/java/com/github/arhor/journey`
-- Core navigation: `core/navigation/src/main/kotlin/com/github/arhor/journey/core/navigation`
-- Core UI: `core/ui/src/main/kotlin/com/github/arhor/journey/core/ui`
-- Features: `feature/<name>/src/main/kotlin/com/github/arhor/journey/feature/<name>`
-- Map fog of war: `feature/map/fog-of-war/src/main/kotlin/com/github/arhor/journey/feature/map/fow`
-- Godot mini-game assets: `app/src/main/assets/minigame.pck`
+- App shell: `app/src/main/kotlin/com/github/arhor/journey`
+- Domain: `app/src/main/kotlin/com/github/arhor/journey/domain`
+- Data: `app/src/main/kotlin/com/github/arhor/journey/data`
+- Core common: `app/src/main/java/com/github/arhor/journey`
+- Core navigation: `app/src/main/kotlin/com/github/arhor/journey/core/navigation`
+- Core UI: `app/src/main/kotlin/com/github/arhor/journey/core/ui`
+- Features: `app/src/main/kotlin/com/github/arhor/journey/feature/<name>`
+- Map fog of war: `app/src/main/kotlin/com/github/arhor/journey/feature/map/fow`
+- Godot mini-game project: `app/src/main/godot`
+- Generated Godot mini-game bundle: `app/build/generated/godot/assets/minigame.pck`
 - App resources: `app/src/main/res`
 
 Build configuration lives in:
@@ -70,34 +62,34 @@ Build configuration lives in:
 - `settings.gradle.kts`
 - `build.gradle.kts`
 - `app/build.gradle.kts`
-- `data/build.gradle.kts`
-- `core/domain/build.gradle.kts`
-- `core/*/build.gradle.kts`
-- `feature/*/build.gradle.kts`
 - `gradle/libs.versions.toml`
 - `.github/workflows/android-ci.yml`
 
 ## Architecture & Dependency Rules
-Keep dependency direction intact:
+Keep the former module boundaries as package-level architecture boundaries:
 
-- `:app -> :data, :core:domain, :core:*, :feature:*`
-- `:core:ui -> :core:common`
-- `:feature:* -> :core:domain, :core:*`
-- `:feature:map -> :feature:map:fog-of-war`
-- `:data -> :core:domain, :core:common`
-- `:core:domain -> :core:common`
+- App shell code may depend on data, domain, core, and feature packages.
+- Core UI may depend on core common primitives.
+- Feature packages may depend on domain and core packages.
+- Map package may depend on the fog-of-war package.
+- Data package may depend on domain and core common packages.
+- Domain package may depend on core common primitives.
 
 Practical rules:
 
-- Keep `:core:domain` Android-free.
-- Treat `:app` as the composition root, not as the default place for new business logic.
+- Keep `com.github.arhor.journey.domain` Android-free.
+- Treat `com.github.arhor.journey` app-shell packages as the composition root, not as the default place for new business logic.
 - Put app-wide wiring and singleton bindings in `app/src/main/kotlin/com/github/arhor/journey/di`.
-- Keep feature-specific platform bindings inside the owning feature module when they are not truly app-wide.
-- `:app` packages the exported Godot mini-game bundle from `app/src/main/assets/minigame.pck` and owns the Android `GodotActivity` launch surface.
+- Keep feature-specific platform bindings inside the owning feature package when they are not truly app-wide.
+- `:app` owns the Godot mini-game project under `app/src/main/godot`, exports `minigame.pck` through the
+  `exportGodotPack` Gradle task when `godot.bin` or `GODOT_BIN` is configured, and owns the Android `GodotActivity`
+  launch surface.
 - Root navigation is assembled in `app/ui/navigation/AppNavGraph.kt`; features own typed destinations and `*Graph(...)` builders.
 - Use typed navigation contracts with `@Serializable` destinations and `composable<T>` routes, matching existing feature modules.
-- `:feature:map` may start, stop, or observe exploration tracking sessions, but it must not own continuous location collection or the tile-reveal pipeline.
-- Keep fog-of-war implementation details in `:feature:map:fog-of-war`; `:feature:map` should consume its public state/controller API instead of rebuilding fog logic locally.
+- `com.github.arhor.journey.feature.map` may start, stop, or observe exploration tracking sessions, but it must not own
+  continuous location collection or the tile-reveal pipeline.
+- Keep fog-of-war implementation details in `com.github.arhor.journey.feature.map.fow`; map code should consume its
+  public state/controller API instead of rebuilding fog logic locally.
 
 ## UI & State Management Conventions
 Main screen pattern:
@@ -111,14 +103,16 @@ Main screen pattern:
 
 Shared UI placement:
 
-- Keep feature-local reusable UI in the owning feature module.
+- Keep feature-local reusable UI in the owning feature package.
 - Keep app-shell UI in `app/ui`.
-- If a Compose component or UI helper is reused across multiple features, prefer moving it into `:core:ui` instead of `:app`.
+- If a Compose component or UI helper is reused across multiple features, prefer moving it into
+  `com.github.arhor.journey.core.ui` instead of app-shell packages.
 
 ## Data & Domain Conventions
 
-- Repository interfaces live in `:core:domain`; implementations live in `:data`.
-- Room entities, DAOs, and mappers stay in `:data`.
+- Repository interfaces live in `com.github.arhor.journey.domain`; implementations live in
+  `com.github.arhor.journey.data`.
+- Room entities, DAOs, and mappers stay in `com.github.arhor.journey.data`.
 - Use the existing typed `Output<T, E : DomainError>` pattern as a strict use-case boundary contract.
 - Every use case class must return `Output` for one-shot operations or `Flow`/`StateFlow` of `Output` for observable streams.
 - Do not expose raw values, nullable results, or bare `Unit` from use case APIs, even when the current implementation looks infallible.
@@ -130,10 +124,10 @@ Use the Gradle wrapper from repo root. JDK 17 is required; CI uses Temurin 17.
 
 - `./gradlew assembleDebug` builds a debug APK.
 - `./gradlew assembleRelease` builds a release APK.
-- `./gradlew lintDebug` runs Android lint across Android modules.
-- `./gradlew test testDebugUnitTest` runs JVM/unit tests across modules.
+- `./gradlew lintDebug` runs Android lint for the app module.
+- `./gradlew testDebugUnitTest` runs JVM/unit tests for the app module.
 - `./gradlew connectedDebugAndroidTest` runs instrumentation/Compose tests on a connected device or emulator.
-- `./gradlew lintDebug test testDebugUnitTest assembleRelease --stacktrace` matches the main CI verification job.
+- `./gradlew lintDebug testDebugUnitTest assembleRelease --stacktrace` matches the main CI verification job.
 
 The repo also includes `run/setup.sh` for bootstrapping Android SDK command-line tooling in a fresh environment.
 
@@ -155,13 +149,13 @@ Follow existing naming and structure patterns in each feature:
 - `Observe...UseCase`, `Set...UseCase`, `Add...UseCase`, etc.
 
 Do not reintroduce the old `app/ui/views/<feature>` layout.
-New features belong in their own `feature/<feature>` module unless the architecture is intentionally being changed.
+New features belong in `app/src/main/kotlin/com/github/arhor/journey/feature/<feature>`.
 
 ## Testing Guidelines
 Put tests in the module that owns the code:
 
-- JVM tests: `<module>/src/test/kotlin`
-- Instrumented/UI tests: currently `app/src/androidTest/kotlin`
+- JVM tests: `app/src/test/kotlin`
+- Instrumented/UI tests: `app/src/androidTest/kotlin`
 
 Current test stack includes:
 
@@ -179,7 +173,7 @@ Repo test conventions:
 - Prefer backtick test names in the form `{function/method/action} should {expected behavior} when {given context}`.
 - Split tests visually into `// Given`, `// When`, and `// Then`.
 - Keep fast logic tests in JVM source sets.
-- If you add instrumentation tests in feature modules later, keep root `connectedDebugAndroidTest` execution healthy.
+- Keep root `connectedDebugAndroidTest` execution healthy when adding instrumentation tests.
 
 ## Commit & Pull Request Guidelines
 Recent history favors short, imperative, sentence-style commits.
