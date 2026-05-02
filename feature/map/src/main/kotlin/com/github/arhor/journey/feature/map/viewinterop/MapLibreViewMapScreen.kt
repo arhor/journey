@@ -76,7 +76,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import java.util.concurrent.atomic.AtomicLong
 
-private const val DEFAULT_VIEW_MAP_STYLE_ASSET_URI: String = "asset://map/styles/style.json"
+private const val DEFAULT_VIEW_MAP_STYLE_ASSET_URI: String = "asset://map/styles/cyberpunk.json"
 
 private const val DEFAULT_LOCATION_ZOOM = 18.0
 private const val STARTUP_GATE_TIMEOUT_MILLIS = 5_000L
@@ -91,6 +91,7 @@ private val LOCATION_PERMISSIONS = arrayOf(
 @Composable
 fun MapLibreViewMapScreen(
     modifier: Modifier = Modifier,
+    styleUri: String = DEFAULT_VIEW_MAP_STYLE_ASSET_URI,
     fogOfWar: FogOfWarRenderState = FogOfWarRenderState(),
     onViewportChanged: (GeoBounds) -> Unit = {},
     onCameraGestureStarted: (CameraPositionState) -> Unit = {},
@@ -107,6 +108,7 @@ fun MapLibreViewMapScreen(
     ) {
         LegacyMapLibreMap(
             modifier = modifier,
+            styleUri = styleUri,
             fogOfWar = fogOfWar,
             onViewportChanged = onViewportChanged,
             onCameraGestureStarted = onCameraGestureStarted,
@@ -252,6 +254,7 @@ private fun LocationPermissionDeniedScreen(
 @Composable
 private fun LegacyMapLibreMap(
     modifier: Modifier = Modifier,
+    styleUri: String,
     fogOfWar: FogOfWarRenderState,
     onViewportChanged: (GeoBounds) -> Unit,
     onCameraGestureStarted: (CameraPositionState) -> Unit,
@@ -275,7 +278,7 @@ private fun LegacyMapLibreMap(
     val mapViewHandles = remember { mutableStateMapOf<MapView, MapViewHandle>() }
 
     Box(modifier = modifier) {
-        key(DEFAULT_VIEW_MAP_STYLE_ASSET_URI) {
+        key(styleUri) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
@@ -351,6 +354,7 @@ private fun LegacyMapLibreMap(
                         lifecycle.addObserver(observer)
                         mapView.addOnDidFailLoadingMapListener(loadFailureListener)
                         mapView.configureLocationAwareMap(
+                            styleUri = styleUri,
                             fogOfWar = fogOfWar,
                             startupController = startupController,
                             fogLayerController = fogLayerController,
@@ -384,6 +388,7 @@ private fun LegacyMapLibreMap(
 
 @SuppressLint("MissingPermission")
 private fun MapView.configureLocationAwareMap(
+    styleUri: String,
     fogOfWar: FogOfWarRenderState,
     startupController: MapLocationStartupController,
     fogLayerController: NativeFogOfWarLayerController,
@@ -394,7 +399,7 @@ private fun MapView.configureLocationAwareMap(
         if (startupController.isReleased) return@getMapAsync
 
         map.configureUiSettings()
-        map.setStyleDefinition(DEFAULT_VIEW_MAP_STYLE_ASSET_URI) { style ->
+        map.setStyleDefinition(styleUri) { style ->
             if (startupController.isReleased) return@setStyleDefinition
 
             fogLayerController.attach(style)

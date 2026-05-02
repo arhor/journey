@@ -28,6 +28,7 @@ sealed interface MapUiState {
         val explorationTrackingStatus: ExplorationTrackingStatus,
         val isStartupSplashVisible: Boolean,
         @StringRes val startupSplashMessage: Int,
+        val mapStyleUri: String,
         val visibleObjects: List<MapObjectUiModel>,
         val selectedWatchtower: WatchtowerSheetUiState?,
         val fogOfWar: FogOfWarUiState,

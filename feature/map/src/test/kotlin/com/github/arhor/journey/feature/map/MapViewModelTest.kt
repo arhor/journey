@@ -14,6 +14,7 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.Watchtower
@@ -25,6 +26,7 @@ import com.github.arhor.journey.domain.model.error.ClaimWatchtowerError
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.model.error.UpgradeWatchtowerError
 import com.github.arhor.journey.domain.model.error.UseCaseError
+import com.github.arhor.journey.domain.repository.AppSettingsRepository
 import com.github.arhor.journey.domain.usecase.ClaimWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.GetPackedExploredTilesUseCase
@@ -34,6 +36,7 @@ import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsU
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
@@ -58,6 +61,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -75,6 +79,26 @@ import kotlin.math.ceil
 import kotlin.math.sqrt
 
 class MapViewModelTest {
+
+    @Test
+    fun `uiState should expose selected map style uri`() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+
+        // Given
+        val fixture = createFixture(
+            selectedMapStyle = MapStyle.styleById("light")!!,
+        )
+
+        try {
+            // When
+            val actual = fixture.viewModel.awaitContent()
+
+            // Then
+            actual.mapStyleUri shouldBe "asset://map/styles/light.json"
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
 
     @Test
     fun `uiState should include resource spawns when query window contains them`() = runTest {
@@ -2379,6 +2403,7 @@ class MapViewModelTest {
         observeExploredTilesFlowFactory: ((ExplorationTileRange) -> Flow<Set<MapTile>>)? = null,
         getExploredTilesOverride: (suspend (ExplorationTileRange) -> Set<MapTile>)? = null,
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
+        selectedMapStyle: MapStyle = MapStyle.defaultStyle,
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: Output<Unit, StartExplorationTrackingSessionError> = Output.Success(Unit),
         claimWatchtowerResult: Output<WatchtowerState, ClaimWatchtowerError> = Output.Success(
@@ -2410,6 +2435,7 @@ class MapViewModelTest {
         val getWatchtower = mockk<GetWatchtowerUseCase>()
         val getPackedExploredTiles = mockk<GetPackedExploredTilesUseCase>()
         val getExplorationTileRuntimeConfig = mockk<GetExplorationTileRuntimeConfigUseCase>()
+        val appSettingsRepository = FakeAppSettingsRepository(selectedMapStyle)
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
@@ -2466,6 +2492,7 @@ class MapViewModelTest {
                 upgradeWatchtower = upgradeWatchtower,
                 getWatchtower = getWatchtower,
                 getExplorationTileRuntimeConfig = getExplorationTileRuntimeConfig,
+                observeSelectedMapStyle = ObserveSelectedMapStyleUseCase(appSettingsRepository),
                 fogOfWarControllerFactory = { scope ->
                     FogOfWarController(
                         observeExplorationTileRuntimeConfig = observeExplorationTileRuntimeConfig,
@@ -2494,6 +2521,20 @@ class MapViewModelTest {
             getPackedExploredTiles = getPackedExploredTiles,
             startTrackingSession = startTrackingSession,
         )
+    }
+
+    private class FakeAppSettingsRepository(
+        private val selectedMapStyle: MapStyle,
+    ) : AppSettingsRepository {
+
+        override fun observeAvailableMapStyles() =
+            flowOf(Output.Success(MapStyle.availableStyles))
+
+        override fun observeSelectedMapStyle() =
+            flowOf(Output.Success(selectedMapStyle))
+
+        override suspend fun setSelectedMapStyle(styleId: String) =
+            Output.Success(Unit)
     }
 
     private fun resourceSpawn(

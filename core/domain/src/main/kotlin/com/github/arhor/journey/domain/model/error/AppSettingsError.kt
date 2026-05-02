@@ -8,4 +8,9 @@ interface AppSettingsError : DomainError {
         override val cause: Throwable? = null,
         override val message: String? = null,
     ) : AppSettingsError
+
+    data class SavingFailed(
+        override val cause: Throwable? = null,
+        override val message: String? = null,
+    ) : AppSettingsError
 }

@@ -15,6 +15,7 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
+import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.Watchtower
@@ -27,6 +28,7 @@ import com.github.arhor.journey.domain.usecase.GetWatchtowerUseCase
 import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveHeroResourceAmountUseCase
+import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.ObserveVisibleWatchtowersUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.UpgradeWatchtowerUseCase
@@ -93,6 +95,7 @@ class MapViewModel @Inject constructor(
     private val upgradeWatchtower: UpgradeWatchtowerUseCase,
     private val getWatchtower: GetWatchtowerUseCase,
     private val getExplorationTileRuntimeConfig: GetExplorationTileRuntimeConfigUseCase,
+    private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val fogOfWarControllerFactory: FogOfWarController.Factory,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
@@ -135,6 +138,12 @@ class MapViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = Output.Success(VisibleWatchtowerData()),
         )
+    private val selectedMapStyle = observeSelectedMapStyle()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = Output.Success(MapStyle.defaultStyle),
+        )
 
     private var cachedVisibleObjects: List<MapObjectUiModel> = emptyList()
 
@@ -157,14 +166,23 @@ class MapViewModel @Inject constructor(
                 )
             },
             watchtowerResourceAmounts,
-            observeVisibleWorldObjects(),
-        ) { inputs, watchtowerResourceAmounts, visibleWorldObjects ->
+            combine(
+                observeVisibleWorldObjects(),
+                selectedMapStyle,
+            ) { visibleWorldObjects, selectedMapStyle ->
+                UiStateStyleInputs(
+                    visibleWorldObjectsOutput = visibleWorldObjects,
+                    selectedMapStyleOutput = selectedMapStyle,
+                )
+            },
+        ) { inputs, watchtowerResourceAmounts, styleInputs ->
             intoBaseUiState(
                 state = inputs.state,
                 trackingSessionOutput = inputs.trackingSessionOutput,
                 fogOfWar = inputs.fogOfWar,
-                visibleWorldObjectsOutput = visibleWorldObjects,
+                visibleWorldObjectsOutput = styleInputs.visibleWorldObjectsOutput,
                 watchtowerResourceAmountsOutput = watchtowerResourceAmounts,
+                selectedMapStyleOutput = styleInputs.selectedMapStyleOutput,
             )
         }
             .catch {
@@ -391,6 +409,7 @@ class MapViewModel @Inject constructor(
         fogOfWar: FogOfWarUiState,
         visibleWorldObjectsOutput: Output<VisibleWorldObjects, DomainError>,
         watchtowerResourceAmountsOutput: Output<Map<String, Int>, DomainError>,
+        selectedMapStyleOutput: Output<MapStyle, DomainError>,
     ): MapBaseUiState = if (state.failureMessage == null) {
         val trackingSession = when (trackingSessionOutput) {
             is Output.Success -> trackingSessionOutput.value
@@ -413,6 +432,14 @@ class MapViewModel @Inject constructor(
             is Output.Failure -> {
                 return MapBaseUiState.Failure(
                     errorMessage = watchtowerResourceAmountsOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
+                )
+            }
+        }
+        val selectedMapStyle = when (selectedMapStyleOutput) {
+            is Output.Success -> selectedMapStyleOutput.value
+            is Output.Failure -> {
+                return MapBaseUiState.Failure(
+                    errorMessage = selectedMapStyleOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
                 )
             }
         }
@@ -451,6 +478,7 @@ class MapViewModel @Inject constructor(
             explorationTrackingStatus = trackingSession.status,
             isStartupSplashVisible = state.startupGate.isSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
+            mapStyleUri = selectedMapStyle.value,
             visibleObjects = resolvedVisibleObjects,
             selectedWatchtower = selectedWatchtower,
             fogOfWar = fogOfWar,
@@ -469,6 +497,7 @@ class MapViewModel @Inject constructor(
                 explorationTrackingStatus = explorationTrackingStatus,
                 isStartupSplashVisible = isStartupSplashVisible,
                 startupSplashMessage = startupSplashMessage,
+                mapStyleUri = mapStyleUri,
                 visibleObjects = visibleObjects,
                 selectedWatchtower = selectedWatchtower,
                 fogOfWar = fogOfWar,
@@ -796,6 +825,7 @@ class MapViewModel @Inject constructor(
             val explorationTrackingStatus: ExplorationTrackingStatus,
             val isStartupSplashVisible: Boolean,
             val startupSplashMessage: Int,
+            val mapStyleUri: String,
             val visibleObjects: List<MapObjectUiModel>,
             val selectedWatchtower: WatchtowerSheetUiState?,
             val fogOfWar: FogOfWarUiState,
@@ -807,6 +837,12 @@ class MapViewModel @Inject constructor(
         val state: State,
         val fogOfWar: FogOfWarUiState,
         val trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
+    )
+
+    @Immutable
+    private data class UiStateStyleInputs(
+        val visibleWorldObjectsOutput: Output<VisibleWorldObjects, DomainError>,
+        val selectedMapStyleOutput: Output<MapStyle, DomainError>,
     )
 
     @Immutable

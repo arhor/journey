@@ -5,10 +5,12 @@ import com.github.arhor.journey.data.mapobject.MapObjectAreaSource
 import com.github.arhor.journey.data.mapobject.WatchtowerDefinitionTileSource
 import com.github.arhor.journey.data.repository.DeterministicResourceSpawnRepository
 import com.github.arhor.journey.data.repository.DeterministicWatchtowerRepository
+import com.github.arhor.journey.data.repository.DataStoreAppSettingsRepository
 import com.github.arhor.journey.data.repository.RoomCollectedResourceSpawnRepository
 import com.github.arhor.journey.data.repository.RoomExplorationTileRepository
 import com.github.arhor.journey.data.repository.RoomHeroRepository
 import com.github.arhor.journey.data.repository.RoomHeroResourcesRepository
+import com.github.arhor.journey.domain.repository.AppSettingsRepository
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
@@ -55,5 +57,9 @@ interface RepositoryModule {
     @Binds
     fun bindWatchtowerRepository(impl: DeterministicWatchtowerRepository)
         : WatchtowerRepository
+
+    @Binds
+    fun bindAppSettingsRepository(impl: DataStoreAppSettingsRepository)
+        : AppSettingsRepository
 
 }
