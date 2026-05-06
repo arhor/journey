@@ -2,7 +2,8 @@
 
 #include <android/log.h>
 
-#include <cmath>
+#include <algorithm>
+#include <limits>
 #include <utility>
 
 #include "assets/AssetReader.hpp"
@@ -14,10 +15,10 @@
 namespace {
 
 constexpr const char* LOG_TAG = "NativeModelLayer";
-constexpr double kMarkerLatitude = 54.3744505;
-constexpr double kMarkerLongitude = 18.6502754;
-constexpr double kEarthRadiusMeters = 6378137.0;
-constexpr double kModelScaleMeters = 95.0;
+constexpr double kMarkerLatitude = 54.3738000;
+constexpr double kMarkerLongitude = 18.6508750;
+constexpr double kModelScaleMeters = 45.0;
+constexpr double kBillboardVerticalOffsetNdc = -0.15;
 
 constexpr const char* kVertexShaderSource = R"(#version 300 es
 layout(location = 0) in vec3 a_pos;
@@ -37,25 +38,17 @@ uniform sampler2D u_texture;
 out highp vec4 fragColor;
 
 void main() {
-    fragColor = texture(u_texture, v_uv);
+    vec4 sampled = texture(u_texture, v_uv);
+    fragColor = vec4(sampled.rgb, 1.0);
 }
 )";
 
-struct GeoOffset {
-    double longitude;
-    double latitude;
+struct NdcBounds {
+    double minX = std::numeric_limits<double>::max();
+    double minY = std::numeric_limits<double>::max();
+    double maxX = std::numeric_limits<double>::lowest();
+    double maxY = std::numeric_limits<double>::lowest();
 };
-
-GeoOffset offsetMeters(double longitude, double latitude, double eastMeters, double northMeters) {
-    constexpr double radiansToDegrees = 180.0 / 3.14159265358979323846264338327950288;
-    constexpr double degreesToRadians = 3.14159265358979323846264338327950288 / 180.0;
-    const double dLat = northMeters / kEarthRadiusMeters;
-    const double dLon = eastMeters / (kEarthRadiusMeters * std::cos(latitude * degreesToRadians));
-    return GeoOffset{
-            .longitude = longitude + dLon * radiansToDegrees,
-            .latitude = latitude + dLat * radiansToDegrees,
-    };
-}
 
 }  // namespace
 
@@ -87,7 +80,8 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         return;
     }
 
-    if (!didLogFirstRender_) {
+    const bool shouldLogFirstRender = !didLogFirstRender_;
+    if (shouldLogFirstRender) {
         __android_log_print(
                 ANDROID_LOG_INFO,
                 LOG_TAG,
@@ -112,6 +106,47 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         return;
     }
 
+    if (shouldLogFirstRender) {
+        NdcBounds bounds;
+        for (size_t vertexOffset = 0; vertexOffset < vertices.size(); vertexOffset += 5) {
+            bounds.minX = std::min(bounds.minX, static_cast<double>(vertices[vertexOffset]));
+            bounds.maxX = std::max(bounds.maxX, static_cast<double>(vertices[vertexOffset]));
+            bounds.minY = std::min(bounds.minY, static_cast<double>(vertices[vertexOffset + 1]));
+            bounds.maxY = std::max(bounds.maxY, static_cast<double>(vertices[vertexOffset + 1]));
+        }
+        __android_log_print(
+                ANDROID_LOG_INFO,
+                LOG_TAG,
+                "projected bounds ndc=(%.3f, %.3f)-(%.3f, %.3f)",
+                bounds.minX,
+                bounds.minY,
+                bounds.maxX,
+                bounds.maxY
+        );
+    }
+
+    GLint previousProgram = 0;
+    GLint previousArrayBuffer = 0;
+    GLint previousActiveTexture = 0;
+    GLint previousTexture2d = 0;
+    GLint previousBlendSrcRgb = 0;
+    GLint previousBlendDstRgb = 0;
+    GLint previousBlendSrcAlpha = 0;
+    GLint previousBlendDstAlpha = 0;
+    const GLboolean wasStencilEnabled = glIsEnabled(GL_STENCIL_TEST);
+    const GLboolean wasDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
+    const GLboolean wasCullEnabled = glIsEnabled(GL_CULL_FACE);
+    const GLboolean wasBlendEnabled = glIsEnabled(GL_BLEND);
+    glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &previousArrayBuffer);
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &previousActiveTexture);
+    glGetIntegerv(GL_BLEND_SRC_RGB, &previousBlendSrcRgb);
+    glGetIntegerv(GL_BLEND_DST_RGB, &previousBlendDstRgb);
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &previousBlendSrcAlpha);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &previousBlendDstAlpha);
+    glActiveTexture(GL_TEXTURE0);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture2d);
+
     glUseProgram(program_.handle());
     texture_.bind(GL_TEXTURE0);
     const GLint textureUniform = glGetUniformLocation(program_.handle(), "u_texture");
@@ -133,15 +168,43 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
 
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDrawArrays(GL_TRIANGLES, 0, vertexCount_);
 
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glUseProgram(0);
+    if (wasStencilEnabled) {
+        glEnable(GL_STENCIL_TEST);
+    } else {
+        glDisable(GL_STENCIL_TEST);
+    }
+    if (wasDepthEnabled) {
+        glEnable(GL_DEPTH_TEST);
+    } else {
+        glDisable(GL_DEPTH_TEST);
+    }
+    if (wasCullEnabled) {
+        glEnable(GL_CULL_FACE);
+    } else {
+        glDisable(GL_CULL_FACE);
+    }
+    if (wasBlendEnabled) {
+        glEnable(GL_BLEND);
+    } else {
+        glDisable(GL_BLEND);
+    }
+    glBlendFuncSeparate(
+            static_cast<GLenum>(previousBlendSrcRgb),
+            static_cast<GLenum>(previousBlendDstRgb),
+            static_cast<GLenum>(previousBlendSrcAlpha),
+            static_cast<GLenum>(previousBlendDstAlpha)
+    );
+    glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(previousArrayBuffer));
+    glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previousTexture2d));
+    glActiveTexture(static_cast<GLenum>(previousActiveTexture));
+    glUseProgram(static_cast<GLuint>(previousProgram));
     custom_map_layers::rendering::logGlErrors("render", LOG_TAG);
 }
 
@@ -202,22 +265,22 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(
 ) const {
     std::vector<GLfloat> vertices;
     vertices.reserve(model_.triangleVertices.size() * 5);
+    const custom_map_layers::geo::ScreenPoint marker =
+            custom_map_layers::geo::projectToNdc(
+                    kMarkerLongitude,
+                    kMarkerLatitude,
+                    0.0,
+                    params
+            );
+    const double horizontalNdcPerMeter = 2.0 / params.width;
+    const double verticalNdcPerMeter = 2.0 / params.height;
 
     for (const custom_map_layers::gltf::ModelVertex& vertex : model_.triangleVertices) {
-        const double eastMeters = static_cast<double>(vertex.x) * kModelScaleMeters;
-        const double northMeters = static_cast<double>(-vertex.z) * kModelScaleMeters;
-        const double altitudeMeters = static_cast<double>(vertex.y) * kModelScaleMeters;
-        const GeoOffset geo = offsetMeters(kMarkerLongitude, kMarkerLatitude, eastMeters, northMeters);
-        const custom_map_layers::geo::ScreenPoint projected =
-                custom_map_layers::geo::projectToNdc(
-                        geo.longitude,
-                        geo.latitude,
-                        altitudeMeters,
-                        params
-                );
+        const double horizontalMeters = static_cast<double>(vertex.x) * kModelScaleMeters;
+        const double verticalMeters = static_cast<double>(vertex.y) * kModelScaleMeters;
 
-        vertices.push_back(static_cast<GLfloat>(projected.x));
-        vertices.push_back(static_cast<GLfloat>(projected.y));
+        vertices.push_back(static_cast<GLfloat>(marker.x + horizontalMeters * horizontalNdcPerMeter));
+        vertices.push_back(static_cast<GLfloat>(marker.y + kBillboardVerticalOffsetNdc - verticalMeters * verticalNdcPerMeter));
         vertices.push_back(0.0f);
         vertices.push_back(vertex.u);
         vertices.push_back(vertex.v);

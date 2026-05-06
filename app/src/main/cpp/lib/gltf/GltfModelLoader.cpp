@@ -57,6 +57,7 @@ void appendPrimitive(
     }
 
     const cgltf_size indexCount = primitive.indices->count;
+    const size_t initialVertexCount = vertices.size();
     vertices.reserve(vertices.size() + static_cast<size_t>(indexCount));
 
     for (cgltf_size i = 0; i < indexCount; ++i) {
@@ -65,8 +66,12 @@ void appendPrimitive(
         float position[3] = {0.0f, 0.0f, 0.0f};
         float texcoord[2] = {0.0f, 0.0f};
         float transformed[3] = {0.0f, 0.0f, 0.0f};
-        cgltf_accessor_read_float(positionAccessor, vertexIndex, position, 3);
-        cgltf_accessor_read_float(texcoordAccessor, vertexIndex, texcoord, 2);
+        if (!cgltf_accessor_read_float(positionAccessor, vertexIndex, position, 3) ||
+            !cgltf_accessor_read_float(texcoordAccessor, vertexIndex, texcoord, 2)) {
+            __android_log_write(ANDROID_LOG_ERROR, logTag, "Failed to read primitive vertex accessors");
+            vertices.resize(initialVertexCount);
+            return;
+        }
         transformPosition(matrix, position, transformed);
 
         vertices.push_back(ModelVertex{
@@ -135,6 +140,12 @@ std::optional<LoadedModel> GltfModelLoader::loadTiger(const char* logTag) const 
     );
     if (parseResult != cgltf_result_success || data == nullptr) {
         __android_log_print(ANDROID_LOG_ERROR, logTag, "cgltf_parse failed: %d", parseResult);
+        return std::nullopt;
+    }
+    const cgltf_result loadBuffersResult = cgltf_load_buffers(&options, data, nullptr);
+    if (loadBuffersResult != cgltf_result_success) {
+        __android_log_print(ANDROID_LOG_ERROR, logTag, "cgltf_load_buffers failed: %d", loadBuffersResult);
+        cgltf_free(data);
         return std::nullopt;
     }
 
