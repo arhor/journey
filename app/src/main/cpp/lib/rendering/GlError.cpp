@@ -28,7 +28,7 @@ const char* glErrorName(GLenum error) {
     }
 }
 
-} // namespace
+}  // namespace
 
 void logGlErrors(const char* operation, const char* logTag) {
     GLenum error = GL_NO_ERROR;
@@ -37,4 +37,4 @@ void logGlErrors(const char* operation, const char* logTag) {
     }
 }
 
-} // namespace custom_map_layers::rendering
+}  // namespace custom_map_layers::rendering

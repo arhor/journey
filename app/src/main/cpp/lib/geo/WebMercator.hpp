@@ -20,4 +20,4 @@ ScreenPoint projectToNdc(
         const mbgl::style::CustomLayerRenderParameters& parameters
 );
 
-} // namespace custom_map_layers::geo
+}  // namespace custom_map_layers::geo

@@ -109,7 +109,7 @@ fun MapLibreViewMapScreen(
         LegacyMapLibreMap(
             modifier = modifier,
             styleUri = styleUri,
-            fogOfWar = fogOfWar,
+//            fogOfWar = fogOfWar,
             onViewportChanged = onViewportChanged,
             onCameraGestureStarted = onCameraGestureStarted,
             onCameraSettled = onCameraSettled,
@@ -255,7 +255,7 @@ private fun LocationPermissionDeniedScreen(
 private fun LegacyMapLibreMap(
     modifier: Modifier = Modifier,
     styleUri: String,
-    fogOfWar: FogOfWarRenderState,
+//    fogOfWar: FogOfWarRenderState,
     onViewportChanged: (GeoBounds) -> Unit,
     onCameraGestureStarted: (CameraPositionState) -> Unit,
     onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit,
@@ -284,7 +284,7 @@ private fun LegacyMapLibreMap(
                 factory = { context ->
                     MapLibre.getInstance(context)
 
-                    val fogLayerController = NativeFogOfWarLayerController()
+//                    val fogLayerController = NativeFogOfWarLayerController()
                     val viewportReporter = NativeMapViewportReporter(
                         onViewportChanged = { bounds ->
                             currentOnViewportChanged(bounds)
@@ -346,7 +346,7 @@ private fun LegacyMapLibreMap(
                             startupController = startupController,
                             startupGateController = startupGateController,
                             renderReadinessListeners = renderReadinessListeners,
-                            fogLayerController = fogLayerController,
+//                            fogLayerController = fogLayerController,
                             viewportReporter = viewportReporter,
                             cameraGestureController = cameraGestureController,
                             loadFailureListener = loadFailureListener,
@@ -355,9 +355,9 @@ private fun LegacyMapLibreMap(
                         mapView.addOnDidFailLoadingMapListener(loadFailureListener)
                         mapView.configureLocationAwareMap(
                             styleUri = styleUri,
-                            fogOfWar = fogOfWar,
+//                            fogOfWar = fogOfWar,
                             startupController = startupController,
-                            fogLayerController = fogLayerController,
+//                            fogLayerController = fogLayerController,
                             viewportReporter = viewportReporter,
                             cameraGestureController = cameraGestureController,
                         )
@@ -365,7 +365,7 @@ private fun LegacyMapLibreMap(
                 },
                 update = { mapView ->
                     mapViewHandles[mapView]?.let { handle ->
-                        handle.fogLayerController.update(fogOfWar)
+//                        handle.fogLayerController.update(fogOfWar)
                     }
                 },
                 onRelease = { mapView ->
@@ -389,9 +389,9 @@ private fun LegacyMapLibreMap(
 @SuppressLint("MissingPermission")
 private fun MapView.configureLocationAwareMap(
     styleUri: String,
-    fogOfWar: FogOfWarRenderState,
+//    fogOfWar: FogOfWarRenderState,
     startupController: MapLocationStartupController,
-    fogLayerController: NativeFogOfWarLayerController,
+//    fogLayerController: NativeFogOfWarLayerController,
     viewportReporter: NativeMapViewportReporter,
     cameraGestureController: NativeCameraGestureController,
 ) {
@@ -402,8 +402,11 @@ private fun MapView.configureLocationAwareMap(
         map.setStyleDefinition(styleUri) { style ->
             if (startupController.isReleased) return@setStyleDefinition
 
-            fogLayerController.attach(style)
-            fogLayerController.update(fogOfWar)
+//            fogLayerController.attach(style)
+//            fogLayerController.update(fogOfWar)
+
+            NativeExclamationLayer.addTo(map, style)
+
             viewportReporter.attach(map)
 
             val locationEngine = ForwardingLocationEngine(context) { location ->
@@ -453,6 +456,19 @@ private fun MapLibreMap.configureUiSettings() {
     }
 }
 
+//private fun MapLibreMap.moveToExclamationCamera() {
+//    moveCamera(
+//        CameraUpdateFactory.newCameraPosition(
+//            CameraPosition.Builder()
+//                .target(LatLng(EXCLAMATION_LATITUDE, EXCLAMATION_LONGITUDE))
+//                .zoom(EXCLAMATION_CAMERA_ZOOM)
+//                .tilt(EXCLAMATION_CAMERA_TILT)
+//                .bearing(EXCLAMATION_CAMERA_BEARING)
+//                .build(),
+//        ),
+//    )
+//}
+
 private fun MapLibreMap.setStyleDefinition(
     style: String,
     onStyleLoaded: Style.OnStyleLoaded,
@@ -471,7 +487,7 @@ private data class MapViewHandle(
     val startupController: MapLocationStartupController,
     val startupGateController: MapStartupGateController,
     val renderReadinessListeners: MapRenderReadinessListeners,
-    val fogLayerController: NativeFogOfWarLayerController,
+//    val fogLayerController: NativeFogOfWarLayerController,
     val viewportReporter: NativeMapViewportReporter,
     val cameraGestureController: NativeCameraGestureController,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,

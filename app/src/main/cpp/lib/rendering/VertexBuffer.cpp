@@ -40,4 +40,4 @@ GLuint VertexBuffer::handle() const {
     return buffer_;
 }
 
-} // namespace custom_map_layers::rendering
+}  // namespace custom_map_layers::rendering

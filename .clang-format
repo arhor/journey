@@ -1,0 +1,57 @@
+BasedOnStyle: Google
+
+Language: Cpp
+Standard: Latest
+
+IndentWidth: 4
+ContinuationIndentWidth: 8
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+
+BreakBeforeBraces: Attach
+NamespaceIndentation: None
+
+AccessModifierOffset: -4
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+AlignAfterOpenBracket: BlockIndent
+
+# Keep calls/declarations on one line while they fit under ColumnLimit.
+# Once they wrap, put one argument/parameter per line instead of packing them.
+BinPackArguments: false
+BinPackParameters: OnePerLine
+
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# Do not force multiline function definitions when the signature fits.
+# If your clang-format version complains about this option, remove it.
+BreakFunctionDefinitionParameters: false
+
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+
+SortIncludes: true
+IncludeBlocks: Regroup
+
+Cpp11BracedListStyle: true
+IndentCaseLabels: true
+
+SpaceAfterCStyleCast: true
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpaceBeforeParens: ControlStatements
+
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+
+ReflowComments: true
+
+

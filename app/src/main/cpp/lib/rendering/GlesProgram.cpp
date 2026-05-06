@@ -1,12 +1,12 @@
 #include "GlesProgram.hpp"
 
-#include "GlError.hpp"
-
 #include <android/log.h>
 
 #include <algorithm>
 #include <cstddef>
 #include <string>
+
+#include "GlError.hpp"
 
 namespace custom_map_layers::rendering {
 
@@ -61,7 +61,7 @@ GLuint compileShader(GLenum type, const char* source, const char* label, const c
     return shader;
 }
 
-} // namespace
+}  // namespace
 
 bool GlesProgram::create(const char* vertexShaderSource, const char* fragmentShaderSource, const char* logTag) {
     reset();
@@ -123,4 +123,4 @@ GLuint GlesProgram::handle() const {
     return program_;
 }
 
-} // namespace custom_map_layers::rendering
+}  // namespace custom_map_layers::rendering

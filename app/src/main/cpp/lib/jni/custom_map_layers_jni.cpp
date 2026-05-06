@@ -1,15 +1,15 @@
-#include "layers/exclamation/ExclamationLayer.hpp"
-
 #include <android/log.h>
 #include <jni.h>
 
 #include <memory>
 
+#include "layers/exclamation/ExclamationLayer.hpp"
+
 namespace {
 
 constexpr const char* LOG_TAG = "NativeExclamationLayer";
 
-} // namespace
+}  // namespace
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_github_arhor_journey_feature_map_viewinterop_NativeExclamationLayer_nativeCreateContext(

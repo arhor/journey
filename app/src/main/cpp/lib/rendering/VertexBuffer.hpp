@@ -26,4 +26,4 @@ private:
     GLuint buffer_ = 0;
 };
 
-} // namespace custom_map_layers::rendering
+}  // namespace custom_map_layers::rendering

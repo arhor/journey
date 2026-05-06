@@ -1,11 +1,11 @@
 #include "layers/exclamation/ExclamationLayer.hpp"
 
-#include "geo/WebMercator.hpp"
-#include "rendering/GlError.hpp"
-
 #include <android/log.h>
 
 #include <cmath>
+
+#include "geo/WebMercator.hpp"
+#include "rendering/GlError.hpp"
 
 namespace {
 
@@ -38,12 +38,7 @@ using custom_map_layers::geo::metersToMercatorUnits;
 using custom_map_layers::geo::projectToNdc;
 using custom_map_layers::geo::ScreenPoint;
 
-void appendTriangle(
-        std::vector<GLfloat>& vertices,
-        const ScreenPoint& a,
-        const ScreenPoint& b,
-        const ScreenPoint& c
-) {
+void appendTriangle(std::vector<GLfloat>& vertices, const ScreenPoint& a, const ScreenPoint& b, const ScreenPoint& c) {
     vertices.push_back(static_cast<GLfloat>(a.x));
     vertices.push_back(static_cast<GLfloat>(a.y));
     vertices.push_back(0.0f);
@@ -78,20 +73,9 @@ void appendVerticalBillboardRect(
     constexpr double tileSize = 512.0;
     const double worldSize = tileSize * std::pow(2.0, params.zoom);
     const double halfWidthNdc =
-            halfWidthMeters * metersToMercatorUnits(1.0, centerLatitude) * worldSize * 2.0 /
-            params.width;
-    const ScreenPoint bottomCenter = projectToNdc(
-            centerLongitude,
-            centerLatitude,
-            bottomMeters,
-            params
-    );
-    const ScreenPoint topCenter = projectToNdc(
-            centerLongitude,
-            centerLatitude,
-            topMeters,
-            params
-    );
+            halfWidthMeters * metersToMercatorUnits(1.0, centerLatitude) * worldSize * 2.0 / params.width;
+    const ScreenPoint bottomCenter = projectToNdc(centerLongitude, centerLatitude, bottomMeters, params);
+    const ScreenPoint topCenter = projectToNdc(centerLongitude, centerLatitude, topMeters, params);
     const ScreenPoint bottomLeft{.x = bottomCenter.x - halfWidthNdc, .y = bottomCenter.y};
     const ScreenPoint bottomRight{.x = bottomCenter.x + halfWidthNdc, .y = bottomCenter.y};
     const ScreenPoint topRight{.x = topCenter.x + halfWidthNdc, .y = topCenter.y};
@@ -99,9 +83,7 @@ void appendVerticalBillboardRect(
     appendQuad(vertices, bottomLeft, bottomRight, topRight, topLeft);
 }
 
-std::vector<GLfloat> buildExclamationMark(
-        const mbgl::style::CustomLayerRenderParameters& params
-) {
+std::vector<GLfloat> buildExclamationMark(const mbgl::style::CustomLayerRenderParameters& params) {
     std::vector<GLfloat> vertices;
     vertices.reserve(12 * 3);
     appendVerticalBillboardRect(
@@ -125,7 +107,7 @@ std::vector<GLfloat> buildExclamationMark(
     return vertices;
 }
 
-} // namespace
+}  // namespace
 
 namespace custom_map_layers::layers::exclamation {
 
@@ -205,4 +187,4 @@ void ExclamationLayer::resetState() {
     didLogFirstRender_ = false;
 }
 
-} // namespace custom_map_layers::layers::exclamation
+}  // namespace custom_map_layers::layers::exclamation
