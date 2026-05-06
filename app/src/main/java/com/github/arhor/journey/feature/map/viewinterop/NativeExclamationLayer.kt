@@ -6,10 +6,8 @@ import org.maplibre.android.style.layers.CustomLayer
 
 internal object NativeExclamationLayer {
     private const val LAYER_ID = "native-exclamation-layer"
-
-    init {
-        System.loadLibrary("custom-map-layers")
-    }
+    @Volatile
+    private var isNativeLibraryLoaded = false
 
     fun addTo(map: MapLibreMap, style: Style) {
         val context = createContext()
@@ -30,6 +28,7 @@ internal object NativeExclamationLayer {
     internal fun layerId(): String = LAYER_ID
 
     private fun createContext(): Long {
+        ensureNativeLibraryLoaded()
         return nativeCreateContext()
     }
 
@@ -37,7 +36,23 @@ internal object NativeExclamationLayer {
         if (context == 0L) {
             return
         }
+        ensureNativeLibraryLoaded()
         nativeDestroyContext(context)
+    }
+
+    private fun ensureNativeLibraryLoaded() {
+        if (isNativeLibraryLoaded) {
+            return
+        }
+
+        synchronized(this) {
+            if (isNativeLibraryLoaded) {
+                return
+            }
+
+            System.loadLibrary("custom-map-layers")
+            isNativeLibraryLoaded = true
+        }
     }
 
     @JvmStatic
