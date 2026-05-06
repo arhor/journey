@@ -12,13 +12,15 @@ internal object NativeExclamationLayer {
     fun addTo(map: MapLibreMap, style: Style) {
         val context = createContext()
         var customLayer: CustomLayer? = null
+        var layerAdded = false
 
         try {
             customLayer = CustomLayer(LAYER_ID, context)
             style.addLayer(customLayer)
+            layerAdded = true
             map.triggerRepaint()
         } catch (throwable: Throwable) {
-            if (customLayer == null) {
+            if (!layerAdded) {
                 destroyContext(context)
             }
             throw throwable
