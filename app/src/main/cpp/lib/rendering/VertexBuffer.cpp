@@ -4,10 +4,6 @@
 
 namespace custom_map_layers::rendering {
 
-VertexBuffer::~VertexBuffer() {
-    reset();
-}
-
 bool VertexBuffer::create(const char* logTag) {
     reset();
     glGenBuffers(1, &buffer_);
@@ -33,6 +29,10 @@ void VertexBuffer::reset() {
     if (buffer_ != 0) {
         glDeleteBuffers(1, &buffer_);
     }
+    forget();
+}
+
+void VertexBuffer::forget() {
     buffer_ = 0;
 }
 

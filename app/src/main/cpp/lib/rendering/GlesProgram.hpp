@@ -7,13 +7,14 @@ namespace custom_map_layers::rendering {
 class GlesProgram {
 public:
     GlesProgram() = default;
-    ~GlesProgram();
+    ~GlesProgram() = default;
 
     GlesProgram(const GlesProgram&) = delete;
     GlesProgram& operator=(const GlesProgram&) = delete;
 
     bool create(const char* vertexShaderSource, const char* fragmentShaderSource, const char* logTag);
     void reset();
+    void forget();
 
     [[nodiscard]] GLuint handle() const;
 

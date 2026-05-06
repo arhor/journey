@@ -9,7 +9,7 @@ namespace custom_map_layers::rendering {
 class VertexBuffer {
 public:
     VertexBuffer() = default;
-    ~VertexBuffer();
+    ~VertexBuffer() = default;
 
     VertexBuffer(const VertexBuffer&) = delete;
     VertexBuffer& operator=(const VertexBuffer&) = delete;
@@ -18,6 +18,7 @@ public:
     void upload(const std::vector<GLfloat>& vertices) const;
     void bind() const;
     void reset();
+    void forget();
 
     [[nodiscard]] GLuint handle() const;
 

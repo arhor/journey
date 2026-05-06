@@ -63,10 +63,6 @@ GLuint compileShader(GLenum type, const char* source, const char* label, const c
 
 } // namespace
 
-GlesProgram::~GlesProgram() {
-    reset();
-}
-
 bool GlesProgram::create(const char* vertexShaderSource, const char* fragmentShaderSource, const char* logTag) {
     reset();
 
@@ -114,6 +110,10 @@ void GlesProgram::reset() {
         glDeleteProgram(program_);
     }
 
+    forget();
+}
+
+void GlesProgram::forget() {
     program_ = 0;
     vertexShader_ = 0;
     fragmentShader_ = 0;

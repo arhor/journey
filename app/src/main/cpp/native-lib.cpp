@@ -237,8 +237,8 @@ void main() {
 
         void contextLost() override {
             __android_log_write(ANDROID_LOG_INFO, LOG_TAG, "contextLost");
-            program_.reset();
-            vertexBuffer_.reset();
+            program_.forget();
+            vertexBuffer_.forget();
             resetHandles();
         }
 
