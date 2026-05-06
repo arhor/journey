@@ -3,11 +3,12 @@
 #include <jni.h>
 
 #include "custom_map_layers/maplibre/custom_layer_host.hpp"
+#include "lib/rendering/GlesProgram.hpp"
+#include "lib/rendering/GlError.hpp"
+#include "lib/rendering/VertexBuffer.hpp"
 
 #include <cmath>
-#include <cstddef>
 #include <memory>
-#include <string>
 #include <vector>
 
 namespace {
@@ -37,82 +38,6 @@ void main() {
     fragColor = vec4(1.0, 0.0, 0.0, 1.0);
 }
 )";
-
-    const char *glErrorName(GLenum error) {
-        switch (error) {
-            case GL_INVALID_ENUM:
-                return "GL_INVALID_ENUM";
-            case GL_INVALID_VALUE:
-                return "GL_INVALID_VALUE";
-            case GL_INVALID_OPERATION:
-                return "GL_INVALID_OPERATION";
-            case GL_INVALID_FRAMEBUFFER_OPERATION:
-                return "GL_INVALID_FRAMEBUFFER_OPERATION";
-            case GL_OUT_OF_MEMORY:
-                return "GL_OUT_OF_MEMORY";
-#ifdef GL_CONTEXT_LOST
-                case GL_CONTEXT_LOST:
-                    return "GL_CONTEXT_LOST";
-#endif
-            default:
-                return "GL_UNKNOWN";
-        }
-    }
-
-    void logGlErrors(const char *operation) {
-        GLenum error = GL_NO_ERROR;
-        while ((error = glGetError()) != GL_NO_ERROR) {
-            __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "%s: %s", operation, glErrorName(error));
-        }
-    }
-
-    bool checkShader(GLuint shader, const char *label) {
-        GLint compiled = GL_FALSE;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
-        if (compiled == GL_TRUE) {
-            return true;
-        }
-
-        GLint length = 0;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
-        std::string log(static_cast<std::size_t>(std::max(length, 1)), '\0');
-        glGetShaderInfoLog(shader, length, nullptr, log.data());
-        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "%s shader compile failed: %s", label, log.c_str());
-        return false;
-    }
-
-    bool checkProgram(GLuint program) {
-        GLint linked = GL_FALSE;
-        glGetProgramiv(program, GL_LINK_STATUS, &linked);
-        if (linked == GL_TRUE) {
-            return true;
-        }
-
-        GLint length = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-        std::string log(static_cast<std::size_t>(std::max(length, 1)), '\0');
-        glGetProgramInfoLog(program, length, nullptr, log.data());
-        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Program link failed: %s", log.c_str());
-        return false;
-    }
-
-    GLuint compileShader(GLenum type, const char *source, const char *label) {
-        const GLuint shader = glCreateShader(type);
-        if (shader == 0) {
-            logGlErrors("glCreateShader");
-            return 0;
-        }
-
-        glShaderSource(shader, 1, &source, nullptr);
-        glCompileShader(shader);
-        logGlErrors("glCompileShader");
-
-        if (!checkShader(shader, label)) {
-            glDeleteShader(shader);
-            return 0;
-        }
-        return shader;
-    }
 
     double longitudeToMercatorX(double longitude) {
         return (longitude + 180.0) / 360.0;
@@ -257,35 +182,19 @@ void main() {
             __android_log_write(ANDROID_LOG_INFO, LOG_TAG, "initialize");
             deinitialize();
 
-            vertexShader_ = compileShader(GL_VERTEX_SHADER, kVertexShaderSource, "Vertex");
-            fragmentShader_ = compileShader(GL_FRAGMENT_SHADER, kFragmentShaderSource, "Fragment");
-            if (vertexShader_ == 0 || fragmentShader_ == 0) {
+            if (!program_.create(kVertexShaderSource, kFragmentShaderSource, LOG_TAG)) {
                 deinitialize();
                 return;
             }
 
-            program_ = glCreateProgram();
-            if (program_ == 0) {
-                logGlErrors("glCreateProgram");
+            if (!vertexBuffer_.create(LOG_TAG)) {
                 deinitialize();
                 return;
             }
-
-            glAttachShader(program_, vertexShader_);
-            glAttachShader(program_, fragmentShader_);
-            glLinkProgram(program_);
-            logGlErrors("glLinkProgram");
-            if (!checkProgram(program_)) {
-                deinitialize();
-                return;
-            }
-
-            glGenBuffers(1, &vertexBuffer_);
-            logGlErrors("initialize buffers");
         }
 
         void render(const mbgl::style::CustomLayerRenderParameters &params) override {
-            if (program_ == 0 || vertexBuffer_ == 0) {
+            if (program_.handle() == 0 || vertexBuffer_.handle() == 0) {
                 return;
             }
 
@@ -310,14 +219,9 @@ void main() {
             vertices_ = buildExclamationMark(params);
             vertexCount_ = static_cast<GLsizei>(vertices_.size() / 3);
 
-            glUseProgram(program_);
-            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer_);
-            glBufferData(
-                    GL_ARRAY_BUFFER,
-                    static_cast<GLsizeiptr>(vertices_.size() * sizeof(GLfloat)),
-                    vertices_.data(),
-                    GL_DYNAMIC_DRAW
-            );
+            glUseProgram(program_.handle());
+            vertexBuffer_.upload(vertices_);
+            vertexBuffer_.bind();
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), nullptr);
             glDisable(GL_STENCIL_TEST);
@@ -328,51 +232,31 @@ void main() {
             glDisableVertexAttribArray(0);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
             glUseProgram(0);
-            logGlErrors("render");
+            custom_map_layers::rendering::logGlErrors("render", LOG_TAG);
         }
 
         void contextLost() override {
             __android_log_write(ANDROID_LOG_INFO, LOG_TAG, "contextLost");
+            program_.reset();
+            vertexBuffer_.reset();
             resetHandles();
         }
 
         void deinitialize() override {
-            if (vertexBuffer_ != 0) {
-                glDeleteBuffers(1, &vertexBuffer_);
-            }
-            if (program_ != 0 && vertexShader_ != 0) {
-                glDetachShader(program_, vertexShader_);
-            }
-            if (program_ != 0 && fragmentShader_ != 0) {
-                glDetachShader(program_, fragmentShader_);
-            }
-            if (vertexShader_ != 0) {
-                glDeleteShader(vertexShader_);
-            }
-            if (fragmentShader_ != 0) {
-                glDeleteShader(fragmentShader_);
-            }
-            if (program_ != 0) {
-                glDeleteProgram(program_);
-            }
-            logGlErrors("deinitialize");
+            vertexBuffer_.reset();
+            program_.reset();
+            custom_map_layers::rendering::logGlErrors("deinitialize", LOG_TAG);
             resetHandles();
         }
 
     private:
         void resetHandles() {
-            program_ = 0;
-            vertexShader_ = 0;
-            fragmentShader_ = 0;
-            vertexBuffer_ = 0;
             vertexCount_ = 0;
             didLogFirstRender_ = false;
         }
 
-        GLuint program_ = 0;
-        GLuint vertexShader_ = 0;
-        GLuint fragmentShader_ = 0;
-        GLuint vertexBuffer_ = 0;
+        custom_map_layers::rendering::GlesProgram program_;
+        custom_map_layers::rendering::VertexBuffer vertexBuffer_;
         GLsizei vertexCount_ = 0;
         bool didLogFirstRender_ = false;
         std::vector<GLfloat> vertices_;

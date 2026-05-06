@@ -5,6 +5,9 @@ project(custom-map-layers LANGUAGES CXX)
 add_library(
         custom-map-layers
         SHARED
+        lib/rendering/GlError.cpp
+        lib/rendering/GlesProgram.cpp
+        lib/rendering/VertexBuffer.cpp
         native-lib.cpp
 )
 
