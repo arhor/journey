@@ -4,6 +4,8 @@
 #include <android/imagedecoder.h>
 #include <android/log.h>
 
+#include <utility>
+
 namespace custom_map_layers::assets {
 
 std::optional<DecodedImage> decodePngRgba(
