@@ -10,15 +10,32 @@ internal object NativeExclamationLayer {
     private var isNativeLibraryLoaded = false
 
     fun addTo(map: MapLibreMap, style: Style) {
+        addToWithManagedContext(
+            createContext = ::createContext,
+            destroyContext = ::destroyContext,
+            addLayer = { context ->
+                val customLayer = CustomLayer(LAYER_ID, context)
+                style.addLayer(customLayer)
+            },
+            repaint = map::triggerRepaint,
+        )
+    }
+
+    internal fun layerId(): String = LAYER_ID
+
+    internal fun addToWithManagedContext(
+        createContext: () -> Long,
+        destroyContext: (Long) -> Unit,
+        addLayer: (Long) -> Unit,
+        repaint: () -> Unit,
+    ) {
         val context = createContext()
-        var customLayer: CustomLayer? = null
         var layerAdded = false
 
         try {
-            customLayer = CustomLayer(LAYER_ID, context)
-            style.addLayer(customLayer)
+            addLayer(context)
             layerAdded = true
-            map.triggerRepaint()
+            repaint()
         } catch (throwable: Throwable) {
             if (!layerAdded) {
                 destroyContext(context)
@@ -26,8 +43,6 @@ internal object NativeExclamationLayer {
             throw throwable
         }
     }
-
-    internal fun layerId(): String = LAYER_ID
 
     private fun createContext(): Long {
         ensureNativeLibraryLoaded()
