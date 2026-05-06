@@ -405,7 +405,11 @@ private fun MapView.configureLocationAwareMap(
 //            fogLayerController.attach(style)
 //            fogLayerController.update(fogOfWar)
 
-            NativeExclamationLayer.addTo(map, style)
+            NativeModelLayer.addTo(
+                map = map,
+                style = style,
+                assetManager = context.assets,
+            )
 
             viewportReporter.attach(map)
 
