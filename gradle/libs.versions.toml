@@ -63,7 +63,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutinesAndroid" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesAndroid" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
-maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibreAndroid" }
+maplibre-android = { module = "org.maplibre.gl:android-sdk-opengl", version.ref = "maplibreAndroid" }
 maplibre-spatialk-geojson = { module = "org.maplibre.spatialk:geojson", version.ref = "maplibreSpatialk" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }

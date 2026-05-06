@@ -1,4 +1,4 @@
-@file:Suppress("ChromeOsAbiSupport")
+@file:Suppress("ChromeOsAbiSupport", "UnstableApiUsage", "unused")
 
 import java.util.Properties
 
@@ -16,15 +16,23 @@ val godotOutputPckBundle = layout.buildDirectory.file("generated/godot/assets/mi
 val godotProjectDir = layout.projectDirectory.dir("src/main/godot")
 val godotBinaryPath = providers.gradleProperty("godot.bin").orLocalProperty("godot.bin").orEnvVariable("GODOT_BIN")
 
+val nativeSourceDir = layout.projectDirectory.dir("src/main/cpp")
+val nativeOutputDir = layout.projectDirectory.dir(".cxx")
+
 idea {
     module {
         sourceDirs.add(godotProjectDir.asFile)
+        sourceDirs.add(nativeSourceDir.asFile)
+
         generatedSourceDirs.add(godotOutputAssetsDir.get().asFile)
+
+        excludeDirs.add(nativeOutputDir.asFile)
     }
 }
 
 android {
     namespace = "com.github.arhor.journey"
+    ndkVersion = "29.0.14206865"
 
     compileSdk {
         version = release(37)
@@ -39,7 +47,35 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf(
+                "arm64-v8a",
+                "x86_64",
+            )
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
+                )
+            }
+        }
+    }
+
+    androidResources {
+        noCompress.add("pck")
+    }
+
+    sourceSets {
+        getByName("main") {
+            assets.directories += godotOutputAssetsDir.get().asFile.absolutePath
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = nativeSourceDir.file("CMakeLists.txt").asFile
+            version = "4.1.2"
         }
     }
 
@@ -52,21 +88,15 @@ android {
             )
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+
     buildFeatures {
         compose = true
         buildConfig = true
     }
-    sourceSets {
-        getByName("main") {
-            assets.directories += godotOutputAssetsDir.get().asFile.absolutePath
-        }
-    }
-    androidResources {
-        noCompress.add("pck")
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -132,19 +162,19 @@ tasks {
         inputs.dir(godotProjectDir)
         outputs.dir(godotOutputAssetsDir)
 
+        commandLine(
+            godotBinaryPath.get(),
+            "--headless",
+            "--path", godotProjectDir.asFile,
+            "--export-pack",
+            "Android",
+            godotOutputPckBundle.get().asFile.absolutePath,
+        )
+
         doFirst {
             godotOutputAssetsDir.get().asFile.mkdirs()
-            commandLine(
-                godotBinaryPath.get(),
-                "--headless",
-                "--path", godotProjectDir.asFile,
-                "--export-pack",
-                "Android",
-                godotOutputPckBundle.get().asFile.absolutePath,
-            )
         }
     }
-
 }
 
 fun Provider<String>.orLocalProperty(propertyName: String): Provider<String> = orElse(
