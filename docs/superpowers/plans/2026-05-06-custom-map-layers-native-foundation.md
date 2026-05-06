@@ -476,7 +476,7 @@ constexpr const char* LOG_TAG = "NativeExclamationLayer";
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_github_arhor_journey_feature_map_viewinterop_NativeExclamationLayer_nativeCreateContext(
+Java_com_github_arhor_journey_feature_map_viewinterop_NativeExclamationLayer_createContextNative(
         JNIEnv*,
         jclass
 ) {
@@ -486,7 +486,7 @@ Java_com_github_arhor_journey_feature_map_viewinterop_NativeExclamationLayer_nat
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_github_arhor_journey_feature_map_viewinterop_NativeExclamationLayer_nativeDestroyContext(
+Java_com_github_arhor_journey_feature_map_viewinterop_NativeExclamationLayer_destroyContextNative(
         JNIEnv*,
         jclass,
         jlong context

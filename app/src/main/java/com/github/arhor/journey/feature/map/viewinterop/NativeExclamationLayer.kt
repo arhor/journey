@@ -5,7 +5,7 @@ import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.CustomLayer
 
 internal object NativeExclamationLayer {
-    private val nativeLibraryLoaded: Unit by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    private val nativeLibraryLoadedGate by lazy {
         System.loadLibrary("custom-map-layers")
     }
 
@@ -47,21 +47,21 @@ internal object NativeExclamationLayer {
     }
 
     private fun createContext(): Long {
-        nativeLibraryLoaded
-        return nativeCreateContext()
+        nativeLibraryLoadedGate
+        return createContextNative()
     }
 
     private fun destroyContext(context: Long) {
         if (context == 0L) {
             return
         }
-        nativeLibraryLoaded
-        nativeDestroyContext(context)
+        nativeLibraryLoadedGate
+        destroyContextNative(context)
     }
 
     @JvmStatic
-    private external fun nativeCreateContext(): Long
+    private external fun createContextNative(): Long
 
     @JvmStatic
-    private external fun nativeDestroyContext(context: Long)
+    private external fun destroyContextNative(context: Long)
 }
