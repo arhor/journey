@@ -64,4 +64,43 @@ ScreenPoint projectToNdc(
     };
 }
 
+ScreenPoint projectMetersOffsetToNdc(
+        double originLongitude,
+        double originLatitude,
+        double originAltitudeMeters,
+        LocalMeters offsetMeters,
+        const mbgl::style::CustomLayerRenderParameters& params
+) {
+    const double worldSize = kTileSize * std::pow(2.0, params.zoom);
+    const double worldUnitsPerMeter = metersToMercatorUnits(1.0, originLatitude) * worldSize;
+
+    const double cameraX = longitudeToMercatorX(params.longitude) * worldSize;
+    const double cameraY = latitudeToMercatorY(params.latitude) * worldSize;
+
+    const double originX = longitudeToMercatorX(originLongitude) * worldSize;
+    const double originY = latitudeToMercatorY(originLatitude) * worldSize;
+
+    const double pointX = originX + offsetMeters.east * worldUnitsPerMeter;
+    const double pointY = originY - offsetMeters.north * worldUnitsPerMeter;
+    const double pointAltitudePixels =
+            (originAltitudeMeters + offsetMeters.up) * worldUnitsPerMeter;
+
+    const double bearingRadians = degreesToRadiansIfNeeded(params.bearing);
+    const double pitchRadians = degreesToRadiansIfNeeded(params.pitch);
+
+    const double dx = pointX - cameraX;
+    const double dy = pointY - cameraY;
+
+    const double rotatedX = dx * std::cos(bearingRadians) - dy * std::sin(bearingRadians);
+    const double rotatedY = dx * std::sin(bearingRadians) + dy * std::cos(bearingRadians);
+
+    const double pitchedY =
+            rotatedY * std::cos(pitchRadians) - pointAltitudePixels * std::sin(pitchRadians);
+
+    return ScreenPoint{
+            .x = 2.0 * rotatedX / params.width,
+            .y = -2.0 * pitchedY / params.height,
+    };
+}
+
 }  // namespace custom_map_layers::geo
