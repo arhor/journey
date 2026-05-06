@@ -4,6 +4,7 @@
 .gradle-cache/
 build/
 .worktrees/
+.superpowers/
 
 # Local configuration file (sdk path, etc)
 local.properties
