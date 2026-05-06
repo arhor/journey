@@ -14,6 +14,12 @@ target_compile_features(
         cxx_std_20
 )
 
+target_include_directories(
+        custom-map-layers
+        PRIVATE
+        include
+)
+
 target_compile_options(
         custom-map-layers
         PRIVATE

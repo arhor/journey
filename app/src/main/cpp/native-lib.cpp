@@ -2,40 +2,13 @@
 #include <android/log.h>
 #include <jni.h>
 
-#include <array>
+#include "custom_map_layers/maplibre/custom_layer_host.hpp"
+
 #include <cmath>
 #include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
-
-namespace mbgl::style {
-
-    struct CustomLayerRenderParameters {
-        double width;
-        double height;
-        double latitude;
-        double longitude;
-        double zoom;
-        double bearing;
-        double pitch;
-        double fieldOfView;
-        std::array<double, 16> projectionMatrix;
-    };
-
-    class CustomLayerHost {
-    public:
-        virtual ~CustomLayerHost() = default;
-
-        virtual void initialize() = 0;
-
-        virtual void render(const CustomLayerRenderParameters &) = 0;
-
-        virtual void contextLost() = 0;
-
-        virtual void deinitialize() = 0;
-    };
-}
 
 namespace {
 
