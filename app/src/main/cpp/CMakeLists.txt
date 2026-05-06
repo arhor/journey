@@ -5,6 +5,7 @@ project(custom-map-layers LANGUAGES CXX)
 add_library(
         custom-map-layers
         SHARED
+        lib/geo/WebMercator.cpp
         lib/rendering/GlError.cpp
         lib/rendering/GlesProgram.cpp
         lib/rendering/VertexBuffer.cpp
