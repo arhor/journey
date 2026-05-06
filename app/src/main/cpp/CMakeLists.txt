@@ -6,6 +6,7 @@ add_library(
         custom-map-layers
         SHARED
         lib/geo/WebMercator.cpp
+        lib/layers/exclamation/ExclamationLayer.cpp
         lib/rendering/GlError.cpp
         lib/rendering/GlesProgram.cpp
         lib/rendering/VertexBuffer.cpp
@@ -22,6 +23,7 @@ target_include_directories(
         custom-map-layers
         PRIVATE
         include
+        lib
 )
 
 target_compile_options(
