@@ -2,15 +2,17 @@ cmake_minimum_required(VERSION 4.1.2)
 
 project(custom-map-layers LANGUAGES CXX)
 
-add_library(
+add_library(custom-map-layers SHARED)
+
+target_sources(
         custom-map-layers
-        SHARED
-        lib/geo/WebMercator.cpp
+        PRIVATE
+        lib/jni/custom_map_layers_jni.cpp
         lib/layers/exclamation/ExclamationLayer.cpp
+        lib/geo/WebMercator.cpp
         lib/rendering/GlError.cpp
         lib/rendering/GlesProgram.cpp
         lib/rendering/VertexBuffer.cpp
-        native-lib.cpp
 )
 
 target_compile_features(
