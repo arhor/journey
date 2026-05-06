@@ -8,10 +8,15 @@ target_sources(
         custom-map-layers
         PRIVATE
         lib/jni/custom_map_layers_jni.cpp
-        lib/layers/exclamation/ExclamationLayer.cpp
+        lib/layers/model/ModelLayer.cpp
+        lib/assets/AssetReader.cpp
+        lib/assets/ImageDecoder.cpp
+        lib/gltf/GltfModelLoader.cpp
+        lib/gltf/cgltf_impl.cpp
         lib/geo/WebMercator.cpp
         lib/rendering/GlError.cpp
         lib/rendering/GlesProgram.cpp
+        lib/rendering/GlTexture.cpp
         lib/rendering/VertexBuffer.cpp
 )
 
@@ -26,6 +31,7 @@ target_include_directories(
         PRIVATE
         include
         lib
+        third_party/cgltf
 )
 
 target_compile_options(
@@ -42,5 +48,6 @@ target_link_libraries(
         PRIVATE
         android
         log
+        jnigraphics
         GLESv3
 )
