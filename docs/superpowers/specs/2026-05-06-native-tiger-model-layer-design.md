@@ -12,7 +12,7 @@ This design covers one hard-coded tiger model marker:
 
 - Model asset: `app/src/main/assets/models/animal-tiger.glb`
 - Texture asset fallback: `app/src/main/assets/models/textures/colormap.png`
-- Map location: the same hard-coded coordinates currently used by the exclamation proof of concept
+- Map location: hard-coded coordinates near the initial map camera for runtime visibility
 - Renderer: app-owned GLES code inside `libcustom-map-layers.so`
 
 This design does not cover gameplay-driven model selection, multiple model instances, animation, lighting beyond a simple textured shader, picking, collision, or ViewModel state changes for model markers.
@@ -106,14 +106,14 @@ This keeps the current asset usable without silently ignoring the model's materi
 
 ## Rendering Behavior
 
-The model should render at the same latitude and longitude used by the existing exclamation layer:
+The model should render at hard-coded coordinates near the initial map camera:
 
 ```text
-lat = 54.3744505
-lon = 18.6502754
+lat = 54.3738000
+lon = 18.6508750
 ```
 
-The first implementation should use a fixed model scale chosen to make the tiger visible on the map at the current test zoom range. Orientation can initially be fixed in world space. The renderer should leave scale and orientation constants close to `ModelLayer`, so they can become per-instance data in a later generalized marker system.
+The first implementation should use a fixed model scale chosen to make the tiger visible on the map at the current test zoom range. The final proof of concept uses a screen-space billboard projection from the model's `x/y` axes instead of a true ground-anchored 3D transform. This keeps the tiger legible with the map at pitch `0`, and leaves the projection, scale, and anchor constants close to `ModelLayer` so they can become per-instance data in a later generalized marker system.
 
 The shader should be simple:
 
@@ -161,6 +161,42 @@ Runtime validation:
 3. Verify the tiger model renders at the hard-coded coordinate.
 4. Move, zoom, rotate, and pitch the map.
 5. Inspect logcat for `NativeModelLayer` asset, shader, texture, or GLES errors.
+
+## Integration Issues And Fixes
+
+During integration, the native layer initially logged a successful load but the tiger did not appear on the map:
+
+```text
+Loaded tiger model vertices=2853 texture=models/textures/colormap.png
+render 412x867 camera=(54.3738000, 18.6508750) zoom=18.00 ...
+```
+
+The first runtime failure was placement. The original hard-coded coordinate was offset from the camera center and rendered near the top of the viewport, under app UI. The marker constants were moved to the initial camera coordinate for this proof of concept. Generalized marker data should replace those constants later.
+
+The second failure was projection. A ground-anchored projection made the model effectively edge-on at map pitch `0`, so even valid model data could be hidden or visually collapsed. A diagnostic full-screen triangle proved the MapLibre `CustomLayer` and GLES draw path were working. The renderer was then changed to project the tiger as a billboard from one marker point, using model `x` for horizontal screen offset and model `y` for vertical screen offset.
+
+The root loader failure was missing buffer loading. `cgltf_parse()` builds the glTF object graph, but accessor reads require loaded buffer data. Without `cgltf_load_buffers()`, position and UV reads produced zeroed vertex data. This made projected triangle area `0.000000`, so the model mesh had a non-empty bounding box from node transforms but no drawable triangle area. `GltfModelLoader` now calls `cgltf_load_buffers(&options, data, nullptr)` after parsing the GLB and before reading accessors.
+
+Accessor failures were also silent. The loader originally ignored `cgltf_accessor_read_float()` return values, which made bad or unloaded data look like valid zero positions. The loader now checks position and UV reads, logs `Failed to read primitive vertex accessors`, rolls back the partially appended primitive, and lets the model fail to load instead of rendering invalid geometry.
+
+The renderer also needed stricter GL state hygiene. Runtime logs included a MapLibre renderer `std::bad_alloc` after the custom layer rendered, which pointed to possible state pollution. `ModelLayer::render()` now saves and restores the previous program, array buffer, active texture, texture binding, depth/stencil/cull/blend enable state, and blend function. The layer disables depth, stencil, and culling for its draw, then restores the previous state before returning to MapLibre.
+
+The texture was finally rendered with forced opaque alpha:
+
+```glsl
+vec4 sampled = texture(u_texture, v_uv);
+fragColor = vec4(sampled.rgb, 1.0);
+```
+
+This avoids treating the texture's alpha channel as marker transparency for the first proof of concept. A later material implementation can map glTF alpha mode and alpha cutoff explicitly.
+
+Final runtime validation used a red diagnostic shader first to prove the corrected mesh had non-zero area, then restored the texture shader. The final checked run showed the textured tiger on the map and `NativeModelLayer` logs with projected NDC bounds:
+
+```text
+projected bounds ndc=(-0.161, -0.324)-(0.134, -0.146)
+```
+
+No `Mbgl-MapRenderer std::bad_alloc` appeared in the filtered logcat output for that final run.
 
 ## Future Generalization
 
