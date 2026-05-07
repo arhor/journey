@@ -24,13 +24,12 @@ constexpr double kModelHeadingRadians = 0.0;
 constexpr double kPitchedCameraLogThreshold = 0.15;
 
 constexpr const char* kVertexShaderSource = R"(#version 300 es
-layout(location = 0) in vec3 a_pos;
+layout(location = 0) in vec4 a_clip_pos;
 layout(location = 1) in vec2 a_uv;
-uniform mat4 u_projection_matrix;
 out vec2 v_uv;
 
 void main() {
-    gl_Position = u_projection_matrix * vec4(a_pos, 1.0);
+    gl_Position = a_clip_pos;
     v_uv = a_uv;
 }
 )";
@@ -54,6 +53,13 @@ struct NdcBounds {
     double maxY = std::numeric_limits<double>::lowest();
 };
 
+struct ClipPosition {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    double w = 1.0;
+};
+
 custom_map_layers::geo::LocalMeters rotateLocalModelMeters(
         const custom_map_layers::gltf::ModelVertex& vertex
 ) {
@@ -68,6 +74,32 @@ custom_map_layers::geo::LocalMeters rotateLocalModelMeters(
             .east = modelEast * cosHeading - modelNorth * sinHeading,
             .north = modelEast * sinHeading + modelNorth * cosHeading,
             .up = modelUp,
+    };
+}
+
+ClipPosition projectWorldToClip(
+        const std::array<double, 16>& projectionMatrix,
+        double worldX,
+        double worldY,
+        double altitudeMeters
+) {
+    return ClipPosition{
+            .x = projectionMatrix[0] * worldX +
+                 projectionMatrix[4] * worldY +
+                 projectionMatrix[8] * altitudeMeters +
+                 projectionMatrix[12],
+            .y = projectionMatrix[1] * worldX +
+                 projectionMatrix[5] * worldY +
+                 projectionMatrix[9] * altitudeMeters +
+                 projectionMatrix[13],
+            .z = projectionMatrix[2] * worldX +
+                 projectionMatrix[6] * worldY +
+                 projectionMatrix[10] * altitudeMeters +
+                 projectionMatrix[14],
+            .w = projectionMatrix[3] * worldX +
+                 projectionMatrix[7] * worldY +
+                 projectionMatrix[11] * altitudeMeters +
+                 projectionMatrix[15],
     };
 }
 
@@ -127,23 +159,29 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     }
 
     const std::vector<GLfloat> vertices = buildProjectedVertices(params);
-    vertexCount_ = static_cast<GLsizei>(vertices.size() / 5);
+    vertexCount_ = static_cast<GLsizei>(vertices.size() / 6);
     if (vertexCount_ == 0) {
         return;
     }
 
     if (shouldLogRender) {
         NdcBounds bounds;
-        for (size_t vertexOffset = 0; vertexOffset < vertices.size(); vertexOffset += 5) {
-            bounds.minX = std::min(bounds.minX, static_cast<double>(vertices[vertexOffset]));
-            bounds.maxX = std::max(bounds.maxX, static_cast<double>(vertices[vertexOffset]));
-            bounds.minY = std::min(bounds.minY, static_cast<double>(vertices[vertexOffset + 1]));
-            bounds.maxY = std::max(bounds.maxY, static_cast<double>(vertices[vertexOffset + 1]));
+        for (size_t vertexOffset = 0; vertexOffset < vertices.size(); vertexOffset += 6) {
+            const auto w = static_cast<double>(vertices[vertexOffset + 3]);
+            if (w == 0.0) {
+                continue;
+            }
+            const double ndcX = static_cast<double>(vertices[vertexOffset]) / w;
+            const double ndcY = static_cast<double>(vertices[vertexOffset + 1]) / w;
+            bounds.minX = std::min(bounds.minX, ndcX);
+            bounds.maxX = std::max(bounds.maxX, ndcX);
+            bounds.minY = std::min(bounds.minY, ndcY);
+            bounds.maxY = std::max(bounds.maxY, ndcY);
         }
         __android_log_print(
                 ANDROID_LOG_INFO,
                 LOG_TAG,
-                "model bounds world=(%.2f, %.2f)-(%.2f, %.2f)",
+                "model bounds ndc=(%.3f, %.3f)-(%.3f, %.3f)",
                 bounds.minX,
                 bounds.minY,
                 bounds.maxX,
@@ -159,6 +197,9 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     GLint previousBlendDstRgb = 0;
     GLint previousBlendSrcAlpha = 0;
     GLint previousBlendDstAlpha = 0;
+    GLint previousDepthFunc = GL_LESS;
+    GLfloat previousDepthClearValue = 1.0f;
+    GLboolean previousDepthMask = GL_TRUE;
     const GLboolean wasStencilEnabled = glIsEnabled(GL_STENCIL_TEST);
     const GLboolean wasDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
     const GLboolean wasCullEnabled = glIsEnabled(GL_CULL_FACE);
@@ -170,6 +211,9 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     glGetIntegerv(GL_BLEND_DST_RGB, &previousBlendDstRgb);
     glGetIntegerv(GL_BLEND_SRC_ALPHA, &previousBlendSrcAlpha);
     glGetIntegerv(GL_BLEND_DST_ALPHA, &previousBlendDstAlpha);
+    glGetIntegerv(GL_DEPTH_FUNC, &previousDepthFunc);
+    glGetFloatv(GL_DEPTH_CLEAR_VALUE, &previousDepthClearValue);
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &previousDepthMask);
     glActiveTexture(GL_TEXTURE0);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture2d);
 
@@ -177,32 +221,29 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     texture_.bind(GL_TEXTURE0);
     const GLint textureUniform = glGetUniformLocation(program_.handle(), "u_texture");
     glUniform1i(textureUniform, 0);
-    const GLint projectionUniform = glGetUniformLocation(program_.handle(), "u_projection_matrix");
-    GLfloat projectionMatrix[16];
-    for (size_t index = 0; index < params.projectionMatrix.size(); index += 1) {
-        projectionMatrix[index] = static_cast<GLfloat>(params.projectionMatrix[index]);
-    }
-    glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, projectionMatrix);
 
     vertexBuffer_.upload(vertices);
     vertexBuffer_.bind();
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), nullptr);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), nullptr);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(
             1,
             2,
             GL_FLOAT,
             GL_FALSE,
-            5 * sizeof(GLfloat),
-            reinterpret_cast<const void*>(3 * sizeof(GLfloat))
+            6 * sizeof(GLfloat),
+            reinterpret_cast<const void*>(4 * sizeof(GLfloat))
     );
 
     glDisable(GL_STENCIL_TEST);
-    glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+    glClearDepthf(1.0f);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
     glDrawArrays(GL_TRIANGLES, 0, vertexCount_);
 
     glDisableVertexAttribArray(1);
@@ -227,6 +268,9 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     } else {
         glDisable(GL_BLEND);
     }
+    glDepthFunc(static_cast<GLenum>(previousDepthFunc));
+    glClearDepthf(previousDepthClearValue);
+    glDepthMask(previousDepthMask);
     glBlendFuncSeparate(
             static_cast<GLenum>(previousBlendSrcRgb),
             static_cast<GLenum>(previousBlendDstRgb),
@@ -296,7 +340,7 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(
         const mbgl::style::CustomLayerRenderParameters& params
 ) const {
     std::vector<GLfloat> vertices;
-    vertices.reserve(model_.triangleVertices.size() * 5);
+    vertices.reserve(model_.triangleVertices.size() * 6);
 
     const double worldSize = 512.0 * std::pow(2.0, params.zoom);
     const double worldPixelsPerMeter =
@@ -309,10 +353,17 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(
         const double worldX = originX + localMeters.east * worldPixelsPerMeter;
         const double worldY = originY - localMeters.north * worldPixelsPerMeter;
         const double altitudeMeters = kMarkerAltitudeMeters + localMeters.up;
+        const ClipPosition clipPosition = projectWorldToClip(
+                params.projectionMatrix,
+                worldX,
+                worldY,
+                altitudeMeters
+        );
 
-        vertices.push_back(static_cast<GLfloat>(worldX));
-        vertices.push_back(static_cast<GLfloat>(worldY));
-        vertices.push_back(static_cast<GLfloat>(altitudeMeters));
+        vertices.push_back(static_cast<GLfloat>(clipPosition.x));
+        vertices.push_back(static_cast<GLfloat>(clipPosition.y));
+        vertices.push_back(static_cast<GLfloat>(clipPosition.z));
+        vertices.push_back(static_cast<GLfloat>(clipPosition.w));
         vertices.push_back(vertex.u);
         vertices.push_back(vertex.v);
     }

@@ -78,9 +78,42 @@ class NativeModelLayerTest {
 
         // Then
         usesMapLibreProjectionMatrix shouldBe true
-        source shouldContain "u_projection_matrix"
+        source shouldContain "projectWorldToClip"
         source shouldContain "std::pow(2.0, params.zoom)"
         source shouldContain "worldPixelsPerMeter"
         source shouldNotContain "projectMetersOffsetToNdc"
+    }
+
+    @Test
+    fun `native model renderer should upload clip coordinates instead of large world pixel coordinates`() {
+        // Given
+        val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
+        val vertexShader = source.substringAfter("kVertexShaderSource").substringBefore("kFragmentShaderSource")
+        val positionAttributeSetup = source.substringAfter("glEnableVertexAttribArray(0)").substringBefore("glEnableVertexAttribArray(1)")
+
+        // When
+        val uploadsClipPosition = vertexShader.contains("in vec4 a_clip_pos")
+
+        // Then
+        uploadsClipPosition shouldBe true
+        vertexShader shouldContain "gl_Position = a_clip_pos"
+        positionAttributeSetup shouldContain "glVertexAttribPointer(0, 4, GL_FLOAT"
+        source shouldContain "projectWorldToClip"
+    }
+
+    @Test
+    fun `native model renderer should depth test tiger triangles when rendering opaque 3d mesh`() {
+        // Given
+        val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
+        val drawSetup = source.substringAfter("glVertexAttribPointer(").substringBefore("glDrawArrays")
+
+        // When
+        val usesDepthTestingForModelDraw = drawSetup.contains("glEnable(GL_DEPTH_TEST)")
+
+        // Then
+        usesDepthTestingForModelDraw shouldBe true
+        drawSetup shouldContain "glDepthFunc(GL_LEQUAL)"
+        drawSetup shouldContain "glDepthMask(GL_TRUE)"
+        drawSetup shouldNotContain "glDisable(GL_DEPTH_TEST);"
     }
 }
