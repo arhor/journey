@@ -1,6 +1,9 @@
 package com.github.arhor.journey.feature.map.viewinterop
 
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
+import java.io.File
 import org.junit.Test
 
 class NativeModelLayerTest {
@@ -63,5 +66,21 @@ class NativeModelLayerTest {
         actual shouldBe expected
         destroyedContexts shouldBe listOf(createdContext)
         repaintCalls shouldBe 0
+    }
+
+    @Test
+    fun `native model renderer should use MapLibre projection matrix instead of manual camera rotation`() {
+        // Given
+        val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
+
+        // When
+        val usesMapLibreProjectionMatrix = source.contains("params.projectionMatrix")
+
+        // Then
+        usesMapLibreProjectionMatrix shouldBe true
+        source shouldContain "u_projection_matrix"
+        source shouldContain "std::pow(2.0, params.zoom)"
+        source shouldContain "worldPixelsPerMeter"
+        source shouldNotContain "projectMetersOffsetToNdc"
     }
 }

@@ -26,10 +26,11 @@ constexpr double kPitchedCameraLogThreshold = 0.15;
 constexpr const char* kVertexShaderSource = R"(#version 300 es
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
+uniform mat4 u_projection_matrix;
 out vec2 v_uv;
 
 void main() {
-    gl_Position = vec4(a_pos, 1.0);
+    gl_Position = u_projection_matrix * vec4(a_pos, 1.0);
     v_uv = a_uv;
 }
 )";
@@ -142,7 +143,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         __android_log_print(
                 ANDROID_LOG_INFO,
                 LOG_TAG,
-                "projected bounds ndc=(%.3f, %.3f)-(%.3f, %.3f)",
+                "model bounds world=(%.2f, %.2f)-(%.2f, %.2f)",
                 bounds.minX,
                 bounds.minY,
                 bounds.maxX,
@@ -176,6 +177,12 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     texture_.bind(GL_TEXTURE0);
     const GLint textureUniform = glGetUniformLocation(program_.handle(), "u_texture");
     glUniform1i(textureUniform, 0);
+    const GLint projectionUniform = glGetUniformLocation(program_.handle(), "u_projection_matrix");
+    GLfloat projectionMatrix[16];
+    for (size_t index = 0; index < params.projectionMatrix.size(); index += 1) {
+        projectionMatrix[index] = static_cast<GLfloat>(params.projectionMatrix[index]);
+    }
+    glUniformMatrix4fv(projectionUniform, 1, GL_FALSE, projectionMatrix);
 
     vertexBuffer_.upload(vertices);
     vertexBuffer_.bind();
@@ -291,20 +298,21 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(
     std::vector<GLfloat> vertices;
     vertices.reserve(model_.triangleVertices.size() * 5);
 
+    const double worldSize = 512.0 * std::pow(2.0, params.zoom);
+    const double worldPixelsPerMeter =
+            custom_map_layers::geo::metersToMercatorUnits(1.0, kMarkerLatitude) * worldSize;
+    const double originX = custom_map_layers::geo::longitudeToMercatorX(kMarkerLongitude) * worldSize;
+    const double originY = custom_map_layers::geo::latitudeToMercatorY(kMarkerLatitude) * worldSize;
+
     for (const custom_map_layers::gltf::ModelVertex& vertex : model_.triangleVertices) {
         const custom_map_layers::geo::LocalMeters localMeters = rotateLocalModelMeters(vertex);
-        const custom_map_layers::geo::ScreenPoint projected =
-                custom_map_layers::geo::projectMetersOffsetToNdc(
-                        kMarkerLongitude,
-                        kMarkerLatitude,
-                        kMarkerAltitudeMeters,
-                        localMeters,
-                        params
-                );
+        const double worldX = originX + localMeters.east * worldPixelsPerMeter;
+        const double worldY = originY - localMeters.north * worldPixelsPerMeter;
+        const double altitudeMeters = kMarkerAltitudeMeters + localMeters.up;
 
-        vertices.push_back(static_cast<GLfloat>(projected.x));
-        vertices.push_back(static_cast<GLfloat>(projected.y));
-        vertices.push_back(0.0f);
+        vertices.push_back(static_cast<GLfloat>(worldX));
+        vertices.push_back(static_cast<GLfloat>(worldY));
+        vertices.push_back(static_cast<GLfloat>(altitudeMeters));
         vertices.push_back(vertex.u);
         vertices.push_back(vertex.v);
     }
