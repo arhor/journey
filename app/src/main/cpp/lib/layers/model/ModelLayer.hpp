@@ -35,6 +35,7 @@ private:
     GLsizei vertexCount_ = 0;
     bool loaded_ = false;
     bool didLogFirstRender_ = false;
+    bool didLogFirstPitchedRender_ = false;
 };
 
 }  // namespace custom_map_layers::layers::model

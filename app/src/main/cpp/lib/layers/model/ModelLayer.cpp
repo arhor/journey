@@ -21,6 +21,7 @@ constexpr double kMarkerLongitude = 18.6508750;
 constexpr double kMarkerAltitudeMeters = 0.0;
 constexpr double kModelMetersPerUnit = 45.0;
 constexpr double kModelHeadingRadians = 0.0;
+constexpr double kPitchedCameraLogThreshold = 0.15;
 
 constexpr const char* kVertexShaderSource = R"(#version 300 es
 layout(location = 0) in vec3 a_pos;
@@ -99,8 +100,9 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         return;
     }
 
-    const bool shouldLogFirstRender = !didLogFirstRender_;
-    if (shouldLogFirstRender) {
+    const bool isPitchedCamera = std::abs(params.pitch) > kPitchedCameraLogThreshold;
+    const bool shouldLogRender = !didLogFirstRender_ || (!didLogFirstPitchedRender_ && isPitchedCamera);
+    if (shouldLogRender) {
         __android_log_print(
                 ANDROID_LOG_INFO,
                 LOG_TAG,
@@ -118,6 +120,9 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
                 vertexCount_
         );
         didLogFirstRender_ = true;
+        if (isPitchedCamera) {
+            didLogFirstPitchedRender_ = true;
+        }
     }
 
     const std::vector<GLfloat> vertices = buildProjectedVertices(params);
@@ -126,7 +131,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         return;
     }
 
-    if (shouldLogFirstRender) {
+    if (shouldLogRender) {
         NdcBounds bounds;
         for (size_t vertexOffset = 0; vertexOffset < vertices.size(); vertexOffset += 5) {
             bounds.minX = std::min(bounds.minX, static_cast<double>(vertices[vertexOffset]));
@@ -311,6 +316,7 @@ void ModelLayer::resetState() {
     vertexCount_ = 0;
     loaded_ = false;
     didLogFirstRender_ = false;
+    didLogFirstPitchedRender_ = false;
 }
 
 }  // namespace custom_map_layers::layers::model
