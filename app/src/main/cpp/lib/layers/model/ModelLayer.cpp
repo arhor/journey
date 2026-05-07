@@ -3,6 +3,7 @@
 #include <android/log.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <utility>
 
@@ -17,8 +18,9 @@ namespace {
 constexpr const char* LOG_TAG = "NativeModelLayer";
 constexpr double kMarkerLatitude = 54.3738000;
 constexpr double kMarkerLongitude = 18.6508750;
-constexpr double kModelScaleMeters = 45.0;
-constexpr double kBillboardVerticalOffsetNdc = -0.15;
+constexpr double kMarkerAltitudeMeters = 0.0;
+constexpr double kModelMetersPerUnit = 45.0;
+constexpr double kModelHeadingRadians = 0.0;
 
 constexpr const char* kVertexShaderSource = R"(#version 300 es
 layout(location = 0) in vec3 a_pos;
@@ -49,6 +51,23 @@ struct NdcBounds {
     double maxX = std::numeric_limits<double>::lowest();
     double maxY = std::numeric_limits<double>::lowest();
 };
+
+custom_map_layers::geo::LocalMeters rotateLocalModelMeters(
+        const custom_map_layers::gltf::ModelVertex& vertex
+) {
+    const double modelEast = static_cast<double>(vertex.x) * kModelMetersPerUnit;
+    const double modelNorth = static_cast<double>(-vertex.z) * kModelMetersPerUnit;
+    const double modelUp = static_cast<double>(vertex.y) * kModelMetersPerUnit;
+
+    const double cosHeading = std::cos(kModelHeadingRadians);
+    const double sinHeading = std::sin(kModelHeadingRadians);
+
+    return custom_map_layers::geo::LocalMeters{
+            .east = modelEast * cosHeading - modelNorth * sinHeading,
+            .north = modelEast * sinHeading + modelNorth * cosHeading,
+            .up = modelUp,
+    };
+}
 
 }  // namespace
 
@@ -85,7 +104,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         __android_log_print(
                 ANDROID_LOG_INFO,
                 LOG_TAG,
-                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f marker=(%.7f, %.7f) vertices=%d",
+                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f marker=(%.7f, %.7f, %.1fm) vertices=%d",
                 params.width,
                 params.height,
                 params.latitude,
@@ -95,6 +114,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
                 params.pitch,
                 kMarkerLatitude,
                 kMarkerLongitude,
+                kMarkerAltitudeMeters,
                 vertexCount_
         );
         didLogFirstRender_ = true;
@@ -265,22 +285,20 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(
 ) const {
     std::vector<GLfloat> vertices;
     vertices.reserve(model_.triangleVertices.size() * 5);
-    const custom_map_layers::geo::ScreenPoint marker =
-            custom_map_layers::geo::projectToNdc(
-                    kMarkerLongitude,
-                    kMarkerLatitude,
-                    0.0,
-                    params
-            );
-    const double horizontalNdcPerMeter = 2.0 / params.width;
-    const double verticalNdcPerMeter = 2.0 / params.height;
 
     for (const custom_map_layers::gltf::ModelVertex& vertex : model_.triangleVertices) {
-        const double horizontalMeters = static_cast<double>(vertex.x) * kModelScaleMeters;
-        const double verticalMeters = static_cast<double>(vertex.y) * kModelScaleMeters;
+        const custom_map_layers::geo::LocalMeters localMeters = rotateLocalModelMeters(vertex);
+        const custom_map_layers::geo::ScreenPoint projected =
+                custom_map_layers::geo::projectMetersOffsetToNdc(
+                        kMarkerLongitude,
+                        kMarkerLatitude,
+                        kMarkerAltitudeMeters,
+                        localMeters,
+                        params
+                );
 
-        vertices.push_back(static_cast<GLfloat>(marker.x + horizontalMeters * horizontalNdcPerMeter));
-        vertices.push_back(static_cast<GLfloat>(marker.y + kBillboardVerticalOffsetNdc - verticalMeters * verticalNdcPerMeter));
+        vertices.push_back(static_cast<GLfloat>(projected.x));
+        vertices.push_back(static_cast<GLfloat>(projected.y));
         vertices.push_back(0.0f);
         vertices.push_back(vertex.u);
         vertices.push_back(vertex.v);
