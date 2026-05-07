@@ -9,6 +9,7 @@
 
 #include "assets/AssetReader.hpp"
 #include "cgltf.h"
+#include "gltf/TextureCoordinate.hpp"
 
 namespace {
 
@@ -79,7 +80,7 @@ void appendPrimitive(
                 .y = transformed[1],
                 .z = transformed[2],
                 .u = texcoord[0],
-                .v = 1.0f - texcoord[1],
+                .v = custom_map_layers::gltf::rendererTextureV(texcoord[1]),
         });
     }
 }
