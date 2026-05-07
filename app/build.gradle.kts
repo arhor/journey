@@ -14,7 +14,7 @@ plugins {
 val godotOutputAssetsDir = layout.buildDirectory.dir("generated/godot/assets")
 val godotOutputPckBundle = layout.buildDirectory.file("generated/godot/assets/minigame.pck")
 val godotProjectDir = layout.projectDirectory.dir("src/main/godot")
-val godotBinaryPath = providers.gradleProperty("godot.bin").orLocalProperty("godot.bin").orEnvVariable("GODOT_BIN")
+val godotBinaryPath = providers.gradleOrLocalProperty("godot.bin").orEnvVariable("GODOT_BIN")
 
 val nativeSourceDir = layout.projectDirectory.dir("src/main/cpp")
 val nativeOutputDir = layout.projectDirectory.dir(".cxx")
@@ -177,14 +177,16 @@ tasks {
     }
 }
 
-fun Provider<String>.orLocalProperty(propertyName: String): Provider<String> = orElse(
-    providers.provider {
-        rootProject.file("local.properties").takeIf { it.isFile }?.let { file ->
-            Properties()
-                .apply { file.inputStream().use(::load) }
-                .getProperty(propertyName)
-        }
-    }
-)
+fun ProviderFactory.gradleOrLocalProperty(propertyName: String): Provider<String> =
+    gradleProperty(propertyName)
+        .orElse(
+            provider {
+                rootProject.file("local.properties").takeIf { it.isFile }?.let { file ->
+                    Properties()
+                        .apply { file.inputStream().use(::load) }
+                        .getProperty(propertyName)
+                }
+            }
+        )
 
 fun Provider<String>.orEnvVariable(name: String) = orElse(providers.environmentVariable(name))
