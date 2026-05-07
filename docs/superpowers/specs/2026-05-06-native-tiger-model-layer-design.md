@@ -198,6 +198,8 @@ projected bounds ndc=(-0.161, -0.324)-(0.134, -0.146)
 
 No `Mbgl-MapRenderer std::bad_alloc` appeared in the filtered logcat output for that final run.
 
+The later map-bound true-3D step supersedes the screen-space billboard projection described here. The billboard implementation was useful for proving GLB loading, texture upload, and custom-layer drawing, but true model placement now projects every tiger vertex from local east/north/up meters around the hard-coded map coordinate.
+
 ## Future Generalization
 
 The next step can move hard-coded asset path, coordinate, scale, and orientation into model marker instance data. The same `LoadedModel`, `GlTexture`, and `ModelLayer` boundaries should support:

@@ -26,7 +26,7 @@ Each GLB vertex will be treated as local model-space meters around the marker an
 - model `z`: local north/south offset
 - model `y`: local up/altitude offset
 
-For each frame, native code will convert the anchor coordinate and each local model offset into map/world coordinates, then project that world position through the MapLibre custom layer projection matrix. The vertex shader should receive clip-space coordinates or enough world-space data plus matrix uniforms to produce clip-space output.
+For each frame, native code will convert the anchor coordinate and each local model offset into map/world coordinates, then project that world position through the native map projection path. The first implementation uses CPU-projected clip/NDC coordinates; a later rendering pass can move this into shader uniforms once the MapLibre custom layer projection-matrix convention is validated.
 
 At pitch `0`, the tiger may look mostly like a top-down footprint. That is acceptable for this step because the requirement is physical map binding, not billboard readability. Runtime validation should include pitched and rotated map views to verify the model stands on the map.
 
@@ -38,9 +38,9 @@ Preferred first implementation:
 
 1. Convert the marker longitude and latitude to Mercator coordinates.
 2. Convert local model east/north/up meter offsets into Mercator/world units at the marker latitude.
-3. Apply the current zoom/world-size convention expected by MapLibre's `projectionMatrix`.
-4. Transform each vertex through `params.projectionMatrix`.
-5. Emit clip-space position plus UV to the existing GLES vertex buffer.
+3. Apply the current zoom/world-size convention used by the native Web Mercator helper.
+4. Transform each vertex through the same bearing, pitch, and NDC math used by the native custom layer projection path.
+5. Emit projected position plus UV to the existing GLES vertex buffer.
 
 The current shader can remain simple: position plus UV in, sampled base-color texture out with opaque alpha. Lighting and depth can stay minimal, but depth testing should be reconsidered during validation. If depth is disabled, the model will always draw over the map. If depth is enabled, ordering against MapLibre terrain/buildings is outside this step.
 
@@ -85,6 +85,10 @@ Runtime validation:
 5. Rotate the map; the tiger footprint should rotate with the map.
 6. Pitch the map; the tiger should reveal vertical 3D shape instead of remaining a flat screen billboard.
 7. Inspect `NativeModelLayer` and `Mbgl-MapRenderer` logs for GLES errors or renderer failures.
+
+## Implementation Notes
+
+The first implementation uses the existing native Web Mercator camera helper rather than directly multiplying `params.projectionMatrix`. This keeps the behavior consistent with the previous native custom layer projection path while still making every model vertex map-bound. A later rendering pass can replace the CPU projection helper with direct projection-matrix uniforms once the MapLibre native matrix coordinate convention is validated with screenshots and logs.
 
 ## Follow-Up Work
 
