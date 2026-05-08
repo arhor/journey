@@ -11,9 +11,6 @@ struct DecodedImage {
     std::vector<unsigned char> rgbaPixels;
 };
 
-std::optional<DecodedImage> decodePngRgba(
-        const std::vector<unsigned char>& pngBytes,
-        const char* logTag
-);
+std::optional<DecodedImage> decodePngRgba(const std::vector<unsigned char>& pngBytes, const char* logTag);
 
 }  // namespace custom_map_layers::assets

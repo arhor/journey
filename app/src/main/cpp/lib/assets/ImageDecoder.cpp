@@ -8,16 +8,9 @@
 
 namespace custom_map_layers::assets {
 
-std::optional<DecodedImage> decodePngRgba(
-        const std::vector<unsigned char>& pngBytes,
-        const char* logTag
-) {
+std::optional<DecodedImage> decodePngRgba(const std::vector<unsigned char>& pngBytes, const char* logTag) {
     AImageDecoder* decoder = nullptr;
-    int result = AImageDecoder_createFromBuffer(
-            pngBytes.data(),
-            pngBytes.size(),
-            &decoder
-    );
+    int result = AImageDecoder_createFromBuffer(pngBytes.data(), pngBytes.size(), &decoder);
     if (result != ANDROID_IMAGE_DECODER_SUCCESS || decoder == nullptr) {
         __android_log_print(ANDROID_LOG_ERROR, logTag, "Failed to create image decoder: %d", result);
         return std::nullopt;

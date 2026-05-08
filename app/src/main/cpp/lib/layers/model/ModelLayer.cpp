@@ -60,9 +60,7 @@ struct ClipPosition {
     double w = 1.0;
 };
 
-custom_map_layers::geo::LocalMeters rotateLocalModelMeters(
-        const custom_map_layers::gltf::ModelVertex& vertex
-) {
+custom_map_layers::geo::LocalMeters rotateLocalModelMeters(const custom_map_layers::gltf::ModelVertex& vertex) {
     const double modelEast = static_cast<double>(vertex.x) * kModelMetersPerUnit;
     const double modelNorth = static_cast<double>(-vertex.z) * kModelMetersPerUnit;
     const double modelUp = static_cast<double>(vertex.y) * kModelMetersPerUnit;
@@ -84,21 +82,13 @@ ClipPosition projectWorldToClip(
         double altitudeMeters
 ) {
     return ClipPosition{
-            .x = projectionMatrix[0] * worldX +
-                 projectionMatrix[4] * worldY +
-                 projectionMatrix[8] * altitudeMeters +
+            .x = projectionMatrix[0] * worldX + projectionMatrix[4] * worldY + projectionMatrix[8] * altitudeMeters +
                  projectionMatrix[12],
-            .y = projectionMatrix[1] * worldX +
-                 projectionMatrix[5] * worldY +
-                 projectionMatrix[9] * altitudeMeters +
+            .y = projectionMatrix[1] * worldX + projectionMatrix[5] * worldY + projectionMatrix[9] * altitudeMeters +
                  projectionMatrix[13],
-            .z = projectionMatrix[2] * worldX +
-                 projectionMatrix[6] * worldY +
-                 projectionMatrix[10] * altitudeMeters +
+            .z = projectionMatrix[2] * worldX + projectionMatrix[6] * worldY + projectionMatrix[10] * altitudeMeters +
                  projectionMatrix[14],
-            .w = projectionMatrix[3] * worldX +
-                 projectionMatrix[7] * worldY +
-                 projectionMatrix[11] * altitudeMeters +
+            .w = projectionMatrix[3] * worldX + projectionMatrix[7] * worldY + projectionMatrix[11] * altitudeMeters +
                  projectionMatrix[15],
     };
 }
@@ -139,7 +129,8 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         __android_log_print(
                 ANDROID_LOG_INFO,
                 LOG_TAG,
-                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f marker=(%.7f, %.7f, %.1fm) vertices=%d",
+                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f marker=(%.7f, %.7f, %.1fm) "
+                "vertices=%d",
                 params.width,
                 params.height,
                 params.latitude,
@@ -336,15 +327,12 @@ bool ModelLayer::loadModelAndTexture() {
     return true;
 }
 
-std::vector<GLfloat> ModelLayer::buildProjectedVertices(
-        const mbgl::style::CustomLayerRenderParameters& params
-) const {
+std::vector<GLfloat> ModelLayer::buildProjectedVertices(const mbgl::style::CustomLayerRenderParameters& params) const {
     std::vector<GLfloat> vertices;
     vertices.reserve(model_.triangleVertices.size() * 6);
 
     const double worldSize = 512.0 * std::pow(2.0, params.zoom);
-    const double worldPixelsPerMeter =
-            custom_map_layers::geo::metersToMercatorUnits(1.0, kMarkerLatitude) * worldSize;
+    const double worldPixelsPerMeter = custom_map_layers::geo::metersToMercatorUnits(1.0, kMarkerLatitude) * worldSize;
     const double originX = custom_map_layers::geo::longitudeToMercatorX(kMarkerLongitude) * worldSize;
     const double originY = custom_map_layers::geo::latitudeToMercatorY(kMarkerLatitude) * worldSize;
 
@@ -353,12 +341,7 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(
         const double worldX = originX + localMeters.east * worldPixelsPerMeter;
         const double worldY = originY - localMeters.north * worldPixelsPerMeter;
         const double altitudeMeters = kMarkerAltitudeMeters + localMeters.up;
-        const ClipPosition clipPosition = projectWorldToClip(
-                params.projectionMatrix,
-                worldX,
-                worldY,
-                altitudeMeters
-        );
+        const ClipPosition clipPosition = projectWorldToClip(params.projectionMatrix, worldX, worldY, altitudeMeters);
 
         vertices.push_back(static_cast<GLfloat>(clipPosition.x));
         vertices.push_back(static_cast<GLfloat>(clipPosition.y));

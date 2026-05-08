@@ -6,10 +6,7 @@ namespace custom_map_layers::assets {
 
 AssetReader::AssetReader(AAssetManager* assetManager) : assetManager_(assetManager) {}
 
-std::optional<std::vector<unsigned char>> AssetReader::readBytes(
-        const std::string& path,
-        const char* logTag
-) const {
+std::optional<std::vector<unsigned char>> AssetReader::readBytes(const std::string& path, const char* logTag) const {
     if (assetManager_ == nullptr) {
         __android_log_print(ANDROID_LOG_ERROR, logTag, "AssetManager is null while reading %s", path.c_str());
         return std::nullopt;

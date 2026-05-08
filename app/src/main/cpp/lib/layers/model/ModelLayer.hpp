@@ -7,8 +7,8 @@
 
 #include "custom_map_layers/maplibre/custom_layer_host.hpp"
 #include "gltf/LoadedModel.hpp"
-#include "rendering/GlesProgram.hpp"
 #include "rendering/GlTexture.hpp"
+#include "rendering/GlesProgram.hpp"
 #include "rendering/VertexBuffer.hpp"
 
 namespace custom_map_layers::layers::model {
@@ -25,7 +25,9 @@ public:
 private:
     void resetState();
     bool loadModelAndTexture();
-    std::vector<GLfloat> buildProjectedVertices(const mbgl::style::CustomLayerRenderParameters& params) const;
+    [[nodiscard]] std::vector<GLfloat> buildProjectedVertices(
+            const mbgl::style::CustomLayerRenderParameters& params
+    ) const;
 
     AAssetManager* assetManager_;
     rendering::GlesProgram program_;

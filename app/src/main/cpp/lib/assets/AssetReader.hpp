@@ -12,10 +12,8 @@ class AssetReader {
 public:
     explicit AssetReader(AAssetManager* assetManager);
 
-    [[nodiscard]] std::optional<std::vector<unsigned char>> readBytes(
-            const std::string& path,
-            const char* logTag
-    ) const;
+    [[nodiscard]] std::optional<std::vector<unsigned char>>
+    readBytes(const std::string& path, const char* logTag) const;
 
 private:
     AAssetManager* assetManager_;

@@ -1,6 +1,7 @@
 #include "gltf/GltfModelLoader.hpp"
 
 #include <android/log.h>
+#include <cgltf.h>
 
 #include <cstring>
 #include <string>
@@ -8,7 +9,6 @@
 #include <vector>
 
 #include "assets/AssetReader.hpp"
-#include "cgltf.h"
 #include "gltf/TextureCoordinate.hpp"
 
 namespace {
@@ -75,13 +75,15 @@ void appendPrimitive(
         }
         transformPosition(matrix, position, transformed);
 
-        vertices.push_back(ModelVertex{
-                .x = transformed[0],
-                .y = transformed[1],
-                .z = transformed[2],
-                .u = texcoord[0],
-                .v = custom_map_layers::gltf::rendererTextureV(texcoord[1]),
-        });
+        vertices.push_back(
+                ModelVertex{
+                        .x = transformed[0],
+                        .y = transformed[1],
+                        .z = transformed[2],
+                        .u = texcoord[0],
+                        .v = custom_map_layers::gltf::rendererTextureV(texcoord[1]),
+                }
+        );
     }
 }
 
@@ -104,8 +106,7 @@ void appendNode(
             appendPrimitive(primitive, matrix, vertices, logTag);
 
             if (texturePath.empty() && primitive.material != nullptr) {
-                const cgltf_texture_view& baseColor =
-                        primitive.material->pbr_metallic_roughness.base_color_texture;
+                const cgltf_texture_view& baseColor = primitive.material->pbr_metallic_roughness.base_color_texture;
                 if (baseColor.texture != nullptr && baseColor.texture->image != nullptr) {
                     texturePath = resolveTexturePath(baseColor.texture->image->uri);
                 }
@@ -133,12 +134,7 @@ std::optional<LoadedModel> GltfModelLoader::loadTiger(const char* logTag) const 
 
     cgltf_options options = {};
     cgltf_data* data = nullptr;
-    const cgltf_result parseResult = cgltf_parse(
-            &options,
-            bytes->data(),
-            bytes->size(),
-            &data
-    );
+    const cgltf_result parseResult = cgltf_parse(&options, bytes->data(), bytes->size(), &data);
     if (parseResult != cgltf_result_success || data == nullptr) {
         __android_log_print(ANDROID_LOG_ERROR, logTag, "cgltf_parse failed: %d", parseResult);
         return std::nullopt;
@@ -152,9 +148,8 @@ std::optional<LoadedModel> GltfModelLoader::loadTiger(const char* logTag) const 
 
     std::vector<ModelVertex> vertices;
     std::string texturePath;
-    const cgltf_scene* scene = data->scene != nullptr
-            ? data->scene
-            : (data->scenes_count > 0 ? &data->scenes[0] : nullptr);
+    const cgltf_scene* scene =
+            data->scene != nullptr ? data->scene : (data->scenes_count > 0 ? &data->scenes[0] : nullptr);
     if (scene == nullptr) {
         __android_log_write(ANDROID_LOG_ERROR, logTag, "GLB has no scene");
         cgltf_free(data);

@@ -82,8 +82,7 @@ ScreenPoint projectMetersOffsetToNdc(
 
     const double pointX = originX + offsetMeters.east * worldUnitsPerMeter;
     const double pointY = originY - offsetMeters.north * worldUnitsPerMeter;
-    const double pointAltitudePixels =
-            (originAltitudeMeters + offsetMeters.up) * worldUnitsPerMeter;
+    const double pointAltitudePixels = (originAltitudeMeters + offsetMeters.up) * worldUnitsPerMeter;
 
     const double bearingRadians = degreesToRadiansIfNeeded(params.bearing);
     const double pitchRadians = degreesToRadiansIfNeeded(params.pitch);
@@ -94,8 +93,7 @@ ScreenPoint projectMetersOffsetToNdc(
     const double rotatedX = dx * std::cos(bearingRadians) - dy * std::sin(bearingRadians);
     const double rotatedY = dx * std::sin(bearingRadians) + dy * std::cos(bearingRadians);
 
-    const double pitchedY =
-            rotatedY * std::cos(pitchRadians) - pointAltitudePixels * std::sin(pitchRadians);
+    const double pitchedY = rotatedY * std::cos(pitchRadians) - pointAltitudePixels * std::sin(pitchRadians);
 
     return ScreenPoint{
             .x = 2.0 * rotatedX / params.width,
