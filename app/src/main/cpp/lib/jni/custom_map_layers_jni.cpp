@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "layers/model/ModelInstance.hpp"
@@ -153,9 +154,13 @@ Java_com_github_arhor_journey_feature_map_viewinterop_NativeModelLayer_createCon
 ) {
     __android_log_write(ANDROID_LOG_INFO, log_tag, "nativeCreateContext");
     AAssetManager* nativeAssetManager = AAssetManager_fromJava(env, assetManager);
+    auto instances = readModelInstances(env, models);
+    if (env->ExceptionCheck()) {
+        return 0;
+    }
     auto layer = std::make_unique<custom_map_layers::layers::model::ModelLayer>(
             nativeAssetManager,
-            readModelInstances(env, models)
+            std::move(instances)
     );
     return reinterpret_cast<jlong>(layer.release());
 }
