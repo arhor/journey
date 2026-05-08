@@ -16,9 +16,11 @@ internal object NativeModelLayer {
         map: MapLibreMap,
         style: Style,
         assetManager: AssetManager,
+        models: List<NativeMapModelSpec> = emptyList(),
     ) {
         addToWithManagedContext(
-            createContext = { createContext(assetManager) },
+            models = models,
+            createContext = { specs -> createContext(assetManager, specs) },
             destroyContext = ::destroyContext,
             addLayer = { context ->
                 val customLayer = CustomLayer(LAYER_ID, context)
@@ -31,12 +33,13 @@ internal object NativeModelLayer {
     internal fun layerId(): String = LAYER_ID
 
     internal fun addToWithManagedContext(
-        createContext: () -> Long,
+        models: List<NativeMapModelSpec>,
+        createContext: (List<NativeMapModelSpec>) -> Long,
         destroyContext: (Long) -> Unit,
         addLayer: (Long) -> Unit,
         repaint: () -> Unit,
     ) {
-        val context = createContext()
+        val context = createContext(models)
         var layerAdded = false
 
         try {
@@ -51,9 +54,12 @@ internal object NativeModelLayer {
         }
     }
 
-    private fun createContext(assetManager: AssetManager): Long {
+    private fun createContext(
+        assetManager: AssetManager,
+        models: List<NativeMapModelSpec>,
+    ): Long {
         nativeLibraryLoadedGate
-        return createContextNative(assetManager)
+        return createContextNative(assetManager, models.toTypedArray())
     }
 
     private fun destroyContext(context: Long) {
@@ -65,7 +71,10 @@ internal object NativeModelLayer {
     }
 
     @JvmStatic
-    private external fun createContextNative(assetManager: AssetManager): Long
+    private external fun createContextNative(
+        assetManager: AssetManager,
+        models: Array<NativeMapModelSpec>,
+    ): Long
 
     @JvmStatic
     private external fun destroyContextNative(context: Long)

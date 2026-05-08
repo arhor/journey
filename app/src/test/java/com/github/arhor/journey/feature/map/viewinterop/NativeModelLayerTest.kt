@@ -22,6 +22,63 @@ class NativeModelLayerTest {
     }
 
     @Test
+    fun `native map model spec should expose asset path location scale and heading`() {
+        // Given
+        val spec = NativeMapModelSpec(
+            assetPath = "models/animal-tiger.glb",
+            latitude = 54.3738000,
+            longitude = 18.6508750,
+            altitudeMeters = 3.0,
+            scaleMetersPerModelUnit = 45.0,
+            headingDegrees = 90.0,
+        )
+
+        // When
+
+        // Then
+        spec.assetPath shouldBe "models/animal-tiger.glb"
+        spec.latitude shouldBe 54.3738000
+        spec.longitude shouldBe 18.6508750
+        spec.altitudeMeters shouldBe 3.0
+        spec.scaleMetersPerModelUnit shouldBe 45.0
+        spec.headingDegrees shouldBe 90.0
+    }
+
+    @Test
+    fun `addToWithManagedContext should pass model specs into context creation`() {
+        // Given
+        val model = NativeMapModelSpec(
+            assetPath = "models/animal-tiger.glb",
+            latitude = 54.3738000,
+            longitude = 18.6508750,
+            altitudeMeters = 0.0,
+            scaleMetersPerModelUnit = 45.0,
+            headingDegrees = 0.0,
+        )
+        val createdContext = 42L
+        val createdModels = mutableListOf<List<NativeMapModelSpec>>()
+        val addedContexts = mutableListOf<Long>()
+        var repaintCalls = 0
+
+        // When
+        NativeModelLayer.addToWithManagedContext(
+            models = listOf(model),
+            createContext = { models ->
+                createdModels += models
+                createdContext
+            },
+            destroyContext = {},
+            addLayer = { context -> addedContexts += context },
+            repaint = { repaintCalls += 1 },
+        )
+
+        // Then
+        createdModels shouldBe listOf(listOf(model))
+        addedContexts shouldBe listOf(createdContext)
+        repaintCalls shouldBe 1
+    }
+
+    @Test
     fun `addToWithManagedContext should repaint when layer is added`() {
         // Given
         val createdContext = 42L
@@ -31,6 +88,7 @@ class NativeModelLayerTest {
 
         // When
         NativeModelLayer.addToWithManagedContext(
+            models = emptyList(),
             createContext = { createdContext },
             destroyContext = { context -> destroyedContexts += context },
             addLayer = { context -> addedContexts += context },
@@ -54,6 +112,7 @@ class NativeModelLayerTest {
         // When
         val actual = try {
             NativeModelLayer.addToWithManagedContext(
+                models = emptyList(),
                 createContext = { createdContext },
                 destroyContext = { context -> destroyedContexts += context },
                 addLayer = { throw expected },
