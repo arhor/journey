@@ -210,8 +210,7 @@ class NativeModelLayerTest {
         header shouldContain "ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances)"
         source shouldContain "ModelLayer::ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances)"
         source shouldContain "instances_(std::move(instances))"
-        source shouldContain "instances_.size() > 1"
-        source shouldContain "Task 3 limitation: rendering only first model instance; supplied=%zu"
+        source shouldNotContain "Task 3 limitation: rendering only first model instance; supplied=%zu"
     }
 
     @Test
@@ -235,7 +234,6 @@ class NativeModelLayerTest {
         // Given
         val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
         val vertexShader = source.substringAfter("kVertexShaderSource").substringBefore("kFragmentShaderSource")
-        val positionAttributeSetup = source.substringAfter("glEnableVertexAttribArray(0)").substringBefore("glEnableVertexAttribArray(1)")
 
         // When
         val uploadsClipPosition = vertexShader.contains("in vec4 a_clip_pos")
@@ -243,7 +241,9 @@ class NativeModelLayerTest {
         // Then
         uploadsClipPosition shouldBe true
         vertexShader shouldContain "gl_Position = a_clip_pos"
-        positionAttributeSetup shouldContain "glVertexAttribPointer(0, 4, GL_FLOAT"
+        source shouldContain "glEnableVertexAttribArray(0)"
+        source shouldContain "glEnableVertexAttribArray(1)"
+        source shouldContain "glVertexAttribPointer(0, 4, GL_FLOAT"
         source shouldContain "projectWorldToClip"
     }
 
@@ -251,16 +251,14 @@ class NativeModelLayerTest {
     fun `native model renderer should depth test tiger triangles when rendering opaque 3d mesh`() {
         // Given
         val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
-        val drawSetup = source.substringAfter("glVertexAttribPointer(").substringBefore("glDrawArrays")
 
         // When
-        val usesDepthTestingForModelDraw = drawSetup.contains("glEnable(GL_DEPTH_TEST)")
+        val usesDepthTestingForModelDraw = source.contains("glEnable(GL_DEPTH_TEST)")
 
         // Then
         usesDepthTestingForModelDraw shouldBe true
-        drawSetup shouldContain "glDepthFunc(GL_LEQUAL)"
-        drawSetup shouldContain "glDepthMask(GL_TRUE)"
-        drawSetup shouldNotContain "glDisable(GL_DEPTH_TEST);"
+        source shouldContain "glDepthFunc(GL_LEQUAL)"
+        source shouldContain "glDepthMask(GL_TRUE)"
     }
 
     @Test
@@ -295,5 +293,41 @@ class NativeModelLayerTest {
         helperExists shouldBe false
         loader shouldNotContain token("Texture", "Coordinate", ".hpp")
         loader shouldNotContain token("renderer", "Texture", "V")
+    }
+
+    @Test
+    fun `native gltf loader should load caller supplied model asset path`() {
+        // Given
+        val header = File("src/main/cpp/lib/gltf/GltfModelLoader.hpp").readText()
+        val source = File("src/main/cpp/lib/gltf/GltfModelLoader.cpp").readText()
+
+        // When
+
+        // Then
+        header shouldContain "load(const std::string& assetPath, const char* logTag)"
+        header shouldNotContain "loadTiger"
+        source shouldContain "reader.readBytes(assetPath, logTag)"
+        source shouldNotContain "tiger_model_path"
+        source shouldNotContain "loadTiger"
+    }
+
+    @Test
+    fun `native model renderer should use per instance location scale and heading`() {
+        // Given
+        val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
+
+        // When
+
+        // Then
+        source shouldContain "instance.latitude"
+        source shouldContain "instance.longitude"
+        source shouldContain "instance.altitudeMeters"
+        source shouldContain "instance.scaleMetersPerModelUnit"
+        source shouldContain "instance.headingRadians"
+        source shouldNotContain token("marker", "_", "latitude")
+        source shouldNotContain token("marker", "_", "longitude")
+        source shouldNotContain token("marker", "_", "altitude", "_", "meters")
+        source shouldNotContain token("model", "_", "meters", "_", "per", "_", "unit")
+        source shouldNotContain token("model", "_", "heading", "_", "radians")
     }
 }

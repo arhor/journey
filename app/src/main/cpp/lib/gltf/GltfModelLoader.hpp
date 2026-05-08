@@ -3,6 +3,7 @@
 #include <android/asset_manager.h>
 
 #include <optional>
+#include <string>
 
 #include "gltf/LoadedModel.hpp"
 
@@ -12,7 +13,7 @@ class GltfModelLoader {
 public:
     explicit GltfModelLoader(AAssetManager* assetManager);
 
-    [[nodiscard]] std::optional<LoadedModel> loadTiger(const char* logTag) const;
+    [[nodiscard]] std::optional<LoadedModel> load(const std::string& assetPath, const char* logTag) const;
 
 private:
     AAssetManager* assetManager_;

@@ -34,9 +34,12 @@ private:
     };
 
     void resetState();
-    bool loadModelAndTexture();
+    bool loadModelAndTexture(const std::string& assetPath);
+    bool loadModelResources();
     [[nodiscard]] std::vector<GLfloat> buildProjectedVertices(
-            const mbgl::style::CustomLayerRenderParameters& params
+            const mbgl::style::CustomLayerRenderParameters& params,
+            const ModelInstance& instance,
+            const gltf::LoadedModel& model
     ) const;
 
     AAssetManager* assetManager_;

@@ -57,8 +57,8 @@ struct ClipPosition {
 };
 
 custom_map_layers::geo::LocalMeters rotateLocalModelMeters(
-        const custom_map_layers::gltf::ModelVertex& vertex,
-        const custom_map_layers::layers::model::ModelInstance& instance
+        const custom_map_layers::layers::model::ModelInstance& instance,
+        const custom_map_layers::gltf::ModelVertex& vertex
 ) {
     const double modelEast = static_cast<double>(vertex.x) * instance.scaleMetersPerModelUnit;
     const double modelNorth = static_cast<double>(-vertex.z) * instance.scaleMetersPerModelUnit;
@@ -103,15 +103,6 @@ void ModelLayer::initialize() {
     __android_log_write(ANDROID_LOG_INFO, log_tag, "initialize");
     deinitialize();
 
-    if (instances_.size() > 1) {
-        __android_log_print(
-                ANDROID_LOG_WARN,
-                log_tag,
-                "Task 3 limitation: rendering only first model instance; supplied=%zu",
-                instances_.size()
-        );
-    }
-
     if (!program_.create(vertex_shader_source, fragment_shader_source, log_tag)) {
         deinitialize();
         return;
@@ -122,7 +113,7 @@ void ModelLayer::initialize() {
         return;
     }
 
-    if (!loadModelAndTexture()) {
+    if (!loadModelResources()) {
         deinitialize();
     }
 }
@@ -132,24 +123,13 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         return;
     }
 
-    const ModelInstance& instance = instances_.front();
-    const auto resourceIterator = resourcesByAssetPath_.find(instance.assetPath);
-    if (resourceIterator == resourcesByAssetPath_.end()) {
-        return;
-    }
-
-    const CachedModelResource& resource = resourceIterator->second;
-    if (resource.texture == nullptr || resource.texture->handle() == 0) {
-        return;
-    }
-
     const bool isPitchedCamera = std::abs(params.pitch) > pitched_camera_log_threshold;
     const bool shouldLogRender = !didLogFirstRender_ || (!didLogFirstPitchedRender_ && isPitchedCamera);
     if (shouldLogRender) {
         __android_log_print(
                 ANDROID_LOG_INFO,
                 log_tag,
-                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f marker=(%.7f, %.7f, %.1fm) "
+                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f instances=%zu "
                 "vertices=%d",
                 params.width,
                 params.height,
@@ -158,46 +138,13 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
                 params.zoom,
                 params.bearing,
                 params.pitch,
-                instance.latitude,
-                instance.longitude,
-                instance.altitudeMeters,
+                instances_.size(),
                 vertexCount_
         );
         didLogFirstRender_ = true;
         if (isPitchedCamera) {
             didLogFirstPitchedRender_ = true;
         }
-    }
-
-    const std::vector<GLfloat> vertices = buildProjectedVertices(params);
-    vertexCount_ = static_cast<GLsizei>(vertices.size() / 6);
-    if (vertexCount_ == 0) {
-        return;
-    }
-
-    if (shouldLogRender) {
-        NdcBounds bounds;
-        for (size_t vertexOffset = 0; vertexOffset < vertices.size(); vertexOffset += 6) {
-            const auto w = static_cast<double>(vertices[vertexOffset + 3]);
-            if (w == 0.0) {
-                continue;
-            }
-            const double ndcX = static_cast<double>(vertices[vertexOffset]) / w;
-            const double ndcY = static_cast<double>(vertices[vertexOffset + 1]) / w;
-            bounds.minX = std::min(bounds.minX, ndcX);
-            bounds.maxX = std::max(bounds.maxX, ndcX);
-            bounds.minY = std::min(bounds.minY, ndcY);
-            bounds.maxY = std::max(bounds.maxY, ndcY);
-        }
-        __android_log_print(
-                ANDROID_LOG_INFO,
-                log_tag,
-                "model bounds ndc=(%.3f, %.3f)-(%.3f, %.3f)",
-                bounds.minX,
-                bounds.minY,
-                bounds.maxX,
-                bounds.maxY
-        );
     }
 
     GLint previousProgram = 0;
@@ -229,24 +176,10 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture2d);
 
     glUseProgram(program_.handle());
-    resource.texture->bind(GL_TEXTURE0);
     const GLint textureUniform = glGetUniformLocation(program_.handle(), "u_texture");
     glUniform1i(textureUniform, 0);
-
-    vertexBuffer_.upload(vertices);
-    vertexBuffer_.bind();
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), nullptr);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(
-            1,
-            2,
-            GL_FLOAT,
-            GL_FALSE,
-            6 * sizeof(GLfloat),
-            reinterpret_cast<const void*>(4 * sizeof(GLfloat))
-    );
-
     glDisable(GL_STENCIL_TEST);
     glDisable(GL_CULL_FACE);
     glDisable(GL_BLEND);
@@ -255,7 +188,66 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
-    glDrawArrays(GL_TRIANGLES, 0, vertexCount_);
+
+    vertexCount_ = 0;
+    for (const ModelInstance& instance : instances_) {
+        const auto resourceIterator = resourcesByAssetPath_.find(instance.assetPath);
+        if (resourceIterator == resourcesByAssetPath_.end()) {
+            continue;
+        }
+
+        const CachedModelResource& resource = resourceIterator->second;
+        if (resource.texture == nullptr || resource.texture->handle() == 0) {
+            continue;
+        }
+
+        const std::vector<GLfloat> vertices = buildProjectedVertices(params, instance, resource.model);
+        const GLsizei instanceVertexCount = static_cast<GLsizei>(vertices.size() / 6);
+        if (instanceVertexCount == 0) {
+            continue;
+        }
+
+        if (shouldLogRender) {
+            NdcBounds bounds;
+            for (size_t vertexOffset = 0; vertexOffset < vertices.size(); vertexOffset += 6) {
+                const auto w = static_cast<double>(vertices[vertexOffset + 3]);
+                if (w == 0.0) {
+                    continue;
+                }
+                const double ndcX = static_cast<double>(vertices[vertexOffset]) / w;
+                const double ndcY = static_cast<double>(vertices[vertexOffset + 1]) / w;
+                bounds.minX = std::min(bounds.minX, ndcX);
+                bounds.maxX = std::max(bounds.maxX, ndcX);
+                bounds.minY = std::min(bounds.minY, ndcY);
+                bounds.maxY = std::max(bounds.maxY, ndcY);
+            }
+            __android_log_print(
+                    ANDROID_LOG_INFO,
+                    log_tag,
+                    "model asset=%s bounds ndc=(%.3f, %.3f)-(%.3f, %.3f)",
+                    instance.assetPath.c_str(),
+                    bounds.minX,
+                    bounds.minY,
+                    bounds.maxX,
+                    bounds.maxY
+            );
+        }
+
+        resource.texture->bind(GL_TEXTURE0);
+        vertexBuffer_.upload(vertices);
+        vertexBuffer_.bind();
+        glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), nullptr);
+        glVertexAttribPointer(
+                1,
+                2,
+                GL_FLOAT,
+                GL_FALSE,
+                6 * sizeof(GLfloat),
+                reinterpret_cast<const void*>(4 * sizeof(GLfloat))
+        );
+        glDrawArrays(GL_TRIANGLES, 0, instanceVertexCount);
+        vertexCount_ += instanceVertexCount;
+    }
 
     glDisableVertexAttribArray(1);
     glDisableVertexAttribArray(0);
@@ -303,6 +295,7 @@ void ModelLayer::contextLost() {
             resource.texture->forget();
         }
     }
+    resourcesByAssetPath_.clear();
     vertexBuffer_.forget();
     program_.forget();
     resetState();
@@ -315,96 +308,94 @@ void ModelLayer::deinitialize() {
             resource.texture->reset();
         }
     }
+    resourcesByAssetPath_.clear();
     vertexBuffer_.reset();
     program_.reset();
     custom_map_layers::rendering::logGlErrors("deinitialize", log_tag);
     resetState();
 }
 
-bool ModelLayer::loadModelAndTexture() {
-    resourcesByAssetPath_.clear();
-    if (instances_.empty()) {
-        return false;
+bool ModelLayer::loadModelAndTexture(const std::string& assetPath) {
+    if (resourcesByAssetPath_.find(assetPath) != resourcesByAssetPath_.end()) {
+        return true;
     }
 
     const custom_map_layers::gltf::GltfModelLoader loader(assetManager_);
     const custom_map_layers::assets::AssetReader reader(assetManager_);
-
-    for (const ModelInstance& instance : instances_) {
-        if (resourcesByAssetPath_.find(instance.assetPath) != resourcesByAssetPath_.end()) {
-            continue;
-        }
-
-        auto loadedModel = loader.loadTiger(log_tag);
-        if (!loadedModel.has_value()) {
-            return false;
-        }
-
-        const auto textureBytes = reader.readBytes(loadedModel->texturePath, log_tag);
-        if (!textureBytes.has_value()) {
-            __android_log_print(
-                    ANDROID_LOG_ERROR,
-                    log_tag,
-                    "Missing texture asset: %s",
-                    loadedModel->texturePath.c_str()
-            );
-            return false;
-        }
-
-        const auto decoded = custom_map_layers::assets::decodePngRgba(*textureBytes, log_tag);
-        if (!decoded.has_value()) {
-            return false;
-        }
-
-        auto texture = std::make_unique<rendering::GlTexture>();
-        if (!texture->createRgba(decoded->rgbaPixels.data(), decoded->width, decoded->height, log_tag)) {
-            return false;
-        }
-
-        const GLsizei resourceVertexCount = static_cast<GLsizei>(loadedModel->triangleVertices.size());
-        resourcesByAssetPath_.emplace(
-                instance.assetPath,
-                CachedModelResource{
-                        .model = std::move(*loadedModel),
-                        .texture = std::move(texture),
-                        .vertexCount = resourceVertexCount,
-                }
-        );
-    }
-
-    if (resourcesByAssetPath_.empty()) {
+    auto loadedModel = loader.load(assetPath, log_tag);
+    if (!loadedModel.has_value()) {
         return false;
     }
 
-    const auto firstResource = resourcesByAssetPath_.find(instances_.front().assetPath);
-    if (firstResource != resourcesByAssetPath_.end()) {
-        vertexCount_ = firstResource->second.vertexCount;
+    const auto textureBytes = reader.readBytes(loadedModel->texturePath, log_tag);
+    if (!textureBytes.has_value()) {
+        __android_log_print(
+                ANDROID_LOG_ERROR,
+                log_tag,
+                "Missing texture asset: %s",
+                loadedModel->texturePath.c_str()
+        );
+        return false;
     }
-    loaded_ = true;
+
+    const auto decoded = custom_map_layers::assets::decodePngRgba(*textureBytes, log_tag);
+    if (!decoded.has_value()) {
+        return false;
+    }
+
+    auto texture = std::make_unique<rendering::GlTexture>();
+    if (!texture->createRgba(decoded->rgbaPixels.data(), decoded->width, decoded->height, log_tag)) {
+        return false;
+    }
+
+    const GLsizei resourceVertexCount = static_cast<GLsizei>(loadedModel->triangleVertices.size());
+    resourcesByAssetPath_.emplace(
+            assetPath,
+            CachedModelResource{
+                    .model = std::move(*loadedModel),
+                    .texture = std::move(texture),
+                    .vertexCount = resourceVertexCount,
+            }
+    );
     __android_log_print(
             ANDROID_LOG_INFO,
             log_tag,
-            "Loaded model resources=%zu instances=%zu",
-            resourcesByAssetPath_.size(),
-            instances_.size()
+            "Loaded model asset=%s vertices=%d",
+            assetPath.c_str(),
+            resourceVertexCount
     );
     return true;
 }
 
-std::vector<GLfloat> ModelLayer::buildProjectedVertices(const mbgl::style::CustomLayerRenderParameters& params) const {
+bool ModelLayer::loadModelResources() {
+    resourcesByAssetPath_.clear();
+    loaded_ = false;
     if (instances_.empty()) {
-        return {};
+        return false;
     }
 
-    const ModelInstance& instance = instances_.front();
-    const auto resourceIterator = resourcesByAssetPath_.find(instance.assetPath);
-    if (resourceIterator == resourcesByAssetPath_.end()) {
-        return {};
+    for (const ModelInstance& instance : instances_) {
+        if (instance.assetPath.empty()) {
+            __android_log_write(ANDROID_LOG_ERROR, log_tag, "Missing model asset path for instance");
+            continue;
+        }
+        if (!loadModelAndTexture(instance.assetPath)) {
+            return false;
+        }
     }
-    const CachedModelResource& resource = resourceIterator->second;
+
+    loaded_ = !resourcesByAssetPath_.empty();
+    return loaded_;
+}
+
+std::vector<GLfloat> ModelLayer::buildProjectedVertices(
+        const mbgl::style::CustomLayerRenderParameters& params,
+        const ModelInstance& instance,
+        const gltf::LoadedModel& model
+) const {
 
     std::vector<GLfloat> vertices;
-    vertices.reserve(resource.model.triangleVertices.size() * 6);
+    vertices.reserve(model.triangleVertices.size() * 6);
 
     const double worldSize = 512.0 * std::pow(2.0, params.zoom);
     const double worldPixelsPerMeter =
@@ -412,8 +403,8 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(const mbgl::style::Custo
     const double originX = custom_map_layers::geo::longitudeToMercatorX(instance.longitude) * worldSize;
     const double originY = custom_map_layers::geo::latitudeToMercatorY(instance.latitude) * worldSize;
 
-    for (const custom_map_layers::gltf::ModelVertex& vertex : resource.model.triangleVertices) {
-        const custom_map_layers::geo::LocalMeters localMeters = rotateLocalModelMeters(vertex, instance);
+    for (const custom_map_layers::gltf::ModelVertex& vertex : model.triangleVertices) {
+        const custom_map_layers::geo::LocalMeters localMeters = rotateLocalModelMeters(instance, vertex);
         const double worldX = originX + localMeters.east * worldPixelsPerMeter;
         const double worldY = originY - localMeters.north * worldPixelsPerMeter;
         const double altitudeMeters = instance.altitudeMeters + localMeters.up;

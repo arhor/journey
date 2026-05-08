@@ -12,7 +12,6 @@
 
 namespace {
 
-constexpr const char* tiger_model_path = "models/animal-tiger.glb";
 constexpr const char* texture_fallback_path = "models/textures/colormap.png";
 
 using custom_map_layers::gltf::ModelVertex;
@@ -124,9 +123,9 @@ namespace custom_map_layers::gltf {
 
 GltfModelLoader::GltfModelLoader(AAssetManager* assetManager) : assetManager_(assetManager) {}
 
-std::optional<LoadedModel> GltfModelLoader::loadTiger(const char* logTag) const {
+std::optional<LoadedModel> GltfModelLoader::load(const std::string& assetPath, const char* logTag) const {
     const custom_map_layers::assets::AssetReader reader(assetManager_);
-    const auto bytes = reader.readBytes(tiger_model_path, logTag);
+    const auto bytes = reader.readBytes(assetPath, logTag);
     if (!bytes.has_value()) {
         return std::nullopt;
     }
