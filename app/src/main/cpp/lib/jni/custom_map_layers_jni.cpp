@@ -13,22 +13,31 @@ namespace {
 
 constexpr const char* log_tag = "NativeModelLayer";
 
-std::string readString(JNIEnv* env, jobject source, jmethodID getter) {
+bool readString(JNIEnv* env, jobject source, jmethodID getter, std::string* outValue) {
     auto stringValue = static_cast<jstring>(env->CallObjectMethod(source, getter));
+    if (env->ExceptionCheck()) {
+        return false;
+    }
     if (stringValue == nullptr) {
-        return {};
+        outValue->clear();
+        return true;
     }
 
     const char* utfChars = env->GetStringUTFChars(stringValue, nullptr);
+    if (env->ExceptionCheck()) {
+        env->DeleteLocalRef(stringValue);
+        return false;
+    }
     if (utfChars == nullptr) {
         env->DeleteLocalRef(stringValue);
-        return {};
+        outValue->clear();
+        return true;
     }
 
-    std::string value(utfChars);
+    outValue->assign(utfChars);
     env->ReleaseStringUTFChars(stringValue, utfChars);
     env->DeleteLocalRef(stringValue);
-    return value;
+    return true;
 }
 
 std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(JNIEnv* env, jobjectArray models) {
@@ -40,22 +49,35 @@ std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(
     }
 
     const jsize modelCount = env->GetArrayLength(models);
+    if (env->ExceptionCheck()) {
+        return instances;
+    }
     if (modelCount <= 0) {
         return instances;
     }
 
     jclass modelSpecClass = env->FindClass("com/github/arhor/journey/feature/map/viewinterop/NativeMapModelSpec");
+    if (env->ExceptionCheck()) {
+        return instances;
+    }
     if (modelSpecClass == nullptr) {
         return instances;
     }
 
-    const jmethodID getAssetPath = env->GetMethodID(modelSpecClass, "getAssetPath", "()Ljava/lang/String;");
-    const jmethodID getLatitude = env->GetMethodID(modelSpecClass, "getLatitude", "()D");
-    const jmethodID getLongitude = env->GetMethodID(modelSpecClass, "getLongitude", "()D");
-    const jmethodID getAltitudeMeters = env->GetMethodID(modelSpecClass, "getAltitudeMeters", "()D");
-    const jmethodID getScaleMetersPerModelUnit =
-            env->GetMethodID(modelSpecClass, "getScaleMetersPerModelUnit", "()D");
-    const jmethodID getHeadingDegrees = env->GetMethodID(modelSpecClass, "getHeadingDegrees", "()D");
+    const auto readMethod = [&](const char* methodName, const char* signature) -> jmethodID {
+        jmethodID method = env->GetMethodID(modelSpecClass, methodName, signature);
+        if (env->ExceptionCheck()) {
+            return nullptr;
+        }
+        return method;
+    };
+
+    const jmethodID getAssetPath = readMethod("getAssetPath", "()Ljava/lang/String;");
+    const jmethodID getLatitude = readMethod("getLatitude", "()D");
+    const jmethodID getLongitude = readMethod("getLongitude", "()D");
+    const jmethodID getAltitudeMeters = readMethod("getAltitudeMeters", "()D");
+    const jmethodID getScaleMetersPerModelUnit = readMethod("getScaleMetersPerModelUnit", "()D");
+    const jmethodID getHeadingDegrees = readMethod("getHeadingDegrees", "()D");
 
     if (getAssetPath == nullptr || getLatitude == nullptr || getLongitude == nullptr || getAltitudeMeters == nullptr ||
         getScaleMetersPerModelUnit == nullptr || getHeadingDegrees == nullptr) {
@@ -66,18 +88,51 @@ std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(
     instances.reserve(static_cast<size_t>(modelCount));
     for (jsize index = 0; index < modelCount; index++) {
         jobject modelSpec = env->GetObjectArrayElement(models, index);
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(modelSpecClass);
+            return instances;
+        }
         if (modelSpec == nullptr) {
             continue;
         }
 
         ModelInstance instance;
-        instance.assetPath = readString(env, modelSpec, getAssetPath);
+        if (!readString(env, modelSpec, getAssetPath, &instance.assetPath)) {
+            env->DeleteLocalRef(modelSpec);
+            env->DeleteLocalRef(modelSpecClass);
+            return instances;
+        }
         instance.latitude = env->CallDoubleMethod(modelSpec, getLatitude);
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(modelSpec);
+            env->DeleteLocalRef(modelSpecClass);
+            return instances;
+        }
         instance.longitude = env->CallDoubleMethod(modelSpec, getLongitude);
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(modelSpec);
+            env->DeleteLocalRef(modelSpecClass);
+            return instances;
+        }
         instance.altitudeMeters = env->CallDoubleMethod(modelSpec, getAltitudeMeters);
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(modelSpec);
+            env->DeleteLocalRef(modelSpecClass);
+            return instances;
+        }
         instance.scaleMetersPerModelUnit = env->CallDoubleMethod(modelSpec, getScaleMetersPerModelUnit);
-        instance.headingRadians =
-                custom_map_layers::layers::model::degreesToRadians(env->CallDoubleMethod(modelSpec, getHeadingDegrees));
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(modelSpec);
+            env->DeleteLocalRef(modelSpecClass);
+            return instances;
+        }
+        const double headingDegrees = env->CallDoubleMethod(modelSpec, getHeadingDegrees);
+        if (env->ExceptionCheck()) {
+            env->DeleteLocalRef(modelSpec);
+            env->DeleteLocalRef(modelSpecClass);
+            return instances;
+        }
+        instance.headingRadians = custom_map_layers::layers::model::degreesToRadians(headingDegrees);
         instances.push_back(std::move(instance));
 
         env->DeleteLocalRef(modelSpec);
