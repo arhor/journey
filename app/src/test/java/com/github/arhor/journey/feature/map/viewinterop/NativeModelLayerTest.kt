@@ -175,6 +175,42 @@ class NativeModelLayerTest {
     }
 
     @Test
+    fun `native model layer context creation should receive kotlin model spec array`() {
+        // Given
+        val kotlinSource = File("src/main/java/com/github/arhor/journey/feature/map/viewinterop/NativeModelLayer.kt")
+            .readText()
+        val jniSource = File("src/main/cpp/lib/jni/custom_map_layers_jni.cpp").readText()
+
+        // When
+
+        // Then
+        kotlinSource shouldContain "models: Array<NativeMapModelSpec>"
+        jniSource shouldContain "jobjectArray models"
+        jniSource shouldContain "readModelInstances"
+        jniSource shouldContain "getAssetPath"
+        jniSource shouldContain "getLatitude"
+        jniSource shouldContain "getLongitude"
+        jniSource shouldContain "getAltitudeMeters"
+        jniSource shouldContain "getScaleMetersPerModelUnit"
+        jniSource shouldContain "getHeadingDegrees"
+    }
+
+    @Test
+    fun `native model layer should be constructed with model instances`() {
+        // Given
+        val header = File("src/main/cpp/lib/layers/model/ModelLayer.hpp").readText()
+        val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
+
+        // When
+
+        // Then
+        header shouldContain "std::vector<ModelInstance>"
+        header shouldContain "ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances)"
+        source shouldContain "ModelLayer::ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances)"
+        source shouldContain "instances_(std::move(instances))"
+    }
+
+    @Test
     fun `native model renderer should use MapLibre projection matrix instead of manual camera rotation`() {
         // Given
         val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()

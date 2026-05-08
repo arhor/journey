@@ -3,19 +3,23 @@
 #include <GLES3/gl3.h>
 #include <android/asset_manager.h>
 
+#include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "custom_map_layers/maplibre/custom_layer_host.hpp"
 #include "gltf/LoadedModel.hpp"
-#include "rendering/GlTexture.hpp"
+#include "layers/model/ModelInstance.hpp"
 #include "rendering/GlesProgram.hpp"
+#include "rendering/GlTexture.hpp"
 #include "rendering/VertexBuffer.hpp"
 
 namespace custom_map_layers::layers::model {
 
 class ModelLayer final : public mbgl::style::CustomLayerHost {
 public:
-    explicit ModelLayer(AAssetManager* assetManager);
+    ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances);
 
     void initialize() override;
     void render(const mbgl::style::CustomLayerRenderParameters& params) override;
@@ -23,6 +27,12 @@ public:
     void deinitialize() override;
 
 private:
+    struct CachedModelResource {
+        gltf::LoadedModel model;
+        std::unique_ptr<rendering::GlTexture> texture;
+        GLsizei vertexCount = 0;
+    };
+
     void resetState();
     bool loadModelAndTexture();
     [[nodiscard]] std::vector<GLfloat> buildProjectedVertices(
@@ -32,8 +42,8 @@ private:
     AAssetManager* assetManager_;
     rendering::GlesProgram program_;
     rendering::VertexBuffer vertexBuffer_;
-    rendering::GlTexture texture_;
-    gltf::LoadedModel model_;
+    std::vector<ModelInstance> instances_;
+    std::unordered_map<std::string, CachedModelResource> resourcesByAssetPath_;
     GLsizei vertexCount_ = 0;
     bool loaded_ = false;
     bool didLogFirstRender_ = false;

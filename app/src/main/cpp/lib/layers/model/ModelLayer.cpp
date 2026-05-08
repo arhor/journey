@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <memory>
 #include <utility>
 
 #include "assets/AssetReader.hpp"
@@ -16,11 +17,6 @@
 namespace {
 
 constexpr const char* log_tag = "NativeModelLayer";
-constexpr double marker_latitude = 54.3738000;
-constexpr double marker_longitude = 18.6508750;
-constexpr double marker_altitude_meters = 0.0;
-constexpr double model_meters_per_unit = 45.0;
-constexpr double model_heading_radians = 0.0;
 constexpr double pitched_camera_log_threshold = 0.15;
 
 constexpr const char* vertex_shader_source = R"(#version 300 es
@@ -60,13 +56,16 @@ struct ClipPosition {
     double w = 1.0;
 };
 
-custom_map_layers::geo::LocalMeters rotateLocalModelMeters(const custom_map_layers::gltf::ModelVertex& vertex) {
-    const double modelEast = static_cast<double>(vertex.x) * model_meters_per_unit;
-    const double modelNorth = static_cast<double>(-vertex.z) * model_meters_per_unit;
-    const double modelUp = static_cast<double>(vertex.y) * model_meters_per_unit;
+custom_map_layers::geo::LocalMeters rotateLocalModelMeters(
+        const custom_map_layers::gltf::ModelVertex& vertex,
+        const custom_map_layers::layers::model::ModelInstance& instance
+) {
+    const double modelEast = static_cast<double>(vertex.x) * instance.scaleMetersPerModelUnit;
+    const double modelNorth = static_cast<double>(-vertex.z) * instance.scaleMetersPerModelUnit;
+    const double modelUp = static_cast<double>(vertex.y) * instance.scaleMetersPerModelUnit;
 
-    const double cosHeading = std::cos(model_heading_radians);
-    const double sinHeading = std::sin(model_heading_radians);
+    const double cosHeading = std::cos(instance.headingRadians);
+    const double sinHeading = std::sin(instance.headingRadians);
 
     return custom_map_layers::geo::LocalMeters{
             .east = modelEast * cosHeading - modelNorth * sinHeading,
@@ -97,7 +96,8 @@ ClipPosition projectWorldToClip(
 
 namespace custom_map_layers::layers::model {
 
-ModelLayer::ModelLayer(AAssetManager* assetManager) : assetManager_(assetManager) {}
+ModelLayer::ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances)
+    : assetManager_(assetManager), instances_(std::move(instances)) {}
 
 void ModelLayer::initialize() {
     __android_log_write(ANDROID_LOG_INFO, log_tag, "initialize");
@@ -119,7 +119,18 @@ void ModelLayer::initialize() {
 }
 
 void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) {
-    if (!loaded_ || program_.handle() == 0 || vertexBuffer_.handle() == 0 || texture_.handle() == 0) {
+    if (!loaded_ || program_.handle() == 0 || vertexBuffer_.handle() == 0 || instances_.empty()) {
+        return;
+    }
+
+    const ModelInstance& instance = instances_.front();
+    const auto resourceIterator = resourcesByAssetPath_.find(instance.assetPath);
+    if (resourceIterator == resourcesByAssetPath_.end()) {
+        return;
+    }
+
+    const CachedModelResource& resource = resourceIterator->second;
+    if (resource.texture == nullptr || resource.texture->handle() == 0) {
         return;
     }
 
@@ -138,9 +149,9 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
                 params.zoom,
                 params.bearing,
                 params.pitch,
-                marker_latitude,
-                marker_longitude,
-                marker_altitude_meters,
+                instance.latitude,
+                instance.longitude,
+                instance.altitudeMeters,
                 vertexCount_
         );
         didLogFirstRender_ = true;
@@ -209,7 +220,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture2d);
 
     glUseProgram(program_.handle());
-    texture_.bind(GL_TEXTURE0);
+    resource.texture->bind(GL_TEXTURE0);
     const GLint textureUniform = glGetUniformLocation(program_.handle(), "u_texture");
     glUniform1i(textureUniform, 0);
 
@@ -277,14 +288,24 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
 
 void ModelLayer::contextLost() {
     __android_log_write(ANDROID_LOG_INFO, log_tag, "contextLost");
-    texture_.forget();
+    for (auto& [assetPath, resource] : resourcesByAssetPath_) {
+        (void)assetPath;
+        if (resource.texture != nullptr) {
+            resource.texture->forget();
+        }
+    }
     vertexBuffer_.forget();
     program_.forget();
     resetState();
 }
 
 void ModelLayer::deinitialize() {
-    texture_.reset();
+    for (auto& [assetPath, resource] : resourcesByAssetPath_) {
+        (void)assetPath;
+        if (resource.texture != nullptr) {
+            resource.texture->reset();
+        }
+    }
     vertexBuffer_.reset();
     program_.reset();
     custom_map_layers::rendering::logGlErrors("deinitialize", log_tag);
@@ -292,55 +313,101 @@ void ModelLayer::deinitialize() {
 }
 
 bool ModelLayer::loadModelAndTexture() {
+    resourcesByAssetPath_.clear();
+    if (instances_.empty()) {
+        return false;
+    }
+
     const custom_map_layers::gltf::GltfModelLoader loader(assetManager_);
-    auto loadedModel = loader.loadTiger(log_tag);
-    if (!loadedModel.has_value()) {
-        return false;
-    }
-
     const custom_map_layers::assets::AssetReader reader(assetManager_);
-    const auto textureBytes = reader.readBytes(loadedModel->texturePath, log_tag);
-    if (!textureBytes.has_value()) {
-        __android_log_print(ANDROID_LOG_ERROR, log_tag, "Missing texture asset: %s", loadedModel->texturePath.c_str());
+
+    for (const ModelInstance& instance : instances_) {
+        if (resourcesByAssetPath_.find(instance.assetPath) != resourcesByAssetPath_.end()) {
+            continue;
+        }
+
+        auto loadedModel = loader.loadTiger(log_tag);
+        if (!loadedModel.has_value()) {
+            return false;
+        }
+
+        const auto textureBytes = reader.readBytes(loadedModel->texturePath, log_tag);
+        if (!textureBytes.has_value()) {
+            __android_log_print(
+                    ANDROID_LOG_ERROR,
+                    log_tag,
+                    "Missing texture asset: %s",
+                    loadedModel->texturePath.c_str()
+            );
+            return false;
+        }
+
+        const auto decoded = custom_map_layers::assets::decodePngRgba(*textureBytes, log_tag);
+        if (!decoded.has_value()) {
+            return false;
+        }
+
+        auto texture = std::make_unique<rendering::GlTexture>();
+        if (!texture->createRgba(decoded->rgbaPixels.data(), decoded->width, decoded->height, log_tag)) {
+            return false;
+        }
+
+        const GLsizei resourceVertexCount = static_cast<GLsizei>(loadedModel->triangleVertices.size());
+        resourcesByAssetPath_.emplace(
+                instance.assetPath,
+                CachedModelResource{
+                        .model = std::move(*loadedModel),
+                        .texture = std::move(texture),
+                        .vertexCount = resourceVertexCount,
+                }
+        );
+    }
+
+    if (resourcesByAssetPath_.empty()) {
         return false;
     }
 
-    const auto decoded = custom_map_layers::assets::decodePngRgba(*textureBytes, log_tag);
-    if (!decoded.has_value()) {
-        return false;
+    const auto firstResource = resourcesByAssetPath_.find(instances_.front().assetPath);
+    if (firstResource != resourcesByAssetPath_.end()) {
+        vertexCount_ = firstResource->second.vertexCount;
     }
-
-    if (!texture_.createRgba(decoded->rgbaPixels.data(), decoded->width, decoded->height, log_tag)) {
-        return false;
-    }
-
-    model_ = std::move(*loadedModel);
-    vertexCount_ = static_cast<GLsizei>(model_.triangleVertices.size());
     loaded_ = true;
     __android_log_print(
             ANDROID_LOG_INFO,
             log_tag,
-            "Loaded tiger model vertices=%zu texture=%s",
-            model_.triangleVertices.size(),
-            model_.texturePath.c_str()
+            "Loaded model resources=%zu instances=%zu",
+            resourcesByAssetPath_.size(),
+            instances_.size()
     );
     return true;
 }
 
 std::vector<GLfloat> ModelLayer::buildProjectedVertices(const mbgl::style::CustomLayerRenderParameters& params) const {
+    if (instances_.empty()) {
+        return {};
+    }
+
+    const ModelInstance& instance = instances_.front();
+    const auto resourceIterator = resourcesByAssetPath_.find(instance.assetPath);
+    if (resourceIterator == resourcesByAssetPath_.end()) {
+        return {};
+    }
+    const CachedModelResource& resource = resourceIterator->second;
+
     std::vector<GLfloat> vertices;
-    vertices.reserve(model_.triangleVertices.size() * 6);
+    vertices.reserve(resource.model.triangleVertices.size() * 6);
 
     const double worldSize = 512.0 * std::pow(2.0, params.zoom);
-    const double worldPixelsPerMeter = custom_map_layers::geo::metersToMercatorUnits(1.0, marker_latitude) * worldSize;
-    const double originX = custom_map_layers::geo::longitudeToMercatorX(marker_longitude) * worldSize;
-    const double originY = custom_map_layers::geo::latitudeToMercatorY(marker_latitude) * worldSize;
+    const double worldPixelsPerMeter =
+            custom_map_layers::geo::metersToMercatorUnits(1.0, instance.latitude) * worldSize;
+    const double originX = custom_map_layers::geo::longitudeToMercatorX(instance.longitude) * worldSize;
+    const double originY = custom_map_layers::geo::latitudeToMercatorY(instance.latitude) * worldSize;
 
-    for (const custom_map_layers::gltf::ModelVertex& vertex : model_.triangleVertices) {
-        const custom_map_layers::geo::LocalMeters localMeters = rotateLocalModelMeters(vertex);
+    for (const custom_map_layers::gltf::ModelVertex& vertex : resource.model.triangleVertices) {
+        const custom_map_layers::geo::LocalMeters localMeters = rotateLocalModelMeters(vertex, instance);
         const double worldX = originX + localMeters.east * worldPixelsPerMeter;
         const double worldY = originY - localMeters.north * worldPixelsPerMeter;
-        const double altitudeMeters = marker_altitude_meters + localMeters.up;
+        const double altitudeMeters = instance.altitudeMeters + localMeters.up;
         const ClipPosition clipPosition = projectWorldToClip(params.projectionMatrix, worldX, worldY, altitudeMeters);
 
         vertices.push_back(static_cast<GLfloat>(clipPosition.x));
@@ -355,6 +422,7 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(const mbgl::style::Custo
 }
 
 void ModelLayer::resetState() {
+    resourcesByAssetPath_.clear();
     vertexCount_ = 0;
     loaded_ = false;
     didLogFirstRender_ = false;
