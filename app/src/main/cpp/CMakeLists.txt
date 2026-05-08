@@ -18,6 +18,12 @@ cmake_minimum_required(VERSION 4.1.2)
 # support is not initialized unless added later.
 project(custom-map-layers LANGUAGES CXX)
 
+# Enables CMake's built-in dependency fetch helper.
+#
+# The native build uses this for small source dependencies that should be
+# pinned by tag instead of committed into app/src/main/cpp.
+include(FetchContent)
+
 # Keep the native target name in one place.
 #
 # This target name also determines the resulting shared library name:
@@ -26,6 +32,25 @@ project(custom-map-layers LANGUAGES CXX)
 # From Kotlin/Java, load it with:
 #     System.loadLibrary("custom-map-layers")
 set(CUSTOM_MAP_LAYERS_TARGET custom-map-layers)
+
+# Declares the cgltf dependency used by the glTF loader.
+#
+# cgltf is a single-header library. This project keeps the one
+# CGLTF_IMPLEMENTATION translation unit in lib/gltf/cgltf_impl.cpp, while
+# CMake fetches the upstream header from the pinned v1.15 tag during native
+# configuration.
+FetchContent_Declare(
+        cgltf
+        GIT_REPOSITORY https://github.com/jkuhlmann/cgltf.git
+        GIT_TAG v1.15
+)
+
+# Downloads and makes the declared cgltf source directory available.
+#
+# The fetched project does not need to be linked as a separate target here;
+# target_include_directories() below points the native library at the fetched
+# source root so #include "cgltf.h" resolves to the pinned upstream header.
+FetchContent_MakeAvailable(cgltf)
 
 # Creates the native shared library that Gradle will package into the APK.
 #
@@ -85,14 +110,14 @@ target_compile_features(
 # lib:
 #   Internal implementation headers located near .cpp files.
 #
-# third_party/cgltf:
-#   Header-only cgltf dependency used by the glTF loader.
+# cgltf_SOURCE_DIR:
+#   Header-only cgltf dependency fetched from the pinned upstream tag.
 target_include_directories(
         ${CUSTOM_MAP_LAYERS_TARGET}
         PRIVATE
         include
         lib
-        third_party/cgltf
+        ${cgltf_SOURCE_DIR}
 )
 
 # Enables stricter compiler diagnostics for this target.
