@@ -151,13 +151,19 @@ class NativeModelLayerTest {
         // Given
         val source = File("src/main/java/com/github/arhor/journey/feature/map/viewinterop/MapLibreViewMapScreen.kt")
             .readText()
+        val addToCallStartToken = "NativeModelLayer.addTo("
+        val viewportAttachToken = "viewportReporter.attach(map)"
 
         // When
-        val modelLayerCall = source
-            .substringAfter("NativeModelLayer.addTo(")
-            .substringBefore("viewportReporter.attach(map)")
+        val addToCallStartIndex = source.indexOf(addToCallStartToken)
+        val viewportAttachIndex = source.indexOf(viewportAttachToken)
+        val modelLayerCallStartIndex = addToCallStartIndex + addToCallStartToken.length
+        val modelLayerCall = source.substring(modelLayerCallStartIndex, viewportAttachIndex)
 
         // Then
+        (addToCallStartIndex >= 0) shouldBe true
+        (viewportAttachIndex >= 0) shouldBe true
+        (viewportAttachIndex > modelLayerCallStartIndex) shouldBe true
         modelLayerCall shouldContain "models = listOf("
         modelLayerCall shouldContain "NativeMapModelSpec("
         modelLayerCall shouldContain "assetPath = \"models/animal-tiger.glb\""
