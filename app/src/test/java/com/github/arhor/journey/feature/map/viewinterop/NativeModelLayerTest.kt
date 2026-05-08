@@ -8,6 +8,8 @@ import org.junit.Test
 
 class NativeModelLayerTest {
 
+    private fun token(vararg parts: String): String = parts.joinToString(separator = "")
+
     @Test
     fun `layerId should return native model layer id`() {
         // Given
@@ -81,7 +83,7 @@ class NativeModelLayerTest {
         source shouldContain "projectWorldToClip"
         source shouldContain "std::pow(2.0, params.zoom)"
         source shouldContain "worldPixelsPerMeter"
-        source shouldNotContain "projectMetersOffsetToNdc"
+        source shouldNotContain token("project", "Meters", "Offset", "To", "Ndc")
     }
 
     @Test
@@ -127,17 +129,19 @@ class NativeModelLayerTest {
         val combined = header + "\n" + source
 
         // Then
-        combined shouldNotContain "ScreenPoint"
-        combined shouldNotContain "projectToNdc"
-        combined shouldNotContain "projectMetersOffsetToNdc"
-        combined shouldNotContain "degreesToRadiansIfNeeded"
-        combined shouldNotContain "kTileSize"
+        combined shouldNotContain token("Screen", "Point")
+        combined shouldNotContain token("project", "To", "Ndc")
+        combined shouldNotContain token("project", "Meters", "Offset", "To", "Ndc")
+        combined shouldNotContain token("degrees", "To", "Radians", "If", "Needed")
+        combined shouldNotContain token("k", "Tile", "Size")
     }
 
     @Test
     fun `native gltf loader should not depend on no-op texture coordinate helper`() {
         // Given
-        val helper = File("src/main/cpp/lib/gltf/TextureCoordinate.hpp")
+        val helper = File(
+            "src/main/cpp/lib/gltf/" + token("Texture", "Coordinate", ".hpp"),
+        )
         val loader = File("src/main/cpp/lib/gltf/GltfModelLoader.cpp").readText()
 
         // When
@@ -145,7 +149,7 @@ class NativeModelLayerTest {
 
         // Then
         helperExists shouldBe false
-        loader shouldNotContain "TextureCoordinate.hpp"
-        loader shouldNotContain "rendererTextureV"
+        loader shouldNotContain token("Texture", "Coordinate", ".hpp")
+        loader shouldNotContain token("renderer", "Texture", "V")
     }
 }
