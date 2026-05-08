@@ -129,8 +129,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         __android_log_print(
                 ANDROID_LOG_INFO,
                 log_tag,
-                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f instances=%zu "
-                "vertices=%d",
+                "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f instances=%zu",
                 params.width,
                 params.height,
                 params.latitude,
@@ -138,8 +137,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
                 params.zoom,
                 params.bearing,
                 params.pitch,
-                instances_.size(),
-                vertexCount_
+                instances_.size()
         );
         didLogFirstRender_ = true;
         if (isPitchedCamera) {
@@ -247,6 +245,10 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         );
         glDrawArrays(GL_TRIANGLES, 0, instanceVertexCount);
         vertexCount_ += instanceVertexCount;
+    }
+
+    if (shouldLogRender) {
+        __android_log_print(ANDROID_LOG_INFO, log_tag, "rendered vertices=%d", vertexCount_);
     }
 
     glDisableVertexAttribArray(1);
@@ -374,17 +376,25 @@ bool ModelLayer::loadModelResources() {
         return false;
     }
 
+    bool hasLoadedModel = false;
     for (const ModelInstance& instance : instances_) {
         if (instance.assetPath.empty()) {
             __android_log_write(ANDROID_LOG_ERROR, log_tag, "Missing model asset path for instance");
             continue;
         }
         if (!loadModelAndTexture(instance.assetPath)) {
-            return false;
+            __android_log_print(
+                    ANDROID_LOG_ERROR,
+                    log_tag,
+                    "Failed to load model asset: %s",
+                    instance.assetPath.c_str()
+            );
+            continue;
         }
+        hasLoadedModel = true;
     }
 
-    loaded_ = !resourcesByAssetPath_.empty();
+    loaded_ = hasLoadedModel;
     return loaded_;
 }
 

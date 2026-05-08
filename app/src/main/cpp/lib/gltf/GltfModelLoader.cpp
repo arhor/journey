@@ -16,14 +16,18 @@ constexpr const char* texture_fallback_path = "models/textures/colormap.png";
 
 using custom_map_layers::gltf::ModelVertex;
 
-std::string resolveTexturePath(const char* uri) {
+std::string resolveTexturePath(const std::string& assetPath, const char* uri) {
     if (uri == nullptr || std::strlen(uri) == 0) {
         return texture_fallback_path;
     }
     if (std::strcmp(uri, "Textures/colormap.png") == 0) {
         return texture_fallback_path;
     }
-    return std::string("models/") + uri;
+
+    const size_t separatorIndex = assetPath.find_last_of('/');
+    const std::string assetDirectory =
+            separatorIndex == std::string::npos ? std::string() : assetPath.substr(0, separatorIndex + 1);
+    return assetDirectory + uri;
 }
 
 void transformPosition(const cgltf_float matrix[16], const float in[3], float out[3]) {
@@ -87,6 +91,7 @@ void appendPrimitive(
 
 void appendNode(
         const cgltf_node& node,
+        const std::string& assetPath,
         std::vector<ModelVertex>& vertices,
         std::string& texturePath,
         const char* logTag
@@ -106,14 +111,14 @@ void appendNode(
             if (texturePath.empty() && primitive.material != nullptr) {
                 const cgltf_texture_view& baseColor = primitive.material->pbr_metallic_roughness.base_color_texture;
                 if (baseColor.texture != nullptr && baseColor.texture->image != nullptr) {
-                    texturePath = resolveTexturePath(baseColor.texture->image->uri);
+                    texturePath = resolveTexturePath(assetPath, baseColor.texture->image->uri);
                 }
             }
         }
     }
 
     for (cgltf_size childIndex = 0; childIndex < node.children_count; ++childIndex) {
-        appendNode(*node.children[childIndex], vertices, texturePath, logTag);
+        appendNode(*node.children[childIndex], assetPath, vertices, texturePath, logTag);
     }
 }
 
@@ -155,7 +160,7 @@ std::optional<LoadedModel> GltfModelLoader::load(const std::string& assetPath, c
     }
 
     for (cgltf_size nodeIndex = 0; nodeIndex < scene->nodes_count; ++nodeIndex) {
-        appendNode(*scene->nodes[nodeIndex], vertices, texturePath, logTag);
+        appendNode(*scene->nodes[nodeIndex], assetPath, vertices, texturePath, logTag);
     }
 
     cgltf_free(data);

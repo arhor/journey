@@ -330,4 +330,46 @@ class NativeModelLayerTest {
         source shouldNotContain token("model", "_", "meters", "_", "per", "_", "unit")
         source shouldNotContain token("model", "_", "heading", "_", "radians")
     }
+
+    @Test
+    fun `native model resource loading should continue when one asset fails and keep valid models`() {
+        // Given
+        val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
+
+        // When
+
+        // Then
+        source shouldContain "bool hasLoadedModel = false"
+        source shouldContain "if (!loadModelAndTexture(instance.assetPath)) {"
+        source shouldContain "continue;"
+        source shouldContain "hasLoadedModel = true"
+        source shouldContain "loaded_ = hasLoadedModel;"
+        source shouldContain "return loaded_;"
+    }
+
+    @Test
+    fun `native gltf texture path resolution should be relative to glb asset directory`() {
+        // Given
+        val source = File("src/main/cpp/lib/gltf/GltfModelLoader.cpp").readText()
+
+        // When
+
+        // Then
+        source shouldContain "resolveTexturePath(const std::string& assetPath, const char* uri)"
+        source shouldContain "assetPath.find_last_of('/')"
+        source shouldContain "assetPath.substr(0, separatorIndex + 1)"
+        source shouldContain "return assetDirectory + uri"
+        source shouldNotContain "return std::string(\"models/\") + uri;"
+    }
+
+    @Test
+    fun `native render summary log should not print stale pre-loop vertex count`() {
+        // Given
+        val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()
+
+        // When
+
+        // Then
+        source shouldNotContain "pitch=%.4f instances=%zu vertices=%d"
+    }
 }
