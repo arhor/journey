@@ -116,4 +116,36 @@ class NativeModelLayerTest {
         drawSetup shouldContain "glDepthMask(GL_TRUE)"
         drawSetup shouldNotContain "glDisable(GL_DEPTH_TEST);"
     }
+
+    @Test
+    fun `native geo helpers should not keep obsolete manual NDC projection API`() {
+        // Given
+        val header = File("src/main/cpp/lib/geo/WebMercator.hpp").readText()
+        val source = File("src/main/cpp/lib/geo/WebMercator.cpp").readText()
+
+        // When
+        val combined = header + "\n" + source
+
+        // Then
+        combined shouldNotContain "ScreenPoint"
+        combined shouldNotContain "projectToNdc"
+        combined shouldNotContain "projectMetersOffsetToNdc"
+        combined shouldNotContain "degreesToRadiansIfNeeded"
+        combined shouldNotContain "kTileSize"
+    }
+
+    @Test
+    fun `native gltf loader should not depend on no-op texture coordinate helper`() {
+        // Given
+        val helper = File("src/main/cpp/lib/gltf/TextureCoordinate.hpp")
+        val loader = File("src/main/cpp/lib/gltf/GltfModelLoader.cpp").readText()
+
+        // When
+        val helperExists = helper.exists()
+
+        // Then
+        helperExists shouldBe false
+        loader shouldNotContain "TextureCoordinate.hpp"
+        loader shouldNotContain "rendererTextureV"
+    }
 }
