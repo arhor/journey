@@ -22,7 +22,7 @@ class NativeModelLayerTest {
     }
 
     @Test
-    fun `native map model spec should expose asset path location scale and heading`() {
+    fun `NativeMapModelSpec should expose all fields when constructed with explicit values`() {
         // Given
         val spec = NativeMapModelSpec(
             assetPath = "models/animal-tiger.glb",
@@ -42,6 +42,23 @@ class NativeModelLayerTest {
         spec.altitudeMeters shouldBe 3.0
         spec.scaleMetersPerModelUnit shouldBe 45.0
         spec.headingDegrees shouldBe 90.0
+    }
+
+    @Test
+    fun `NativeMapModelSpec should default altitude and heading to zero when omitted`() {
+        // Given
+        val spec = NativeMapModelSpec(
+            assetPath = "models/animal-tiger.glb",
+            latitude = 54.3738000,
+            longitude = 18.6508750,
+            scaleMetersPerModelUnit = 45.0,
+        )
+
+        // When
+
+        // Then
+        spec.altitudeMeters shouldBe 0.0
+        spec.headingDegrees shouldBe 0.0
     }
 
     @Test

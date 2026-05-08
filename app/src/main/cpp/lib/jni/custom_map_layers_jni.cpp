@@ -16,7 +16,8 @@ extern "C" JNIEXPORT jlong JNICALL
 Java_com_github_arhor_journey_feature_map_viewinterop_NativeModelLayer_createContextNative(
         JNIEnv* env,
         jclass,
-        jobject assetManager
+        jobject assetManager,
+        jobjectArray /* models */
 ) {
     __android_log_write(ANDROID_LOG_INFO, log_tag, "nativeCreateContext");
     AAssetManager* nativeAssetManager = AAssetManager_fromJava(env, assetManager);
