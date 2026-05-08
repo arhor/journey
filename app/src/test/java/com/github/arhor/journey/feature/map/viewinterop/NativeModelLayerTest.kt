@@ -158,12 +158,12 @@ class NativeModelLayerTest {
         val addToCallStartIndex = source.indexOf(addToCallStartToken)
         val viewportAttachIndex = source.indexOf(viewportAttachToken)
         val modelLayerCallStartIndex = addToCallStartIndex + addToCallStartToken.length
-        val modelLayerCall = source.substring(modelLayerCallStartIndex, viewportAttachIndex)
 
         // Then
         (addToCallStartIndex >= 0) shouldBe true
         (viewportAttachIndex >= 0) shouldBe true
         (viewportAttachIndex > modelLayerCallStartIndex) shouldBe true
+        val modelLayerCall = source.substring(modelLayerCallStartIndex, viewportAttachIndex)
         modelLayerCall shouldContain "models = listOf("
         modelLayerCall shouldContain "NativeMapModelSpec("
         modelLayerCall shouldContain "assetPath = \"models/animal-tiger.glb\""
