@@ -147,6 +147,28 @@ class NativeModelLayerTest {
     }
 
     @Test
+    fun `map screen should pass current tiger model spec from kotlin`() {
+        // Given
+        val source = File("src/main/java/com/github/arhor/journey/feature/map/viewinterop/MapLibreViewMapScreen.kt")
+            .readText()
+
+        // When
+        val modelLayerCall = source
+            .substringAfter("NativeModelLayer.addTo(")
+            .substringBefore("viewportReporter.attach(map)")
+
+        // Then
+        modelLayerCall shouldContain "models = listOf("
+        modelLayerCall shouldContain "NativeMapModelSpec("
+        modelLayerCall shouldContain "assetPath = \"models/animal-tiger.glb\""
+        modelLayerCall shouldContain "latitude = 54.3738000"
+        modelLayerCall shouldContain "longitude = 18.6508750"
+        modelLayerCall shouldContain "altitudeMeters = 0.0"
+        modelLayerCall shouldContain "scaleMetersPerModelUnit = 45.0"
+        modelLayerCall shouldContain "headingDegrees = 0.0"
+    }
+
+    @Test
     fun `native model renderer should use MapLibre projection matrix instead of manual camera rotation`() {
         // Given
         val source = File("src/main/cpp/lib/layers/model/ModelLayer.cpp").readText()

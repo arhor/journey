@@ -409,6 +409,16 @@ private fun MapView.configureLocationAwareMap(
                 map = map,
                 style = style,
                 assetManager = context.assets,
+                models = listOf(
+                    NativeMapModelSpec(
+                        assetPath = "models/animal-tiger.glb",
+                        latitude = 54.3738000,
+                        longitude = 18.6508750,
+                        altitudeMeters = 0.0,
+                        scaleMetersPerModelUnit = 45.0,
+                        headingDegrees = 0.0,
+                    ),
+                ),
             )
 
             viewportReporter.attach(map)
