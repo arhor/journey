@@ -16,7 +16,7 @@ internal object NativeModelLayer {
         map: MapLibreMap,
         style: Style,
         assetManager: AssetManager,
-        models: List<NativeMapModelSpec> = emptyList(),
+        models: List<NativeMapModelSpec>,
     ) {
         addToWithManagedContext(
             models = models,

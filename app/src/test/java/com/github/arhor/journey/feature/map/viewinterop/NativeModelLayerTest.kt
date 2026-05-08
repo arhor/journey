@@ -184,6 +184,8 @@ class NativeModelLayerTest {
         // When
 
         // Then
+        kotlinSource shouldContain "models: List<NativeMapModelSpec>,"
+        kotlinSource shouldNotContain "models: List<NativeMapModelSpec> = emptyList()"
         kotlinSource shouldContain "models: Array<NativeMapModelSpec>"
         jniSource shouldContain "jobjectArray models"
         jniSource shouldContain "readModelInstances"
@@ -208,6 +210,8 @@ class NativeModelLayerTest {
         header shouldContain "ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances)"
         source shouldContain "ModelLayer::ModelLayer(AAssetManager* assetManager, std::vector<ModelInstance> instances)"
         source shouldContain "instances_(std::move(instances))"
+        source shouldContain "instances_.size() > 1"
+        source shouldContain "Task 3 limitation: rendering only first model instance; supplied=%zu"
     }
 
     @Test

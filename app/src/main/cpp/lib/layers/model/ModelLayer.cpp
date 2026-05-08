@@ -103,6 +103,15 @@ void ModelLayer::initialize() {
     __android_log_write(ANDROID_LOG_INFO, log_tag, "initialize");
     deinitialize();
 
+    if (instances_.size() > 1) {
+        __android_log_print(
+                ANDROID_LOG_WARN,
+                log_tag,
+                "Task 3 limitation: rendering only first model instance; supplied=%zu",
+                instances_.size()
+        );
+    }
+
     if (!program_.create(vertex_shader_source, fragment_shader_source, log_tag)) {
         deinitialize();
         return;
