@@ -65,24 +65,37 @@ std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(
         return instances;
     }
 
-    const auto readMethod = [&](const char* methodName, const char* signature) -> jmethodID {
-        jmethodID method = env->GetMethodID(modelSpecClass, methodName, signature);
-        if (env->ExceptionCheck()) {
-            return nullptr;
+    const auto readMethod = [&](const char* methodName, const char* signature, jmethodID* outMethod) -> bool {
+        *outMethod = env->GetMethodID(modelSpecClass, methodName, signature);
+        if (env->ExceptionCheck() || *outMethod == nullptr) {
+            env->DeleteLocalRef(modelSpecClass);
+            return false;
         }
-        return method;
+        return true;
     };
 
-    const jmethodID getAssetPath = readMethod("getAssetPath", "()Ljava/lang/String;");
-    const jmethodID getLatitude = readMethod("getLatitude", "()D");
-    const jmethodID getLongitude = readMethod("getLongitude", "()D");
-    const jmethodID getAltitudeMeters = readMethod("getAltitudeMeters", "()D");
-    const jmethodID getScaleMetersPerModelUnit = readMethod("getScaleMetersPerModelUnit", "()D");
-    const jmethodID getHeadingDegrees = readMethod("getHeadingDegrees", "()D");
-
-    if (getAssetPath == nullptr || getLatitude == nullptr || getLongitude == nullptr || getAltitudeMeters == nullptr ||
-        getScaleMetersPerModelUnit == nullptr || getHeadingDegrees == nullptr) {
-        env->DeleteLocalRef(modelSpecClass);
+    jmethodID getAssetPath = nullptr;
+    if (!readMethod("getAssetPath", "()Ljava/lang/String;", &getAssetPath)) {
+        return instances;
+    }
+    jmethodID getLatitude = nullptr;
+    if (!readMethod("getLatitude", "()D", &getLatitude)) {
+        return instances;
+    }
+    jmethodID getLongitude = nullptr;
+    if (!readMethod("getLongitude", "()D", &getLongitude)) {
+        return instances;
+    }
+    jmethodID getAltitudeMeters = nullptr;
+    if (!readMethod("getAltitudeMeters", "()D", &getAltitudeMeters)) {
+        return instances;
+    }
+    jmethodID getScaleMetersPerModelUnit = nullptr;
+    if (!readMethod("getScaleMetersPerModelUnit", "()D", &getScaleMetersPerModelUnit)) {
+        return instances;
+    }
+    jmethodID getHeadingDegrees = nullptr;
+    if (!readMethod("getHeadingDegrees", "()D", &getHeadingDegrees)) {
         return instances;
     }
 
