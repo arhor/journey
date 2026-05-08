@@ -12,17 +12,17 @@
 
 namespace {
 
-constexpr const char* kTigerModelPath = "models/animal-tiger.glb";
-constexpr const char* kTextureFallbackPath = "models/textures/colormap.png";
+constexpr const char* tiger_model_path = "models/animal-tiger.glb";
+constexpr const char* texture_fallback_path = "models/textures/colormap.png";
 
 using custom_map_layers::gltf::ModelVertex;
 
 std::string resolveTexturePath(const char* uri) {
     if (uri == nullptr || std::strlen(uri) == 0) {
-        return kTextureFallbackPath;
+        return texture_fallback_path;
     }
     if (std::strcmp(uri, "Textures/colormap.png") == 0) {
-        return kTextureFallbackPath;
+        return texture_fallback_path;
     }
     return std::string("models/") + uri;
 }
@@ -126,7 +126,7 @@ GltfModelLoader::GltfModelLoader(AAssetManager* assetManager) : assetManager_(as
 
 std::optional<LoadedModel> GltfModelLoader::loadTiger(const char* logTag) const {
     const custom_map_layers::assets::AssetReader reader(assetManager_);
-    const auto bytes = reader.readBytes(kTigerModelPath, logTag);
+    const auto bytes = reader.readBytes(tiger_model_path, logTag);
     if (!bytes.has_value()) {
         return std::nullopt;
     }
@@ -166,7 +166,7 @@ std::optional<LoadedModel> GltfModelLoader::loadTiger(const char* logTag) const 
         return std::nullopt;
     }
     if (texturePath.empty()) {
-        texturePath = kTextureFallbackPath;
+        texturePath = texture_fallback_path;
     }
 
     return LoadedModel{

@@ -15,15 +15,15 @@
 
 namespace {
 
-constexpr const char* LOG_TAG = "NativeModelLayer";
-constexpr double kMarkerLatitude = 54.3738000;
-constexpr double kMarkerLongitude = 18.6508750;
-constexpr double kMarkerAltitudeMeters = 0.0;
-constexpr double kModelMetersPerUnit = 45.0;
-constexpr double kModelHeadingRadians = 0.0;
-constexpr double kPitchedCameraLogThreshold = 0.15;
+constexpr const char* log_tag = "NativeModelLayer";
+constexpr double marker_latitude = 54.3738000;
+constexpr double marker_longitude = 18.6508750;
+constexpr double marker_altitude_meters = 0.0;
+constexpr double model_meters_per_unit = 45.0;
+constexpr double model_heading_radians = 0.0;
+constexpr double pitched_camera_log_threshold = 0.15;
 
-constexpr const char* kVertexShaderSource = R"(#version 300 es
+constexpr const char* vertex_shader_source = R"(#version 300 es
 layout(location = 0) in vec4 a_clip_pos;
 layout(location = 1) in vec2 a_uv;
 out vec2 v_uv;
@@ -34,7 +34,7 @@ void main() {
 }
 )";
 
-constexpr const char* kFragmentShaderSource = R"(#version 300 es
+constexpr const char* fragment_shader_source = R"(#version 300 es
 precision highp float;
 in vec2 v_uv;
 uniform sampler2D u_texture;
@@ -61,12 +61,12 @@ struct ClipPosition {
 };
 
 custom_map_layers::geo::LocalMeters rotateLocalModelMeters(const custom_map_layers::gltf::ModelVertex& vertex) {
-    const double modelEast = static_cast<double>(vertex.x) * kModelMetersPerUnit;
-    const double modelNorth = static_cast<double>(-vertex.z) * kModelMetersPerUnit;
-    const double modelUp = static_cast<double>(vertex.y) * kModelMetersPerUnit;
+    const double modelEast = static_cast<double>(vertex.x) * model_meters_per_unit;
+    const double modelNorth = static_cast<double>(-vertex.z) * model_meters_per_unit;
+    const double modelUp = static_cast<double>(vertex.y) * model_meters_per_unit;
 
-    const double cosHeading = std::cos(kModelHeadingRadians);
-    const double sinHeading = std::sin(kModelHeadingRadians);
+    const double cosHeading = std::cos(model_heading_radians);
+    const double sinHeading = std::sin(model_heading_radians);
 
     return custom_map_layers::geo::LocalMeters{
             .east = modelEast * cosHeading - modelNorth * sinHeading,
@@ -100,15 +100,15 @@ namespace custom_map_layers::layers::model {
 ModelLayer::ModelLayer(AAssetManager* assetManager) : assetManager_(assetManager) {}
 
 void ModelLayer::initialize() {
-    __android_log_write(ANDROID_LOG_INFO, LOG_TAG, "initialize");
+    __android_log_write(ANDROID_LOG_INFO, log_tag, "initialize");
     deinitialize();
 
-    if (!program_.create(kVertexShaderSource, kFragmentShaderSource, LOG_TAG)) {
+    if (!program_.create(vertex_shader_source, fragment_shader_source, log_tag)) {
         deinitialize();
         return;
     }
 
-    if (!vertexBuffer_.create(LOG_TAG)) {
+    if (!vertexBuffer_.create(log_tag)) {
         deinitialize();
         return;
     }
@@ -123,12 +123,12 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         return;
     }
 
-    const bool isPitchedCamera = std::abs(params.pitch) > kPitchedCameraLogThreshold;
+    const bool isPitchedCamera = std::abs(params.pitch) > pitched_camera_log_threshold;
     const bool shouldLogRender = !didLogFirstRender_ || (!didLogFirstPitchedRender_ && isPitchedCamera);
     if (shouldLogRender) {
         __android_log_print(
                 ANDROID_LOG_INFO,
-                LOG_TAG,
+                log_tag,
                 "render %.0fx%.0f camera=(%.7f, %.7f) zoom=%.2f bearing=%.4f pitch=%.4f marker=(%.7f, %.7f, %.1fm) "
                 "vertices=%d",
                 params.width,
@@ -138,9 +138,9 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
                 params.zoom,
                 params.bearing,
                 params.pitch,
-                kMarkerLatitude,
-                kMarkerLongitude,
-                kMarkerAltitudeMeters,
+                marker_latitude,
+                marker_longitude,
+                marker_altitude_meters,
                 vertexCount_
         );
         didLogFirstRender_ = true;
@@ -171,7 +171,7 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
         }
         __android_log_print(
                 ANDROID_LOG_INFO,
-                LOG_TAG,
+                log_tag,
                 "model bounds ndc=(%.3f, %.3f)-(%.3f, %.3f)",
                 bounds.minX,
                 bounds.minY,
@@ -272,11 +272,11 @@ void ModelLayer::render(const mbgl::style::CustomLayerRenderParameters& params) 
     glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(previousTexture2d));
     glActiveTexture(static_cast<GLenum>(previousActiveTexture));
     glUseProgram(static_cast<GLuint>(previousProgram));
-    custom_map_layers::rendering::logGlErrors("render", LOG_TAG);
+    custom_map_layers::rendering::logGlErrors("render", log_tag);
 }
 
 void ModelLayer::contextLost() {
-    __android_log_write(ANDROID_LOG_INFO, LOG_TAG, "contextLost");
+    __android_log_write(ANDROID_LOG_INFO, log_tag, "contextLost");
     texture_.forget();
     vertexBuffer_.forget();
     program_.forget();
@@ -287,30 +287,30 @@ void ModelLayer::deinitialize() {
     texture_.reset();
     vertexBuffer_.reset();
     program_.reset();
-    custom_map_layers::rendering::logGlErrors("deinitialize", LOG_TAG);
+    custom_map_layers::rendering::logGlErrors("deinitialize", log_tag);
     resetState();
 }
 
 bool ModelLayer::loadModelAndTexture() {
     const custom_map_layers::gltf::GltfModelLoader loader(assetManager_);
-    auto loadedModel = loader.loadTiger(LOG_TAG);
+    auto loadedModel = loader.loadTiger(log_tag);
     if (!loadedModel.has_value()) {
         return false;
     }
 
     const custom_map_layers::assets::AssetReader reader(assetManager_);
-    const auto textureBytes = reader.readBytes(loadedModel->texturePath, LOG_TAG);
+    const auto textureBytes = reader.readBytes(loadedModel->texturePath, log_tag);
     if (!textureBytes.has_value()) {
-        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Missing texture asset: %s", loadedModel->texturePath.c_str());
+        __android_log_print(ANDROID_LOG_ERROR, log_tag, "Missing texture asset: %s", loadedModel->texturePath.c_str());
         return false;
     }
 
-    const auto decoded = custom_map_layers::assets::decodePngRgba(*textureBytes, LOG_TAG);
+    const auto decoded = custom_map_layers::assets::decodePngRgba(*textureBytes, log_tag);
     if (!decoded.has_value()) {
         return false;
     }
 
-    if (!texture_.createRgba(decoded->rgbaPixels.data(), decoded->width, decoded->height, LOG_TAG)) {
+    if (!texture_.createRgba(decoded->rgbaPixels.data(), decoded->width, decoded->height, log_tag)) {
         return false;
     }
 
@@ -319,7 +319,7 @@ bool ModelLayer::loadModelAndTexture() {
     loaded_ = true;
     __android_log_print(
             ANDROID_LOG_INFO,
-            LOG_TAG,
+            log_tag,
             "Loaded tiger model vertices=%zu texture=%s",
             model_.triangleVertices.size(),
             model_.texturePath.c_str()
@@ -332,15 +332,15 @@ std::vector<GLfloat> ModelLayer::buildProjectedVertices(const mbgl::style::Custo
     vertices.reserve(model_.triangleVertices.size() * 6);
 
     const double worldSize = 512.0 * std::pow(2.0, params.zoom);
-    const double worldPixelsPerMeter = custom_map_layers::geo::metersToMercatorUnits(1.0, kMarkerLatitude) * worldSize;
-    const double originX = custom_map_layers::geo::longitudeToMercatorX(kMarkerLongitude) * worldSize;
-    const double originY = custom_map_layers::geo::latitudeToMercatorY(kMarkerLatitude) * worldSize;
+    const double worldPixelsPerMeter = custom_map_layers::geo::metersToMercatorUnits(1.0, marker_latitude) * worldSize;
+    const double originX = custom_map_layers::geo::longitudeToMercatorX(marker_longitude) * worldSize;
+    const double originY = custom_map_layers::geo::latitudeToMercatorY(marker_latitude) * worldSize;
 
     for (const custom_map_layers::gltf::ModelVertex& vertex : model_.triangleVertices) {
         const custom_map_layers::geo::LocalMeters localMeters = rotateLocalModelMeters(vertex);
         const double worldX = originX + localMeters.east * worldPixelsPerMeter;
         const double worldY = originY - localMeters.north * worldPixelsPerMeter;
-        const double altitudeMeters = kMarkerAltitudeMeters + localMeters.up;
+        const double altitudeMeters = marker_altitude_meters + localMeters.up;
         const ClipPosition clipPosition = projectWorldToClip(params.projectionMatrix, worldX, worldY, altitudeMeters);
 
         vertices.push_back(static_cast<GLfloat>(clipPosition.x));

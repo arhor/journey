@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr const char* LOG_TAG = "NativeModelLayer";
+constexpr const char* log_tag = "NativeModelLayer";
 
 }  // namespace
 
@@ -18,7 +18,7 @@ Java_com_github_arhor_journey_feature_map_viewinterop_NativeModelLayer_createCon
         jclass,
         jobject assetManager
 ) {
-    __android_log_write(ANDROID_LOG_INFO, LOG_TAG, "nativeCreateContext");
+    __android_log_write(ANDROID_LOG_INFO, log_tag, "nativeCreateContext");
     AAssetManager* nativeAssetManager = AAssetManager_fromJava(env, assetManager);
     auto layer = std::make_unique<custom_map_layers::layers::model::ModelLayer>(nativeAssetManager);
     return reinterpret_cast<jlong>(layer.release());
@@ -30,6 +30,6 @@ Java_com_github_arhor_journey_feature_map_viewinterop_NativeModelLayer_destroyCo
         jclass,
         jlong context
 ) {
-    __android_log_write(ANDROID_LOG_INFO, LOG_TAG, "nativeDestroyContext");
+    __android_log_write(ANDROID_LOG_INFO, log_tag, "nativeDestroyContext");
     delete reinterpret_cast<custom_map_layers::layers::model::ModelLayer*>(context);
 }

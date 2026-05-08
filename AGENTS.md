@@ -62,6 +62,8 @@ variable.
 - Keep Compose functions stateless where practical. Hoist state to ViewModels or route-level composables.
 - Use `@Immutable` or `@Stable` only when the type actually satisfies the contract.
 - Avoid adding dependencies unless the existing stack cannot reasonably solve the problem.
+- In native C++ code under `app/src/main/cpp`, name constants with `snake_case`; do not use Hungarian-style prefixes
+  such as `kConstantName`, and do not use all-caps constant names except for external macros required by APIs.
 
 ## Testing Guidance
 
