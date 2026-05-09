@@ -2,6 +2,8 @@
 #include <android/log.h>
 #include <jni.h>
 
+#include <cstddef>
+#include <exception>
 #include <memory>
 #include <string>
 #include <utility>
@@ -13,146 +15,271 @@
 namespace {
 
 constexpr const char* log_tag = "NativeModelLayer";
+constexpr size_t doubles_per_model_record = 5;
+constexpr size_t model_record_size_bytes = sizeof(double) * doubles_per_model_record;
 
-bool readString(JNIEnv* env, jobject source, jmethodID getter, std::string* outValue) {
-    auto stringValue = static_cast<jstring>(env->CallObjectMethod(source, getter));
+class UtfChars {
+public:
+    UtfChars(JNIEnv* env, jstring value)
+        : env_(env), value_(value), chars_(env->GetStringUTFChars(value, nullptr)) {}
+
+    ~UtfChars() {
+        if (chars_ != nullptr) {
+            env_->ReleaseStringUTFChars(value_, chars_);
+        }
+    }
+
+    UtfChars(const UtfChars&) = delete;
+    UtfChars& operator=(const UtfChars&) = delete;
+
+    const char* get() const {
+        return chars_;
+    }
+
+private:
+    JNIEnv* env_;
+    jstring value_;
+    const char* chars_;
+};
+
+class GlobalRef {
+public:
+    GlobalRef(JNIEnv* env, jobject value)
+        : env_(env), ref_(env->NewGlobalRef(value)) {}
+
+    ~GlobalRef() {
+        if (ref_ != nullptr) {
+            env_->DeleteGlobalRef(ref_);
+        }
+    }
+
+    GlobalRef(const GlobalRef&) = delete;
+    GlobalRef& operator=(const GlobalRef&) = delete;
+
+    jobject get() const {
+        return ref_;
+    }
+
+    jobject release() {
+        jobject ref = ref_;
+        ref_ = nullptr;
+        return ref;
+    }
+
+private:
+    JNIEnv* env_;
+    jobject ref_;
+};
+
+class NativeModelLayerContext final : public mbgl::style::CustomLayerHost {
+public:
+    NativeModelLayerContext(
+            JavaVM* javaVm,
+            jobject assetManagerRef,
+            AAssetManager* nativeAssetManager,
+            std::vector<custom_map_layers::layers::model::ModelInstance> instances
+    )
+        : javaVm_(javaVm),
+          assetManagerRef_(assetManagerRef),
+          layer_(nativeAssetManager, std::move(instances)) {}
+
+    ~NativeModelLayerContext() override {
+        deleteAssetManagerRef();
+    }
+
+    NativeModelLayerContext(const NativeModelLayerContext&) = delete;
+    NativeModelLayerContext& operator=(const NativeModelLayerContext&) = delete;
+
+    void initialize() override {
+        layer_.initialize();
+    }
+
+    void render(const mbgl::style::CustomLayerRenderParameters& params) override {
+        layer_.render(params);
+    }
+
+    void contextLost() override {
+        layer_.contextLost();
+    }
+
+    void deinitialize() override {
+        layer_.deinitialize();
+    }
+
+private:
+    void deleteAssetManagerRef() {
+        if (assetManagerRef_ == nullptr || javaVm_ == nullptr) {
+            return;
+        }
+
+        JNIEnv* env = nullptr;
+        const jint getEnvResult = javaVm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
+
+        bool attached = false;
+        if (getEnvResult == JNI_EDETACHED) {
+            if (javaVm_->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+                return;
+            }
+            attached = true;
+        } else if (getEnvResult != JNI_OK) {
+            return;
+        }
+
+        env->DeleteGlobalRef(assetManagerRef_);
+        assetManagerRef_ = nullptr;
+
+        if (attached) {
+            javaVm_->DetachCurrentThread();
+        }
+    }
+
+    JavaVM* javaVm_;
+    jobject assetManagerRef_;
+    custom_map_layers::layers::model::ModelLayer layer_;
+};
+
+void throwJavaException(JNIEnv* env, const char* className, const char* message) {
+    if (env->ExceptionCheck()) {
+        return;
+    }
+
+    jclass exceptionClass = env->FindClass(className);
+    if (exceptionClass == nullptr || env->ExceptionCheck()) {
+        return;
+    }
+
+    env->ThrowNew(exceptionClass, message);
+    env->DeleteLocalRef(exceptionClass);
+}
+
+void throwIllegalArgumentException(JNIEnv* env, const char* message) {
+    throwJavaException(env, "java/lang/IllegalArgumentException", message);
+}
+
+bool validateModelTransport(
+        JNIEnv* env,
+        jobject numericRecords,
+        jobjectArray assetPaths,
+        jint count,
+        const double** outNumericValues
+) {
+    *outNumericValues = nullptr;
+
+    if (count < 0) {
+        throwIllegalArgumentException(env, "model count must be non-negative");
+        return false;
+    }
+    if (count == 0) {
+        return true;
+    }
+    if (numericRecords == nullptr) {
+        throwIllegalArgumentException(env, "model numeric records buffer must not be null");
+        return false;
+    }
+    if (assetPaths == nullptr) {
+        throwIllegalArgumentException(env, "model asset paths must not be null when model count is positive");
+        return false;
+    }
+
+    void* bufferAddress = env->GetDirectBufferAddress(numericRecords);
     if (env->ExceptionCheck()) {
         return false;
     }
-    if (stringValue == nullptr) {
-        outValue->clear();
-        return true;
-    }
-
-    const char* utfChars = env->GetStringUTFChars(stringValue, nullptr);
-    if (env->ExceptionCheck()) {
-        env->DeleteLocalRef(stringValue);
+    if (bufferAddress == nullptr) {
+        throwIllegalArgumentException(env, "model numeric records must be a direct buffer");
         return false;
     }
-    if (utfChars == nullptr) {
-        env->DeleteLocalRef(stringValue);
-        outValue->clear();
-        return true;
+
+    const jlong bufferCapacity = env->GetDirectBufferCapacity(numericRecords);
+    if (env->ExceptionCheck()) {
+        return false;
+    }
+    if (bufferCapacity < 0) {
+        throwIllegalArgumentException(env, "model numeric records must be a direct buffer");
+        return false;
     }
 
-    outValue->assign(utfChars);
-    env->ReleaseStringUTFChars(stringValue, utfChars);
-    env->DeleteLocalRef(stringValue);
+    const auto requiredBytes = static_cast<jlong>(static_cast<size_t>(count) * model_record_size_bytes);
+    if (bufferCapacity < requiredBytes) {
+        throwIllegalArgumentException(env, "model numeric records buffer is too small");
+        return false;
+    }
+
+    const jsize assetPathCount = env->GetArrayLength(assetPaths);
+    if (env->ExceptionCheck()) {
+        return false;
+    }
+    if (assetPathCount < count) {
+        throwIllegalArgumentException(env, "model asset paths length is smaller than model count");
+        return false;
+    }
+
+    *outNumericValues = static_cast<const double*>(bufferAddress);
     return true;
 }
 
-std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(JNIEnv* env, jobjectArray models) {
+bool readString(JNIEnv* env, jstring stringValue, std::string* outValue) {
+    UtfChars utfChars(env, stringValue);
+    if (env->ExceptionCheck()) {
+        return false;
+    }
+    if (utfChars.get() == nullptr) {
+        throwIllegalArgumentException(env, "model asset path could not be read");
+        return false;
+    }
+
+    outValue->assign(utfChars.get());
+    return true;
+}
+
+std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(
+        JNIEnv* env,
+        jobject numericRecords,
+        jobjectArray assetPaths,
+        jint count
+) {
     using custom_map_layers::layers::model::ModelInstance;
 
     std::vector<ModelInstance> instances;
-    if (models == nullptr) {
+    const double* numericValues = nullptr;
+    if (!validateModelTransport(env, numericRecords, assetPaths, count, &numericValues)) {
         return instances;
     }
-
-    const jsize modelCount = env->GetArrayLength(models);
     if (env->ExceptionCheck()) {
         return instances;
     }
-    if (modelCount <= 0) {
+    if (count == 0) {
         return instances;
     }
 
-    jclass modelSpecClass = env->FindClass("com/github/arhor/journey/feature/map/viewinterop/NativeMapModelSpec");
-    if (env->ExceptionCheck()) {
-        return instances;
-    }
-    if (modelSpecClass == nullptr) {
-        return instances;
-    }
-
-    const auto readMethod = [&](const char* methodName, const char* signature, jmethodID* outMethod) -> bool {
-        *outMethod = env->GetMethodID(modelSpecClass, methodName, signature);
-        if (env->ExceptionCheck() || *outMethod == nullptr) {
-            env->DeleteLocalRef(modelSpecClass);
-            return false;
-        }
-        return true;
-    };
-
-    jmethodID getAssetPath = nullptr;
-    if (!readMethod("getAssetPath", "()Ljava/lang/String;", &getAssetPath)) {
-        return instances;
-    }
-    jmethodID getLatitude = nullptr;
-    if (!readMethod("getLatitude", "()D", &getLatitude)) {
-        return instances;
-    }
-    jmethodID getLongitude = nullptr;
-    if (!readMethod("getLongitude", "()D", &getLongitude)) {
-        return instances;
-    }
-    jmethodID getAltitudeMeters = nullptr;
-    if (!readMethod("getAltitudeMeters", "()D", &getAltitudeMeters)) {
-        return instances;
-    }
-    jmethodID getScaleMetersPerModelUnit = nullptr;
-    if (!readMethod("getScaleMetersPerModelUnit", "()D", &getScaleMetersPerModelUnit)) {
-        return instances;
-    }
-    jmethodID getHeadingDegrees = nullptr;
-    if (!readMethod("getHeadingDegrees", "()D", &getHeadingDegrees)) {
-        return instances;
-    }
-
-    instances.reserve(static_cast<size_t>(modelCount));
-    for (jsize index = 0; index < modelCount; index++) {
-        jobject modelSpec = env->GetObjectArrayElement(models, index);
+    instances.reserve(static_cast<size_t>(count));
+    for (jsize index = 0; index < count; index++) {
+        auto assetPath = static_cast<jstring>(env->GetObjectArrayElement(assetPaths, index));
         if (env->ExceptionCheck()) {
-            env->DeleteLocalRef(modelSpecClass);
             return instances;
         }
-        if (modelSpec == nullptr) {
-            continue;
+        if (assetPath == nullptr) {
+            throwIllegalArgumentException(env, "model asset path must not be null");
+            return instances;
         }
 
+        const double* record = numericValues + (static_cast<size_t>(index) * doubles_per_model_record);
         ModelInstance instance;
-        if (!readString(env, modelSpec, getAssetPath, &instance.assetPath)) {
-            env->DeleteLocalRef(modelSpec);
-            env->DeleteLocalRef(modelSpecClass);
+        if (!readString(env, assetPath, &instance.assetPath)) {
+            env->DeleteLocalRef(assetPath);
             return instances;
         }
-        instance.latitude = env->CallDoubleMethod(modelSpec, getLatitude);
-        if (env->ExceptionCheck()) {
-            env->DeleteLocalRef(modelSpec);
-            env->DeleteLocalRef(modelSpecClass);
-            return instances;
-        }
-        instance.longitude = env->CallDoubleMethod(modelSpec, getLongitude);
-        if (env->ExceptionCheck()) {
-            env->DeleteLocalRef(modelSpec);
-            env->DeleteLocalRef(modelSpecClass);
-            return instances;
-        }
-        instance.altitudeMeters = env->CallDoubleMethod(modelSpec, getAltitudeMeters);
-        if (env->ExceptionCheck()) {
-            env->DeleteLocalRef(modelSpec);
-            env->DeleteLocalRef(modelSpecClass);
-            return instances;
-        }
-        instance.scaleMetersPerModelUnit = env->CallDoubleMethod(modelSpec, getScaleMetersPerModelUnit);
-        if (env->ExceptionCheck()) {
-            env->DeleteLocalRef(modelSpec);
-            env->DeleteLocalRef(modelSpecClass);
-            return instances;
-        }
-        const double headingDegrees = env->CallDoubleMethod(modelSpec, getHeadingDegrees);
-        if (env->ExceptionCheck()) {
-            env->DeleteLocalRef(modelSpec);
-            env->DeleteLocalRef(modelSpecClass);
-            return instances;
-        }
+        instance.latitude = record[0];
+        instance.longitude = record[1];
+        instance.altitudeMeters = record[2];
+        instance.scaleMetersPerModelUnit = record[3];
+        const double headingDegrees = record[4];
         instance.headingRadians = custom_map_layers::layers::model::degreesToRadians(headingDegrees);
         instances.push_back(std::move(instance));
 
-        env->DeleteLocalRef(modelSpec);
+        env->DeleteLocalRef(assetPath);
     }
 
-    env->DeleteLocalRef(modelSpecClass);
     return instances;
 }
 
@@ -163,19 +290,51 @@ Java_com_github_arhor_journey_feature_map_viewinterop_NativeModelLayer_createCon
         JNIEnv* env,
         jclass,
         jobject assetManager,
-        jobjectArray models
+        jobject numericRecords,
+        jobjectArray assetPaths,
+        jint count
 ) {
-    __android_log_write(ANDROID_LOG_INFO, log_tag, "nativeCreateContext");
-    AAssetManager* nativeAssetManager = AAssetManager_fromJava(env, assetManager);
-    auto instances = readModelInstances(env, models);
-    if (env->ExceptionCheck()) {
+    try {
+        __android_log_write(ANDROID_LOG_INFO, log_tag, "nativeCreateContext");
+        JavaVM* javaVm = nullptr;
+        if (env->GetJavaVM(&javaVm) != JNI_OK || javaVm == nullptr) {
+            throwJavaException(env, "java/lang/RuntimeException", "failed to get Java VM");
+            return 0;
+        }
+
+        AAssetManager* nativeAssetManager = AAssetManager_fromJava(env, assetManager);
+        if (nativeAssetManager == nullptr) {
+            throwIllegalArgumentException(env, "asset manager must not be null");
+            return 0;
+        }
+
+        auto instances = readModelInstances(env, numericRecords, assetPaths, count);
+        if (env->ExceptionCheck()) {
+            return 0;
+        }
+        GlobalRef assetManagerRef(env, assetManager);
+        if (env->ExceptionCheck()) {
+            return 0;
+        }
+        if (assetManagerRef.get() == nullptr) {
+            throwJavaException(env, "java/lang/OutOfMemoryError", "failed to retain asset manager");
+            return 0;
+        }
+        auto context = std::make_unique<NativeModelLayerContext>(
+                javaVm,
+                assetManagerRef.get(),
+                nativeAssetManager,
+                std::move(instances)
+        );
+        assetManagerRef.release();
+        return reinterpret_cast<jlong>(context.release());
+    } catch (const std::exception& exception) {
+        throwJavaException(env, "java/lang/RuntimeException", exception.what());
+        return 0;
+    } catch (...) {
+        throwJavaException(env, "java/lang/RuntimeException", "unknown native error");
         return 0;
     }
-    auto layer = std::make_unique<custom_map_layers::layers::model::ModelLayer>(
-            nativeAssetManager,
-            std::move(instances)
-    );
-    return reinterpret_cast<jlong>(layer.release());
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -185,5 +344,9 @@ Java_com_github_arhor_journey_feature_map_viewinterop_NativeModelLayer_destroyCo
         jlong context
 ) {
     __android_log_write(ANDROID_LOG_INFO, log_tag, "nativeDestroyContext");
-    delete reinterpret_cast<custom_map_layers::layers::model::ModelLayer*>(context);
+    auto* nativeContext = reinterpret_cast<NativeModelLayerContext*>(context);
+    if (nativeContext == nullptr) {
+        return;
+    }
+    delete nativeContext;
 }

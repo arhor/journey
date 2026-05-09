@@ -4,6 +4,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import java.io.File
+import java.nio.ByteOrder
 import org.junit.Test
 
 class NativeModelLayerTest {
@@ -147,6 +148,68 @@ class NativeModelLayerTest {
     }
 
     @Test
+    fun `buildNativePayload should create direct native-order AoS numeric records and asset paths`() {
+        // Given
+        val models = listOf(
+            NativeMapModelSpec(
+                assetPath = "models/one.glb",
+                latitude = 54.1,
+                longitude = 18.2,
+                altitudeMeters = 3.3,
+                scaleMetersPerModelUnit = 4.4,
+                headingDegrees = 5.5,
+            ),
+            NativeMapModelSpec(
+                assetPath = "models/two.glb",
+                latitude = 64.6,
+                longitude = 28.7,
+                altitudeMeters = 8.8,
+                scaleMetersPerModelUnit = 9.9,
+                headingDegrees = 10.1,
+            ),
+        )
+
+        // When
+        val payload = NativeModelLayer.buildNativePayload(models)
+        val numericRecords = payload.numericRecords.duplicate().order(ByteOrder.nativeOrder())
+
+        // Then
+        payload.count shouldBe 2
+        payload.assetPaths.toList() shouldBe listOf("models/one.glb", "models/two.glb")
+        payload.numericRecords.isDirect shouldBe true
+        payload.numericRecords.order() shouldBe ByteOrder.nativeOrder()
+        payload.numericRecords.position() shouldBe 0
+        payload.numericRecords.limit() shouldBe 2 * 5 * java.lang.Double.BYTES
+        numericRecords.double shouldBe 54.1
+        numericRecords.double shouldBe 18.2
+        numericRecords.double shouldBe 3.3
+        numericRecords.double shouldBe 4.4
+        numericRecords.double shouldBe 5.5
+        numericRecords.double shouldBe 64.6
+        numericRecords.double shouldBe 28.7
+        numericRecords.double shouldBe 8.8
+        numericRecords.double shouldBe 9.9
+        numericRecords.double shouldBe 10.1
+    }
+
+    @Test
+    fun `buildNativePayload should handle empty model list`() {
+        // Given
+        val models = emptyList<NativeMapModelSpec>()
+
+        // When
+        val payload = NativeModelLayer.buildNativePayload(models)
+
+        // Then
+        payload.count shouldBe 0
+        payload.assetPaths.toList() shouldBe emptyList()
+        payload.numericRecords.isDirect shouldBe true
+        payload.numericRecords.order() shouldBe ByteOrder.nativeOrder()
+        payload.numericRecords.position() shouldBe 0
+        payload.numericRecords.limit() shouldBe 0
+    }
+
+    @Test
     fun `map screen should pass current tiger model spec from kotlin`() {
         // Given
         val source = File("src/main/java/com/github/arhor/journey/feature/map/viewinterop/MapLibreViewMapScreen.kt")
@@ -175,7 +238,7 @@ class NativeModelLayerTest {
     }
 
     @Test
-    fun `native model layer context creation should receive kotlin model spec array`() {
+    fun `native model layer context creation should pass direct numeric records and asset paths`() {
         // Given
         val kotlinSource = File("src/main/java/com/github/arhor/journey/feature/map/viewinterop/NativeModelLayer.kt")
             .readText()
@@ -186,15 +249,47 @@ class NativeModelLayerTest {
         // Then
         kotlinSource shouldContain "models: List<NativeMapModelSpec>,"
         kotlinSource shouldNotContain "models: List<NativeMapModelSpec> = emptyList()"
-        kotlinSource shouldContain "models: Array<NativeMapModelSpec>"
-        jniSource shouldContain "jobjectArray models"
+        kotlinSource shouldContain "numericRecords: ByteBuffer,"
+        kotlinSource shouldContain "assetPaths: Array<String>,"
+        kotlinSource shouldContain "count: Int,"
+        kotlinSource shouldContain "createContextNative(assetManager, payload.numericRecords, payload.assetPaths, payload.count)"
+        kotlinSource shouldContain "Math.multiplyExact(models.size, RECORD_SIZE_BYTES)"
+        kotlinSource shouldContain ".allocateDirect(bufferSizeBytes)"
+        kotlinSource shouldContain ".order(ByteOrder.nativeOrder())"
+        kotlinSource shouldContain "buffer.flip()"
+        jniSource shouldContain "jobject numericRecords"
+        jniSource shouldContain "jobjectArray assetPaths"
+        jniSource shouldContain "jint count"
         jniSource shouldContain "readModelInstances"
-        jniSource shouldContain "getAssetPath"
-        jniSource shouldContain "getLatitude"
-        jniSource shouldContain "getLongitude"
-        jniSource shouldContain "getAltitudeMeters"
-        jniSource shouldContain "getScaleMetersPerModelUnit"
-        jniSource shouldContain "getHeadingDegrees"
+        jniSource shouldContain "GetDirectBufferAddress(numericRecords)"
+        jniSource shouldContain "GetDirectBufferCapacity(numericRecords)"
+        jniSource shouldContain "GetStringUTFChars"
+        jniSource shouldContain "ReleaseStringUTFChars"
+        jniSource shouldContain "DeleteLocalRef"
+        jniSource shouldContain "if (count == 0) {\n        return true;\n    }\n    if (numericRecords == nullptr)"
+        jniSource shouldContain "constexpr size_t doubles_per_model_record = 5"
+        jniSource shouldContain "class UtfChars"
+        jniSource shouldContain "UtfChars(const UtfChars&) = delete"
+        jniSource shouldContain "GlobalRef(const GlobalRef&) = delete"
+        jniSource shouldContain "catch (const std::exception& exception)"
+        jniSource shouldContain "java/lang/RuntimeException"
+        jniSource shouldContain "env->GetJavaVM(&javaVm)"
+        jniSource shouldContain "GlobalRef assetManagerRef(env, assetManager)"
+        jniSource shouldContain "NewGlobalRef(value)"
+        jniSource shouldContain "~NativeModelLayerContext() override"
+        jniSource shouldContain "javaVm_->GetEnv"
+        jniSource shouldContain "javaVm_->AttachCurrentThread"
+        jniSource shouldContain "javaVm_->DetachCurrentThread"
+        jniSource shouldContain "DeleteGlobalRef(assetManagerRef_)"
+        jniSource shouldContain "delete nativeContext"
+        jniSource shouldNotContain "nativeContext->destroy(env)"
+        jniSource shouldNotContain "FindClass(\"com/github/arhor/journey/feature/map/viewinterop/NativeMapModelSpec\")"
+        jniSource shouldNotContain "getAssetPath"
+        jniSource shouldNotContain "getLatitude"
+        jniSource shouldNotContain "getLongitude"
+        jniSource shouldNotContain "getAltitudeMeters"
+        jniSource shouldNotContain "getScaleMetersPerModelUnit"
+        jniSource shouldNotContain "getHeadingDegrees"
     }
 
     @Test
