@@ -71,6 +71,29 @@ private:
     jobject ref_;
 };
 
+class LocalRef {
+public:
+    LocalRef(JNIEnv* env, jobject value)
+        : env_(env), ref_(value) {}
+
+    ~LocalRef() {
+        if (ref_ != nullptr) {
+            env_->DeleteLocalRef(ref_);
+        }
+    }
+
+    LocalRef(const LocalRef&) = delete;
+    LocalRef& operator=(const LocalRef&) = delete;
+
+    jobject get() const {
+        return ref_;
+    }
+
+private:
+    JNIEnv* env_;
+    jobject ref_;
+};
+
 class NativeModelLayerContext final : public mbgl::style::CustomLayerHost {
 public:
     NativeModelLayerContext(
@@ -81,9 +104,13 @@ public:
     )
         : javaVm_(javaVm),
           assetManagerRef_(assetManagerRef),
-          layer_(nativeAssetManager, std::move(instances)) {}
+          layer_(std::make_unique<custom_map_layers::layers::model::ModelLayer>(
+                  nativeAssetManager,
+                  std::move(instances)
+          )) {}
 
     ~NativeModelLayerContext() override {
+        layer_.reset();
         deleteAssetManagerRef();
     }
 
@@ -91,19 +118,19 @@ public:
     NativeModelLayerContext& operator=(const NativeModelLayerContext&) = delete;
 
     void initialize() override {
-        layer_.initialize();
+        layer_->initialize();
     }
 
     void render(const mbgl::style::CustomLayerRenderParameters& params) override {
-        layer_.render(params);
+        layer_->render(params);
     }
 
     void contextLost() override {
-        layer_.contextLost();
+        layer_->contextLost();
     }
 
     void deinitialize() override {
-        layer_.deinitialize();
+        layer_->deinitialize();
     }
 
 private:
@@ -135,7 +162,7 @@ private:
 
     JavaVM* javaVm_;
     jobject assetManagerRef_;
-    custom_map_layers::layers::model::ModelLayer layer_;
+    std::unique_ptr<custom_map_layers::layers::model::ModelLayer> layer_;
 };
 
 void throwJavaException(JNIEnv* env, const char* className, const char* message) {
@@ -199,7 +226,7 @@ bool validateModelTransport(
         return false;
     }
 
-    const auto requiredBytes = static_cast<jlong>(static_cast<size_t>(count) * model_record_size_bytes);
+    const auto requiredBytes = static_cast<jlong>(count) * static_cast<jlong>(model_record_size_bytes);
     if (bufferCapacity < requiredBytes) {
         throwIllegalArgumentException(env, "model numeric records buffer is too small");
         return false;
@@ -254,10 +281,11 @@ std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(
 
     instances.reserve(static_cast<size_t>(count));
     for (jsize index = 0; index < count; index++) {
-        auto assetPath = static_cast<jstring>(env->GetObjectArrayElement(assetPaths, index));
+        LocalRef assetPathRef(env, env->GetObjectArrayElement(assetPaths, index));
         if (env->ExceptionCheck()) {
             return instances;
         }
+        auto assetPath = static_cast<jstring>(assetPathRef.get());
         if (assetPath == nullptr) {
             throwIllegalArgumentException(env, "model asset path must not be null");
             return instances;
@@ -266,7 +294,6 @@ std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(
         const double* record = numericValues + (static_cast<size_t>(index) * doubles_per_model_record);
         ModelInstance instance;
         if (!readString(env, assetPath, &instance.assetPath)) {
-            env->DeleteLocalRef(assetPath);
             return instances;
         }
         instance.latitude = record[0];
@@ -276,8 +303,6 @@ std::vector<custom_map_layers::layers::model::ModelInstance> readModelInstances(
         const double headingDegrees = record[4];
         instance.headingRadians = custom_map_layers::layers::model::degreesToRadians(headingDegrees);
         instances.push_back(std::move(instance));
-
-        env->DeleteLocalRef(assetPath);
     }
 
     return instances;
