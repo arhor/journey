@@ -123,6 +123,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.godot)
+    implementation(libs.h3.android)
     implementation(libs.hilt.android)
     implementation(libs.javax.inject)
     implementation(libs.kotlin.reflect)
