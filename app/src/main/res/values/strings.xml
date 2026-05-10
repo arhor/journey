@@ -22,15 +22,7 @@
     <string name="hero_resources_title">Resources</string>
     <string name="hero_nav_label">Hero</string>
     <string name="map_recenter_content_description">Reset map to north up</string>
-    <string name="map_hud_hero_content_description">Open hero screen, %1$s</string>
-    <string name="map_hud_settings_content_description">Open settings</string>
-    <string name="map_hud_resource_content_description">%1$s: %2$d</string>
-    <string name="map_hud_weather_title">Weather</string>
-    <string name="map_hud_weather_condition">Light rain</string>
-    <string name="map_hud_weather_details">18°C / SW 12 km/h</string>
-    <string name="map_hud_xp_label">XP %1$d / %2$d</string>
     <string name="map_locator_skill_content_description">Activate locator skill</string>
-    <string name="map_weather_content_description">Weather conditions</string>
     <string name="map_nav_label">Map</string>
     <string name="map_view_location_permission_title">Location permission needed</string>
     <string name="map_view_location_permission_message">This map needs location access to follow your current position.</string>
