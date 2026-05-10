@@ -12,13 +12,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun MapRoute(
     vm: MapViewModel = hiltViewModel(),
-    hudVm: MapHudViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
     onOpenHero: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
-    val hudState by hudVm.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         launch(start = CoroutineStart.UNDISPATCHED) {
@@ -38,9 +36,6 @@ fun MapRoute(
 
     MapScreen(
         state = state,
-        hudState = hudState,
         dispatch = vm::dispatch,
-        onOpenHero = onOpenHero,
-        onOpenSettings = onOpenSettings,
     )
 }

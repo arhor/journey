@@ -30,20 +30,14 @@ internal const val MAP_STARTUP_SPLASH_TEST_TAG = "map_startup_splash"
 @Composable
 fun MapScreen(
     state: MapUiState,
-    hudState: MapHudUiState,
     dispatch: (MapIntent) -> Unit,
-    onOpenHero: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     when (state) {
         is MapUiState.Loading -> LoadingIndicator()
         is MapUiState.Failure -> ErrorMessage(message = state.errorMessage)
         is MapUiState.Content -> MapContent(
             state = state,
-            hudState = hudState,
             dispatch = dispatch,
-            onOpenHero = onOpenHero,
-            onOpenSettings = onOpenSettings,
         )
     }
 }
@@ -51,10 +45,7 @@ fun MapScreen(
 @Composable
 internal fun MapContent(
     state: MapUiState.Content,
-    hudState: MapHudUiState,
     dispatch: (MapIntent) -> Unit,
-    onOpenHero: () -> Unit,
-    onOpenSettings: () -> Unit,
     mapContent: @Composable (Modifier, (MapIntent) -> Unit) -> Unit = { modifier, mapDispatch ->
         MapLibreViewMapScreen(
             modifier = modifier,
@@ -110,15 +101,6 @@ internal fun MapContent(
                     )
                 },
             dispatch,
-        )
-
-        MapPlayerHud(
-            state = hudState,
-            onHeroClick = onOpenHero,
-            onSettingsClick = onOpenSettings,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
         )
 
         if (state.isStartupSplashVisible) {
