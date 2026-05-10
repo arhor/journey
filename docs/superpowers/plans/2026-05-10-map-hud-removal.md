@@ -41,7 +41,7 @@ Do not modify:
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/MapScreen.kt`
 - Modify: `app/src/androidTest/java/com/github/arhor/journey/feature/map/MapScreenTest.kt`
 
-- [ ] **Step 1: Update `MapScreenTest` first**
+- [x] **Step 1: Update `MapScreenTest` first**
 
 In `app/src/androidTest/java/com/github/arhor/journey/feature/map/MapScreenTest.kt`, remove these imports:
 
@@ -117,7 +117,7 @@ private fun hudState(): MapHudUiState.Content =
 
 After this step, the file should still contain the two startup splash tests and the `contentState(...)` helper.
 
-- [ ] **Step 2: Run the focused Android test compilation to verify the expected failure**
+- [x] **Step 2: Run the focused Android test compilation to verify the expected failure**
 
 Run:
 
@@ -127,7 +127,7 @@ Run:
 
 Expected: FAIL because `MapContent` still requires `hudState`, `onOpenHero`, and `onOpenSettings`.
 
-- [ ] **Step 3: Update `MapRoute`**
+- [x] **Step 3: Update `MapRoute`**
 
 In `app/src/main/java/com/github/arhor/journey/feature/map/MapRoute.kt`, keep this import because `MapViewModel`
 state collection still uses it:
@@ -159,12 +159,12 @@ MapScreen(
 
 Keep `onOpenHero` and `onOpenSettings` parameters on `MapRoute` for now, because app navigation still passes them into the route. Suppress unused callback warnings by leaving them as named parameters; Kotlin does not require local use for public Composable parameters.
 
-- [ ] **Step 4: Update `MapScreen` signatures and rendering**
+- [x] **Step 4: Update `MapScreen` signatures and rendering**
 
-In `app/src/main/java/com/github/arhor/journey/feature/map/MapScreen.kt`, remove unused imports after deleting HUD rendering:
+In `app/src/main/java/com/github/arhor/journey/feature/map/MapScreen.kt`, remove the unused `dp` import after deleting
+HUD rendering. Keep `Alignment` because `StartupSplashOverlay` still uses it:
 
 ```kotlin
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 ```
 
@@ -244,7 +244,7 @@ MapPlayerHud(
 )
 ```
 
-- [ ] **Step 5: Re-run focused Android test compilation**
+- [x] **Step 5: Re-run focused Android test compilation**
 
 Run:
 
@@ -254,7 +254,7 @@ Run:
 
 Expected: PASS for Android test source compilation.
 
-- [ ] **Step 6: Commit Task 1**
+- [x] **Step 6: Commit Task 1**
 
 ```shell
 git add app/src/main/java/com/github/arhor/journey/feature/map/MapRoute.kt app/src/main/java/com/github/arhor/journey/feature/map/MapScreen.kt app/src/androidTest/java/com/github/arhor/journey/feature/map/MapScreenTest.kt
@@ -273,7 +273,7 @@ git commit -m "Remove map HUD from screen surface"
 - Delete: `app/src/test/java/com/github/arhor/journey/feature/map/MapHudViewModelTest.kt`
 - Modify: `app/src/main/res/values/strings.xml`
 
-- [ ] **Step 1: Delete HUD production and test files**
+- [x] **Step 1: Delete HUD production and test files**
 
 Delete these files:
 
@@ -285,7 +285,7 @@ app/src/androidTest/java/com/github/arhor/journey/feature/map/MapPlayerHudTest.k
 app/src/test/java/com/github/arhor/journey/feature/map/MapHudViewModelTest.kt
 ```
 
-- [ ] **Step 2: Remove HUD strings**
+- [x] **Step 2: Remove HUD strings**
 
 In `app/src/main/res/values/strings.xml`, remove these exact string entries:
 
@@ -300,7 +300,7 @@ In `app/src/main/res/values/strings.xml`, remove these exact string entries:
 <string name="map_weather_content_description">Weather conditions</string>
 ```
 
-- [ ] **Step 3: Search for stale HUD references**
+- [x] **Step 3: Search for stale HUD references**
 
 Run:
 
@@ -310,7 +310,7 @@ rg -n "MapHud|MapPlayerHud|MAP_HUD|mapHud|map_hud|map_weather|formatResourceAmou
 
 Expected: no output.
 
-- [ ] **Step 4: Compile production Kotlin**
+- [x] **Step 4: Compile production Kotlin**
 
 Run:
 
@@ -320,7 +320,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Assemble Android tests**
+- [x] **Step 5: Assemble Android tests**
 
 Run:
 
@@ -330,7 +330,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 ```shell
 git add -A app/src/main/java/com/github/arhor/journey/feature/map app/src/androidTest/java/com/github/arhor/journey/feature/map app/src/test/java/com/github/arhor/journey/feature/map app/src/main/res/values/strings.xml
@@ -344,7 +344,7 @@ git commit -m "Delete old map HUD feature"
 **Files:**
 - Existing files changed by Tasks 1 and 2.
 
-- [ ] **Step 1: Verify final HUD absence**
+- [x] **Step 1: Verify final HUD absence**
 
 Run:
 
@@ -354,7 +354,7 @@ rg -n "MapHud|MapPlayerHud|MAP_HUD|mapHud|map_hud|map_weather|formatResourceAmou
 
 Expected: no output.
 
-- [ ] **Step 2: Verify production and Android test compilation**
+- [x] **Step 2: Verify production and Android test compilation**
 
 Run:
 
@@ -365,7 +365,7 @@ Run:
 
 Expected: both commands exit 0.
 
-- [ ] **Step 3: Inspect change scope**
+- [x] **Step 3: Inspect change scope**
 
 Run:
 
