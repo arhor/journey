@@ -4,7 +4,7 @@
 
 Replace the watchtower area-control feature with Breach Protocol, a cyberpunk/noir gameplay loop where the player scans
 for vulnerable infrastructure, physically approaches the signal, completes an upload while staying in range, and gains
-permanent fog-of-war visibility for the controlled sector.
+permanent fog-of-war visibility for the controlled hex sector.
 
 This is an epic, not a single small feature. The work should be split into larger tickets that each leave the app in a
 coherent, buildable state, with smaller implementation sub-tasks inside each ticket.
@@ -19,7 +19,7 @@ persistent fog reveal. Breach Protocol should start with its own domain language
 
 The only concepts worth preserving are generic infrastructure patterns:
 
-- deterministic location generation from map tiles;
+- deterministic location generation from H3 cells;
 - generated object caching by map area;
 - Room-backed local state for player progress;
 - location-driven interaction checks;
@@ -37,7 +37,7 @@ The first playable version covers the core Breach Protocol loop:
 4. Signal strength updates as the player's tracked location changes.
 5. When the player reaches the breach radius, the breach node becomes interactable.
 6. The player starts an upload and must remain in radius until progress reaches 100%.
-7. Completion marks the node controlled and permanently reveals its sector.
+7. Completion marks the node controlled and permanently reveals its H3 sector.
 
 The first version intentionally excludes:
 
@@ -54,17 +54,29 @@ Those can be follow-up tickets after the domain loop and map integration are sta
 
 ## Domain Model
 
+Use H3 cells as the gameplay spatial unit. The project already includes `com.uber:h3-android`, so Breach Protocol should
+wrap that library behind a small domain-facing adapter rather than adding custom hex-grid math.
+
+Initial H3 decisions:
+
+- breach sector resolution: `9`;
+- one breach candidate can exist per H3 cell;
+- the controlled zone for the first playable version is the breach node's H3 cell;
+- later upgrades can expand control with H3 disk/ring operations without changing persisted node identity.
+
 Introduce breach-specific models under `domain/model`:
 
 - `BreachNodeDefinition`
     - `id`
+    - `h3CellId`
     - `districtName`
     - `description`
     - `location`
     - `interactionRadiusMeters`
-    - `revealRadiusMeters`
+    - `controlledH3CellIds`
 - `BreachNodeState`
     - `breachNodeId`
+    - `h3CellId`
     - `discoveredAt`
     - `controlledAt`
     - `lockdownUntil`
@@ -75,7 +87,7 @@ Introduce breach-specific models under `domain/model`:
 - `BreachNode`
     - presented domain object with phase, distance, and interaction flags.
 - `ControlledBreachRevealSnapshot`
-    - tiles permanently visible because controlled breach nodes cover them.
+    - H3 cells permanently visible because controlled breach nodes cover them.
 
 Initial phases:
 
@@ -92,26 +104,34 @@ Only persisted states need storage. `SIGNAL_LOCKED` can remain a `MapViewModel` 
 Create a breach generator similar in spirit to the old deterministic object generation.
 
 Breach definitions are generated lazily during Pulse and map-area queries by a pure deterministic generator. The
-generator does not spawn random one-off objects. For a given generator version and tile coordinate, it always returns
-the same breach node definition or no node. Only player progress state is persisted.
+generator does not spawn random one-off objects. For a given generator version and H3 cell id, it always returns the
+same breach node definition or no node. Only player progress state is persisted.
 
 - generator version: `1`;
-- generator tile zoom: start with the old map-object generator zoom unless tests show density is poor;
-- stable id format: `breach-node:v1:<zoom>:<x>:<y>`;
-- deterministic location inside the generator cell with padding away from tile edges;
+- H3 resolution: `9`;
+- stable id format: `breach-node:v1:h3r9:<h3-cell-id>`;
+- deterministic location inside the H3 cell with padding away from cell edges;
 - deterministic district-style names from a small adjective/noun vocabulary.
+- deterministic occupancy decision from `generatorVersion + h3CellId`, so not every H3 cell must contain a breach.
+
+Map tiles remain an implementation detail for existing fog and map rendering code. Breach gameplay ownership, scan
+neighborhoods, and controlled zones should use H3 cells.
 
 Create a new Room table:
 
 ```sql
 CREATE TABLE IF NOT EXISTS `breach_node_state` (
     `breachNodeId` TEXT NOT NULL,
+    `h3CellId` TEXT NOT NULL,
     `discoveredAt` INTEGER,
     `controlledAt` INTEGER,
     `lockdownUntil` INTEGER,
     `updatedAt` INTEGER NOT NULL,
     PRIMARY KEY(`breachNodeId`)
 )
+
+CREATE UNIQUE INDEX IF NOT EXISTS `index_breach_node_state_h3CellId`
+ON `breach_node_state` (`h3CellId`)
 ```
 
 Add a database migration from version `5` to `6` that drops `watchtower_state` and creates `breach_node_state`.
@@ -122,8 +142,10 @@ Create a `BreachNodeRepository` with deterministic generated definitions plus Ro
 
 - observe breach records in bounds;
 - get breach records in bounds;
-- get records intersecting tiles;
+- get breach records for H3 cells;
+- get controlled H3 cells in or near bounds;
 - get by id;
+- get by H3 cell id;
 - upsert discovered state;
 - mark controlled;
 - set or clear lockdown when the later failure mechanic is implemented.
@@ -132,7 +154,7 @@ Initial use cases:
 
 - `FindNearestBreachNodeUseCase`
     - input: actor location and scan range.
-    - output: nearest uncontrolled and non-lockdown breach node.
+    - output: nearest uncontrolled and non-lockdown breach node generated from the H3 disk around the actor location.
 - `DiscoverBreachNodeUseCase`
     - persists discovery once the player gets close enough.
 - `CompleteBreachUseCase`
@@ -200,7 +222,8 @@ Fog-of-war should use controlled breach nodes:
 - remove `ObserveClaimedWatchtowerRevealTilesUseCase`;
 - add `ObserveControlledBreachRevealTilesUseCase`;
 - update `FogOfWarController` to observe the new use case;
-- preserve the current behavior where controlled object tiles are merged into permanent visibility.
+- convert controlled H3 cells into the tile or polygon data needed by the current fog renderer;
+- preserve the current behavior where controlled territory is merged into permanent visibility.
 
 The current native fog layer path is commented out in MapLibre interop. The epic should include a separate ticket to
 restore or replace that rendering path so the sector reveal is visible, not only computed.
@@ -257,16 +280,18 @@ Sub-tasks:
 
 ### Ticket 2: Breach Domain And Persistence
 
-Purpose: add the breach node data model, deterministic generation, repository, and persistence without UI.
+Purpose: add the breach node data model, H3 spatial adapter, deterministic generation, repository, and persistence
+without UI.
 
 Sub-tasks:
 
+- create a small adapter around `com.uber:h3-android` for lat/lon-to-cell, cell boundary, disk/ring, and distance logic;
 - create breach node domain models;
-- create deterministic breach generation;
+- create deterministic H3-cell breach generation;
 - add `breach_node_state` entity and DAO;
 - add repository implementation;
 - add repository DI binding;
-- add generator, repository, DAO, and migration tests.
+- add H3 adapter, generator, repository, DAO, and migration tests.
 
 ### Ticket 3: Breach Scan And Completion Use Cases
 
@@ -275,10 +300,10 @@ Purpose: implement the core gameplay rules independent of Compose and MapLibre.
 Sub-tasks:
 
 - add scan range and upload balance constants;
-- implement nearest uncontrolled breach scan;
+- implement nearest uncontrolled breach scan over nearby H3 cells;
 - implement discovery on proximity;
 - implement upload completion with range validation;
-- implement controlled breach reveal tiles;
+- implement controlled H3 cell reveal;
 - add focused JVM tests around scan, discovery, completion, and reveal.
 
 ### Ticket 4: Map ViewModel Session Flow
@@ -328,8 +353,9 @@ Purpose: make controlled breach reveal visible on the map.
 Sub-tasks:
 
 - replace watchtower reveal observation in `FogOfWarController`;
+- convert controlled H3 cell boundaries to fog renderer input;
 - reconnect or replace the commented native fog layer path;
-- verify controlled breach tiles clear persistent fog;
+- verify controlled H3 cells clear persistent fog;
 - add fog controller tests for controlled breach reveal;
 - perform manual runtime validation on a device or emulator.
 
@@ -387,10 +413,10 @@ The epic is complete when:
 
 - no production or test code references watchtowers;
 - no production or test code references the old character-summary or player-stat budget concepts;
-- the database schema stores breach node state instead of watchtower state;
+- the database schema stores breach node state with H3 cell ids instead of watchtower state;
 - the player can pulse-scan for a nearby uncontrolled breach node;
 - signal strength changes as the player approaches;
 - the breach becomes interactable in range;
 - upload completion marks the breach controlled;
-- controlled breach nodes permanently clear their sector from fog of war;
+- controlled breach H3 cells permanently clear their sector from fog of war;
 - focused JVM, migration, Compose, and compile checks pass.
