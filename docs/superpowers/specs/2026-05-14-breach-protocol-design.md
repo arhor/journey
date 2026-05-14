@@ -89,7 +89,11 @@ Only persisted states need storage. `SIGNAL_LOCKED` can remain a `MapViewModel` 
 
 ## Generation And Storage
 
-Create a breach generator similar in spirit to the old deterministic object generation:
+Create a breach generator similar in spirit to the old deterministic object generation.
+
+Breach definitions are generated lazily during Pulse and map-area queries by a pure deterministic generator. The
+generator does not spawn random one-off objects. For a given generator version and tile coordinate, it always returns
+the same breach node definition or no node. Only player progress state is persisted.
 
 - generator version: `1`;
 - generator tile zoom: start with the old map-object generator zoom unless tests show density is poor;
