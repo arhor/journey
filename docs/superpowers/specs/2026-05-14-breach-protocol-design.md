@@ -138,8 +138,8 @@ Initial use cases:
 - `ObserveVisibleBreachNodesUseCase`
     - returns discovered or controlled breach nodes in the active query window.
 
-The initial scan should not spend hero energy unless a separate energy regeneration/spending story is added. The feature
-spec can display "requires energy" later, but the current repository has no robust energy spending use case.
+The initial scan should be free in the first playable version. Player-stat costs and economy spending should not be
+introduced until Breach Protocol has a playable scan, approach, upload, and sector reveal loop.
 
 ## Map Feature Integration
 
@@ -201,7 +201,7 @@ Fog-of-war should use controlled breach nodes:
 The current native fog layer path is commented out in MapLibre interop. The epic should include a separate ticket to
 restore or replace that rendering path so the sector reveal is visible, not only computed.
 
-## Removal Scope
+## Initial Refactoring Cleanup Scope
 
 Delete watchtower production code:
 
@@ -209,8 +209,16 @@ Delete watchtower production code:
 - Room DAO, entity, mapper, repository implementation;
 - map object source/cache/store fields that exist only for watchtower definitions;
 - map presenters, marker state, bottom sheet, sheet UI state, strings;
-- `MapViewModel` watchtower selection, claim, upgrade, and resource amount wiring;
+- `MapViewModel` watchtower selection, claim, and upgrade wiring;
 - DI bindings that expose the watchtower repository.
+
+Delete old character-summary and player-stat budget concepts from the initial gameplay foundation:
+
+- character summary screen, route, navigation destination, and related UI state;
+- character-summary repository/use cases/models when they exist only to support that summary;
+- stored player-stat budget fields and mappers from local storage;
+- startup seeds that only initialize character-summary or player-stat budget values;
+- strings, tests, and DI bindings that exist only for the removed character-summary or player-stat budget flow.
 
 Delete or rewrite watchtower tests:
 
@@ -221,13 +229,15 @@ Delete or rewrite watchtower tests:
 - presenter tests;
 - map view model tests that assert selected watchtower behavior.
 
-Keep generic tests for resources, fog, map startup, map style, and exploration tracking.
+Delete or rewrite character-summary and player-stat budget tests. Keep generic tests for fog, map startup, map style,
+exploration tracking, and map-object infrastructure that remains after cleanup.
 
 ## Epic Tickets
 
-### Ticket 1: Remove Watchtower Feature
+### Ticket 1: Initial Gameplay Foundation Cleanup
 
-Purpose: eliminate old area-control behavior and make the app compile without watchtower concepts.
+Purpose: eliminate old area-control behavior and removed character-summary/player-stat budget concepts, then make the
+app compile without those foundations.
 
 Sub-tasks:
 
@@ -235,8 +245,10 @@ Sub-tasks:
 - remove watchtower strings;
 - remove watchtower dependencies from `MapViewModel`;
 - remove watchtower data from map-object area cache/store/source;
+- remove character summary screen, navigation destination, models, repository calls, strings, and tests;
+- remove stored player-stat budget fields from persisted local models and mappers;
 - add Room migration `5 -> 6`;
-- delete or update watchtower tests;
+- delete or update watchtower, character-summary, and player-stat budget tests;
 - compile Kotlin and run focused database migration tests.
 
 ### Ticket 2: Breach Domain And Persistence
@@ -328,7 +340,7 @@ Sub-tasks:
 - add upload failure and lockdown;
 - add gyroscope or slider stability mechanic;
 - add audio feedback;
-- add passive rewards or sector buffs only after the resource economy is defined.
+- add passive rewards or sector buffs only after the core loop proves those mechanics are needed.
 
 ## Testing Strategy
 
@@ -362,14 +374,15 @@ before visual polish.
 The second risk is deleting watchtowers and replacing them in one large patch. The removal ticket should be completed
 and verified first, then breach domain work should start from a clean compile.
 
-The third risk is overloading hero energy. The current model stores energy, but there is no clear scan-spending and
-regeneration behavior. Energy cost should stay out of the first playable Breach Protocol version.
+The third risk is reintroducing removed progression concepts too early. The first playable Breach Protocol version
+should not add player-stat costs, passive earnings, or character-summary progression.
 
 ## Acceptance Criteria
 
 The epic is complete when:
 
 - no production or test code references watchtowers;
+- no production or test code references the old character-summary or player-stat budget concepts;
 - the database schema stores breach node state instead of watchtower state;
 - the player can pulse-scan for a nearby uncontrolled breach node;
 - signal strength changes as the player approaches;
