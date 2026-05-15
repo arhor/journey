@@ -65,6 +65,7 @@ class MapScreenTest {
             isExplorationTrackingActive = true,
             explorationTrackingCadence = ExplorationTrackingCadence.FOREGROUND,
             explorationTrackingStatus = ExplorationTrackingStatus.TRACKING,
+            breachProtocol = BreachProtocolUiState.Idle,
             isStartupSplashVisible = isStartupSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
             mapStyleUri = "asset://map/styles/cyberpunk.json",

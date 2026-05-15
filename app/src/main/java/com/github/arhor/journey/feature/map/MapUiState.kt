@@ -26,6 +26,7 @@ sealed interface MapUiState {
         val isExplorationTrackingActive: Boolean,
         val explorationTrackingCadence: ExplorationTrackingCadence,
         val explorationTrackingStatus: ExplorationTrackingStatus,
+        val breachProtocol: BreachProtocolUiState,
         val isStartupSplashVisible: Boolean,
         @StringRes val startupSplashMessage: Int,
         val mapStyleUri: String,

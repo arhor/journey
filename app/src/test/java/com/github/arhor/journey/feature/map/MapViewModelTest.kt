@@ -49,6 +49,23 @@ import org.junit.Test
 class MapViewModelTest {
 
     @Test
+    fun `uiState should expose idle breach protocol state before pulse`() = runTest {
+        // Given
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val fixture = createFixture()
+
+        try {
+            // When
+            val actual = fixture.viewModel.awaitContent()
+
+            // Then
+            actual.breachProtocol shouldBe BreachProtocolUiState.Idle
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
     fun `uiState should expose selected map style uri`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 

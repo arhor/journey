@@ -55,6 +55,16 @@ sealed interface MapIntent {
         val objectId: String,
     ) : MapIntent
 
+    data object PulseClicked : MapIntent
+
+    data object StartBreachUpload : MapIntent
+
+    data object BreachUploadTick : MapIntent
+
+    data object CancelBreachUpload : MapIntent
+
+    data object DismissBreachPanel : MapIntent
+
     data class MapLoadFailed(
         val message: String? = null,
     ) : MapIntent

@@ -42,6 +42,7 @@ private data class State(
     val isAwaitingLocationPermissionResult: Boolean = false,
     val viewportSize: MapViewportSize? = null,
     val failureMessage: String? = null,
+    val breachProtocol: BreachProtocolUiState = BreachProtocolUiState.Idle,
     val startupGate: MapStartupGateState = MapStartupGateState(),
 )
 
@@ -129,6 +130,11 @@ class MapViewModel @Inject constructor(
             MapIntent.MapTapped -> onMapTapped()
             is MapIntent.RecenterClicked -> onRecenterClicked()
             is MapIntent.ObjectTapped -> onObjectTapped(intent.objectId)
+            MapIntent.PulseClicked -> onPulseClicked()
+            MapIntent.StartBreachUpload -> onStartBreachUpload()
+            MapIntent.BreachUploadTick -> onBreachUploadTick()
+            MapIntent.CancelBreachUpload -> onCancelBreachUpload()
+            MapIntent.DismissBreachPanel -> onDismissBreachPanel()
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
@@ -219,6 +225,7 @@ class MapViewModel @Inject constructor(
             isExplorationTrackingActive = trackingSessionValue.isActive,
             explorationTrackingCadence = trackingSessionValue.cadence,
             explorationTrackingStatus = trackingSessionValue.status,
+            breachProtocol = state.breachProtocol,
             isStartupSplashVisible = state.startupGate.isSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
             mapStyleUri = selectedMapStyle.value,
@@ -237,6 +244,7 @@ class MapViewModel @Inject constructor(
                 isExplorationTrackingActive = isExplorationTrackingActive,
                 explorationTrackingCadence = explorationTrackingCadence,
                 explorationTrackingStatus = explorationTrackingStatus,
+                breachProtocol = breachProtocol,
                 isStartupSplashVisible = isStartupSplashVisible,
                 startupSplashMessage = startupSplashMessage,
                 mapStyleUri = mapStyleUri,
@@ -360,6 +368,26 @@ class MapViewModel @Inject constructor(
         Unit
     }
 
+    private suspend fun onPulseClicked() {
+        Unit
+    }
+
+    private fun onStartBreachUpload() {
+        Unit
+    }
+
+    private suspend fun onBreachUploadTick() {
+        Unit
+    }
+
+    private fun onCancelBreachUpload() {
+        Unit
+    }
+
+    private fun onDismissBreachPanel() {
+        Unit
+    }
+
     private fun MutableStateFlow<State>.updateStartupGateForSession(
         sessionId: Long,
         transform: (MapStartupGateState) -> MapStartupGateState,
@@ -390,6 +418,7 @@ class MapViewModel @Inject constructor(
             val isExplorationTrackingActive: Boolean,
             val explorationTrackingCadence: ExplorationTrackingCadence,
             val explorationTrackingStatus: ExplorationTrackingStatus,
+            val breachProtocol: BreachProtocolUiState,
             val isStartupSplashVisible: Boolean,
             val startupSplashMessage: Int,
             val mapStyleUri: String,
