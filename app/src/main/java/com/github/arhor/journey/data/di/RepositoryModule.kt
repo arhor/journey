@@ -1,8 +1,10 @@
 package com.github.arhor.journey.data.di
 
 import com.github.arhor.journey.data.repository.DataStoreAppSettingsRepository
+import com.github.arhor.journey.data.repository.DeterministicBreachNodeRepository
 import com.github.arhor.journey.data.repository.RoomExplorationTileRepository
 import com.github.arhor.journey.domain.repository.AppSettingsRepository
+import com.github.arhor.journey.domain.repository.BreachNodeRepository
 import com.github.arhor.journey.domain.repository.ExplorationTileRepository
 import dagger.Binds
 import dagger.Module
@@ -20,5 +22,8 @@ interface RepositoryModule {
     @Binds
     fun bindAppSettingsRepository(impl: DataStoreAppSettingsRepository)
         : AppSettingsRepository
+
+    @Binds
+    fun bindBreachNodeRepository(impl: DeterministicBreachNodeRepository): BreachNodeRepository
 
 }

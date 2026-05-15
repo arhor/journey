@@ -5,12 +5,15 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import com.github.arhor.journey.core.common.ResourceType
+import com.github.arhor.journey.data.local.db.dao.BreachNodeStateDao
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
+import com.github.arhor.journey.data.local.db.entity.BreachNodeStateEntity
 
 @Database(
     entities = [
         ExploredTileEntity::class,
+        BreachNodeStateEntity::class,
     ],
     version = 6,
     exportSchema = false,
@@ -23,6 +26,8 @@ import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
 abstract class JourneyDatabase : RoomDatabase() {
 
     abstract fun explorationTileDao(): ExplorationTileDao
+
+    abstract fun breachNodeStateDao(): BreachNodeStateDao
 
     companion object {
         val MIGRATIONS: Array<Migration>

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.github.arhor.journey.data.local.db.JourneyDatabase
 import com.github.arhor.journey.data.local.db.RoomTransactionRunner
+import com.github.arhor.journey.data.local.db.dao.BreachNodeStateDao
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
 import com.github.arhor.journey.domain.TransactionRunner
 import dagger.Module
@@ -30,6 +31,11 @@ object DatabaseModule {
     @Singleton
     fun provideExplorationTileDao(db: JourneyDatabase): ExplorationTileDao =
         db.explorationTileDao()
+
+    @Provides
+    @Singleton
+    fun provideBreachNodeStateDao(db: JourneyDatabase): BreachNodeStateDao =
+        db.breachNodeStateDao()
 
     @Provides
     @Singleton
