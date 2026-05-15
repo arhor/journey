@@ -13,8 +13,6 @@ import kotlinx.coroutines.launch
 fun MapRoute(
     vm: MapViewModel = hiltViewModel(),
     snackbarHostState: SnackbarHostState,
-    onOpenHero: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     val state by vm.uiState.collectAsStateWithLifecycle()
 

@@ -7,11 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import com.github.arhor.journey.feature.hero.HeroDestination
-import com.github.arhor.journey.feature.hero.heroGraph
 import com.github.arhor.journey.feature.map.MapDestination
 import com.github.arhor.journey.feature.map.mapGraph
-import com.github.arhor.journey.feature.settings.SettingsDestination
 import com.github.arhor.journey.feature.settings.settingsGraph
 
 @Composable
@@ -25,11 +22,8 @@ fun AppNavGraph(
         startDestination = MapDestination,
         modifier = Modifier.padding(innerPadding),
     ) {
-        heroGraph(snackbarHostState = snackbarHostState)
         mapGraph(
             snackbarHostState = snackbarHostState,
-            onOpenHero = { controller.navigateToTopLevel(HeroDestination) },
-            onOpenSettings = { controller.navigateToTopLevel(SettingsDestination) },
         )
         settingsGraph(snackbarHostState = snackbarHostState)
     }

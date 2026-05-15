@@ -10,14 +10,10 @@ data object MapDestination
 
 fun NavGraphBuilder.mapGraph(
     snackbarHostState: SnackbarHostState,
-    onOpenHero: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     composable<MapDestination> {
         MapRoute(
             snackbarHostState = snackbarHostState,
-            onOpenHero = onOpenHero,
-            onOpenSettings = onOpenSettings,
         )
     }
 }
