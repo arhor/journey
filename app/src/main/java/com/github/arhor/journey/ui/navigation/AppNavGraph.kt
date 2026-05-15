@@ -9,6 +9,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import com.github.arhor.journey.feature.map.MapDestination
 import com.github.arhor.journey.feature.map.mapGraph
+import com.github.arhor.journey.feature.settings.SettingsDestination
 import com.github.arhor.journey.feature.settings.settingsGraph
 
 @Composable
@@ -24,6 +25,7 @@ fun AppNavGraph(
     ) {
         mapGraph(
             snackbarHostState = snackbarHostState,
+            onOpenSettings = { controller.navigateToTopLevel(SettingsDestination) },
         )
         settingsGraph(snackbarHostState = snackbarHostState)
     }
