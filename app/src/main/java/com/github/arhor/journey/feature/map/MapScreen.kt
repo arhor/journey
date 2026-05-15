@@ -50,9 +50,13 @@ internal fun MapContent(
         MapLibreViewMapScreen(
             modifier = modifier,
             styleUri = state.mapStyleUri,
+            visibleObjects = state.visibleObjects,
             fogOfWar = state.fogOfWar.toRenderState(),
             onViewportChanged = { visibleBounds ->
                 mapDispatch(MapIntent.CameraViewportChanged(visibleBounds))
+            },
+            onObjectTapped = { objectId ->
+                mapDispatch(MapIntent.ObjectTapped(objectId))
             },
             onCameraGestureStarted = { cameraPosition ->
                 mapDispatch(MapIntent.CameraGestureStarted(cameraPosition))

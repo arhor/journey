@@ -60,6 +60,7 @@ import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng as FeatureLatLng
 import com.github.arhor.journey.feature.map.gesture.normalizeBearing
+import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.MapLibre
@@ -92,8 +93,10 @@ private val LOCATION_PERMISSIONS = arrayOf(
 fun MapLibreViewMapScreen(
     modifier: Modifier = Modifier,
     styleUri: String = DEFAULT_VIEW_MAP_STYLE_ASSET_URI,
+    visibleObjects: List<MapObjectUiModel> = emptyList(),
     fogOfWar: FogOfWarRenderState = FogOfWarRenderState(),
     onViewportChanged: (GeoBounds) -> Unit = {},
+    onObjectTapped: (String) -> Unit = {},
     onCameraGestureStarted: (CameraPositionState) -> Unit = {},
     onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit = { _, _ -> },
     onLocationPermissionGranted: () -> Unit = {},
@@ -109,8 +112,10 @@ fun MapLibreViewMapScreen(
         LegacyMapLibreMap(
             modifier = modifier,
             styleUri = styleUri,
+            visibleObjects = visibleObjects,
 //            fogOfWar = fogOfWar,
             onViewportChanged = onViewportChanged,
+            onObjectTapped = onObjectTapped,
             onCameraGestureStarted = onCameraGestureStarted,
             onCameraSettled = onCameraSettled,
             onMapLoadFailed = onMapLoadFailed,
@@ -255,8 +260,10 @@ private fun LocationPermissionDeniedScreen(
 private fun LegacyMapLibreMap(
     modifier: Modifier = Modifier,
     styleUri: String,
+    visibleObjects: List<MapObjectUiModel>,
 //    fogOfWar: FogOfWarRenderState,
     onViewportChanged: (GeoBounds) -> Unit,
+    onObjectTapped: (String) -> Unit,
     onCameraGestureStarted: (CameraPositionState) -> Unit,
     onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit,
     onMapLoadFailed: (String?) -> Unit,
@@ -267,6 +274,7 @@ private fun LegacyMapLibreMap(
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val currentOnViewportChanged by rememberUpdatedState(onViewportChanged)
+    val currentOnObjectTapped by rememberUpdatedState(onObjectTapped)
     val currentOnCameraGestureStarted by rememberUpdatedState(onCameraGestureStarted)
     val currentOnCameraSettled by rememberUpdatedState(onCameraSettled)
     val currentOnMapLoadFailed by rememberUpdatedState(onMapLoadFailed)
@@ -285,6 +293,13 @@ private fun LegacyMapLibreMap(
                     MapLibre.getInstance(context)
 
 //                    val fogLayerController = NativeFogOfWarLayerController()
+                    val objectLayerController = MapObjectLayerController()
+                    val objectTapController = MapObjectTapController(
+                        objectLayerController = objectLayerController,
+                        onObjectTapped = { objectId ->
+                            currentOnObjectTapped(objectId)
+                        },
+                    )
                     val viewportReporter = NativeMapViewportReporter(
                         onViewportChanged = { bounds ->
                             currentOnViewportChanged(bounds)
@@ -347,6 +362,8 @@ private fun LegacyMapLibreMap(
                             startupGateController = startupGateController,
                             renderReadinessListeners = renderReadinessListeners,
 //                            fogLayerController = fogLayerController,
+                            objectLayerController = objectLayerController,
+                            objectTapController = objectTapController,
                             viewportReporter = viewportReporter,
                             cameraGestureController = cameraGestureController,
                             loadFailureListener = loadFailureListener,
@@ -355,9 +372,12 @@ private fun LegacyMapLibreMap(
                         mapView.addOnDidFailLoadingMapListener(loadFailureListener)
                         mapView.configureLocationAwareMap(
                             styleUri = styleUri,
+                            visibleObjects = visibleObjects,
 //                            fogOfWar = fogOfWar,
                             startupController = startupController,
 //                            fogLayerController = fogLayerController,
+                            objectLayerController = objectLayerController,
+                            objectTapController = objectTapController,
                             viewportReporter = viewportReporter,
                             cameraGestureController = cameraGestureController,
                         )
@@ -366,6 +386,7 @@ private fun LegacyMapLibreMap(
                 update = { mapView ->
                     mapViewHandles[mapView]?.let { handle ->
 //                        handle.fogLayerController.update(fogOfWar)
+                        handle.objectLayerController.update(visibleObjects)
                     }
                 },
                 onRelease = { mapView ->
@@ -373,6 +394,8 @@ private fun LegacyMapLibreMap(
                         handle.startupController.cleanup()
                         handle.startupGateController.cleanup()
                         mapView.detachRenderReadinessListeners(handle.renderReadinessListeners)
+                        handle.objectTapController.cleanup()
+                        handle.objectLayerController.cleanup()
                         handle.viewportReporter.cleanup()
                         handle.cameraGestureController.cleanup()
                         mapView.removeOnDidFailLoadingMapListener(handle.loadFailureListener)
@@ -389,9 +412,12 @@ private fun LegacyMapLibreMap(
 @SuppressLint("MissingPermission")
 private fun MapView.configureLocationAwareMap(
     styleUri: String,
+    visibleObjects: List<MapObjectUiModel>,
 //    fogOfWar: FogOfWarRenderState,
     startupController: MapLocationStartupController,
 //    fogLayerController: NativeFogOfWarLayerController,
+    objectLayerController: MapObjectLayerController,
+    objectTapController: MapObjectTapController,
     viewportReporter: NativeMapViewportReporter,
     cameraGestureController: NativeCameraGestureController,
 ) {
@@ -404,6 +430,9 @@ private fun MapView.configureLocationAwareMap(
 
 //            fogLayerController.attach(style)
 //            fogLayerController.update(fogOfWar)
+            objectLayerController.attach(style)
+            objectLayerController.update(visibleObjects)
+            objectTapController.attach(map)
 
             NativeModelLayer.addTo(
                 map = map,
@@ -502,6 +531,8 @@ private data class MapViewHandle(
     val startupGateController: MapStartupGateController,
     val renderReadinessListeners: MapRenderReadinessListeners,
 //    val fogLayerController: NativeFogOfWarLayerController,
+    val objectLayerController: MapObjectLayerController,
+    val objectTapController: MapObjectTapController,
     val viewportReporter: NativeMapViewportReporter,
     val cameraGestureController: NativeCameraGestureController,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,
@@ -597,6 +628,32 @@ private fun MapView.attachRenderReadinessListeners(
 
 private fun MapView.detachRenderReadinessListeners(listeners: MapRenderReadinessListeners) {
     removeOnDidFinishRenderingFrameListener(listeners.frameListener)
+}
+
+private class MapObjectTapController(
+    private val objectLayerController: MapObjectLayerController,
+    private val onObjectTapped: (String) -> Unit,
+) {
+    private var map: MapLibreMap? = null
+
+    private val mapClickListener = MapLibreMap.OnMapClickListener { latLng ->
+        val map = map ?: return@OnMapClickListener false
+        val screenPoint = map.projection.toScreenLocation(latLng)
+        val objectId = objectLayerController.queryObjectIdAt(map, screenPoint) ?: return@OnMapClickListener false
+        onObjectTapped(objectId)
+        true
+    }
+
+    fun attach(map: MapLibreMap) {
+        cleanup()
+        this.map = map
+        map.addOnMapClickListener(mapClickListener)
+    }
+
+    fun cleanup() {
+        map?.removeOnMapClickListener(mapClickListener)
+        map = null
+    }
 }
 
 private class NativeCameraGestureController(
