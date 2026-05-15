@@ -1,6 +1,7 @@
 package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.testing.MainDispatcherRule
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.ExplorationTileRange
@@ -29,11 +30,14 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.Rule
 import org.junit.Test
 
 private typealias PackedExploredTilesFlow = MutableStateFlow<Output<LongArray, UseCaseError>>
 
 class FogOfWarControllerTest {
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     @Test
     fun `updateViewport should activate initial displayed buffer when fog is not suppressed`() = runTest {
