@@ -1440,11 +1440,11 @@ git commit -m "feat: reveal fog from controlled breach cells"
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/viewinterop/MapLibreViewMapScreen.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/feature/map/viewinterop/NativeFogOfWarLayerControllerTest.kt`
 
-- [ ] **Step 1: Add regression test for fog state delivery**
+- [x] **Step 1: Add regression test for fog state delivery**
 
 Test that `MapLibreViewMapScreen` forwards `FogOfWarRenderState` to `NativeFogOfWarLayerController.update`.
 
-- [ ] **Step 2: Re-enable fog controller lines**
+- [x] **Step 2: Re-enable fog controller lines**
 
 Restore the commented controller creation, attach, update, and cleanup path:
 
@@ -1455,7 +1455,7 @@ fogLayerController.update(fogOfWar)
 handle.fogLayerController.update(fogOfWar)
 ```
 
-- [ ] **Step 3: Run compile and native fog tests**
+- [x] **Step 3: Run compile and native fog tests**
 
 Run:
 
@@ -1466,7 +1466,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 
