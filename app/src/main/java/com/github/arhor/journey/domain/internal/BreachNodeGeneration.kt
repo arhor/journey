@@ -31,6 +31,9 @@ object BreachNodeGeneration {
         cellId: String,
         h3Grid: H3Grid,
     ): BreachNodeDefinition? {
+        if (h3Grid.cellResolution(cellId) != BreachBalance.H3_RESOLUTION) {
+            return null
+        }
         if (!isOccupied(cellId = cellId)) {
             return null
         }
@@ -52,6 +55,7 @@ object BreachNodeGeneration {
     ): List<BreachNodeDefinition> =
         cellIds
             .asSequence()
+            .distinct()
             .mapNotNull { cellId -> definitionForCell(cellId = cellId, h3Grid = h3Grid) }
             .sortedBy { definition -> definition.id }
             .toList()

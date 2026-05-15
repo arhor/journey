@@ -2,6 +2,7 @@ package com.github.arhor.journey.core.testing
 
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
+import com.github.arhor.journey.domain.internal.BreachBalance
 import com.github.arhor.journey.domain.spatial.H3Grid
 import kotlin.math.abs
 
@@ -10,11 +11,15 @@ class FakeH3Grid(
     private val disk: List<String> = listOf(originCell),
     private val centers: Map<String, GeoPoint> = emptyMap(),
     private val boundaries: Map<String, List<GeoPoint>> = emptyMap(),
+    private val resolutions: Map<String, Int> = emptyMap(),
     private val cellsInBounds: List<String> = disk,
     private val averageEdgeLengthMeters: Double = 180.0,
 ) : H3Grid {
 
     override fun cellId(lat: Double, lon: Double, resolution: Int): String = originCell
+
+    override fun cellResolution(cellId: String): Int =
+        resolutions[cellId] ?: BreachBalance.H3_RESOLUTION
 
     override fun cellCenter(cellId: String): GeoPoint =
         centers[cellId] ?: GeoPoint(

@@ -5,6 +5,7 @@ import com.github.arhor.journey.domain.model.GeoPoint
 
 interface H3Grid {
     fun cellId(lat: Double, lon: Double, resolution: Int): String
+    fun cellResolution(cellId: String): Int
     fun cellCenter(cellId: String): GeoPoint
     fun cellBoundary(cellId: String): List<GeoPoint>
     fun gridDisk(cellId: String, radius: Int): List<String>

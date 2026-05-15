@@ -21,6 +21,9 @@ class UberH3Grid internal constructor(
     override fun cellId(lat: Double, lon: Double, resolution: Int): String =
         h3.latLngToCellAddress(lat, lon, resolution)
 
+    override fun cellResolution(cellId: String): Int =
+        h3.getResolution(cellId)
+
     override fun cellCenter(cellId: String): GeoPoint {
         val center = h3.cellToLatLng(cellId)
         return GeoPoint(lat = center.lat, lon = center.lng)
