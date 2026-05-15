@@ -5,26 +5,14 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import com.github.arhor.journey.core.common.ResourceType
-import com.github.arhor.journey.data.local.db.dao.CollectedResourceSpawnDao
 import com.github.arhor.journey.data.local.db.dao.ExplorationTileDao
-import com.github.arhor.journey.data.local.db.dao.HeroDao
-import com.github.arhor.journey.data.local.db.dao.HeroResourceDao
-import com.github.arhor.journey.data.local.db.dao.WatchtowerStateDao
-import com.github.arhor.journey.data.local.db.entity.CollectedResourceSpawnEntity
 import com.github.arhor.journey.data.local.db.entity.ExploredTileEntity
-import com.github.arhor.journey.data.local.db.entity.HeroEntity
-import com.github.arhor.journey.data.local.db.entity.HeroResourceEntity
-import com.github.arhor.journey.data.local.db.entity.WatchtowerStateEntity
 
 @Database(
     entities = [
-        HeroEntity::class,
-        HeroResourceEntity::class,
-        CollectedResourceSpawnEntity::class,
         ExploredTileEntity::class,
-        WatchtowerStateEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 @TypeConverters(
@@ -34,19 +22,11 @@ import com.github.arhor.journey.data.local.db.entity.WatchtowerStateEntity
 )
 abstract class JourneyDatabase : RoomDatabase() {
 
-    abstract fun heroDao(): HeroDao
-
-    abstract fun heroResourceDao(): HeroResourceDao
-
-    abstract fun collectedResourceSpawnDao(): CollectedResourceSpawnDao
-
     abstract fun explorationTileDao(): ExplorationTileDao
-
-    abstract fun watchtowerStateDao(): WatchtowerStateDao
 
     companion object {
         val MIGRATIONS: Array<Migration>
-            get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            get() = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 
         private val MIGRATION_1_2 = Migration(1, 2) { db ->
             val legacyResourceIdMappings = listOf(
@@ -142,6 +122,32 @@ abstract class JourneyDatabase : RoomDatabase() {
         val MIGRATION_4_5 = Migration(4, 5) { db ->
             db.execSQL("DROP TABLE IF EXISTS `discovered_poi`")
             db.execSQL("DROP TABLE IF EXISTS `poi`")
+        }
+
+        val MIGRATION_5_6 = Migration(5, 6) { db ->
+            db.execSQL("DROP TABLE IF EXISTS `watchtower_state`")
+            db.execSQL("DROP TABLE IF EXISTS `hero_resources`")
+            db.execSQL("DROP TABLE IF EXISTS `collected_resource_spawns`")
+            db.execSQL("DROP TABLE IF EXISTS `hero`")
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `breach_node_state` (
+                    `breachNodeId` TEXT NOT NULL,
+                    `h3CellId` TEXT NOT NULL,
+                    `discoveredAt` INTEGER,
+                    `controlledAt` INTEGER,
+                    `lockdownUntil` INTEGER,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`breachNodeId`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS `index_breach_node_state_h3CellId`
+                ON `breach_node_state` (`h3CellId`)
+                """.trimIndent(),
+            )
         }
     }
 }

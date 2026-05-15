@@ -7,7 +7,6 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
-import com.github.arhor.journey.domain.model.WatchtowerDefinition
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.flow.take
@@ -89,94 +88,6 @@ class MapObjectAreaStoreTest {
         source.fetchAreaRequests.size shouldBe fetchCountAfterPreload
     }
 
-    @Test
-    fun `observeWatchtowerDefinitions should emit cached definitions first then refreshed definitions`() = runTest {
-        // Given
-        val source = FakeMapObjectAreaSource()
-        val subject = createSubject(source)
-        val firstTile = MapTile(zoom = 15, x = 18_000, y = 11_000)
-        val firstBounds = bounds(firstTile)
-        val combinedBounds = bounds(
-            ExplorationTileRange(
-                zoom = 15,
-                minX = firstTile.x,
-                maxX = firstTile.x + 1,
-                minY = firstTile.y,
-                maxY = firstTile.y,
-            ),
-        )
-        val activeAt = Instant.parse("2026-03-19T10:00:00Z")
-        subject.getWatchtowerDefinitions(bounds = firstBounds, asOf = activeAt)
-
-        // When
-        val actual = subject.observeWatchtowerDefinitions(
-            bounds = combinedBounds,
-            asOf = activeAt,
-        )
-            .take(2)
-            .toList()
-
-        // Then
-        actual shouldHaveSize 2
-        actual[0].map(WatchtowerDefinition::id) shouldBe listOf(source.watchtowerId(firstBounds))
-        actual[1].map(WatchtowerDefinition::id) shouldBe listOf(
-            source.watchtowerId(firstBounds),
-            source.watchtowerId(
-                bounds(
-                    MapTile(
-                        zoom = firstTile.zoom,
-                        x = firstTile.x + 1,
-                        y = firstTile.y,
-                    ),
-                ),
-            ),
-        )
-    }
-
-    @Test
-    fun `observeWatchtowerDefinitions should emit cached definitions once when the request is fully cached`() = runTest {
-        // Given
-        val source = FakeMapObjectAreaSource()
-        val subject = createSubject(source)
-        val queryBounds = bounds(MapTile(zoom = 15, x = 18_000, y = 11_000))
-        val activeAt = Instant.parse("2026-03-19T10:00:00Z")
-        val initial = subject.getWatchtowerDefinitions(bounds = queryBounds, asOf = activeAt)
-        val fetchCountAfterPreload = source.fetchAreaRequests.size
-
-        // When
-        val actual = subject.observeWatchtowerDefinitions(
-            bounds = queryBounds,
-            asOf = activeAt,
-        ).toList()
-
-        // Then
-        actual shouldBe listOf(initial)
-        source.fetchAreaRequests.size shouldBe fetchCountAfterPreload
-    }
-
-    @Test
-    fun `observeWatchtowerDefinitions should emit empty refreshed result when cold area contains no definitions`() = runTest {
-        // Given
-        val source = FakeMapObjectAreaSource(
-            responseOverride = MapObjectAreaResponse(
-                resourceSpawns = emptyList(),
-                watchtowerDefinitions = emptyList(),
-            ),
-        )
-        val subject = createSubject(source)
-        val queryBounds = bounds(MapTile(zoom = 15, x = 18_000, y = 11_000))
-        val activeAt = Instant.parse("2026-03-19T10:00:00Z")
-
-        // When
-        val actual = subject.observeWatchtowerDefinitions(
-            bounds = queryBounds,
-            asOf = activeAt,
-        ).toList()
-
-        // Then
-        actual shouldBe listOf(emptyList())
-    }
-
     private fun TestScope.createSubject(
         source: FakeMapObjectAreaSource,
     ): MapObjectAreaStore {
@@ -209,15 +120,6 @@ class MapObjectAreaStoreTest {
                         availableUntil = asOf.plusSeconds(60),
                     ),
                 ),
-                watchtowerDefinitions = listOf(
-                    WatchtowerDefinition(
-                        id = watchtowerId(bounds),
-                        name = "Watchtower",
-                        description = null,
-                        location = bounds.center(),
-                        interactionRadiusMeters = 25.0,
-                    ),
-                ),
             )
         }
 
@@ -226,13 +128,8 @@ class MapObjectAreaStoreTest {
             asOf: Instant,
         ): ResourceSpawn? = null
 
-        override suspend fun fetchWatchtowerDefinition(id: String): WatchtowerDefinition? = null
-
         fun resourceId(bounds: GeoBounds): String =
             "resource:${bounds.west}:${bounds.north}"
-
-        fun watchtowerId(bounds: GeoBounds): String =
-            "watchtower:${bounds.west}:${bounds.north}"
 
         private fun GeoBounds.center(): GeoPoint =
             GeoPoint(

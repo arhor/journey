@@ -8,7 +8,6 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.ResourceSpawnQuery
-import com.github.arhor.journey.domain.model.WatchtowerDefinition
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -81,46 +80,6 @@ class MapObjectAreaStore @Inject constructor(
             asOf = asOf,
         )
 
-    fun observeWatchtowerDefinitions(
-        bounds: GeoBounds,
-        asOf: Instant,
-    ): Flow<List<WatchtowerDefinition>> = flow {
-        val chunkRequest = withContext(defaultDispatcher) { bounds.toWatchtowerChunkRequest() }
-        val cached = withContext(defaultDispatcher) { readCachedWatchtowerDefinitions(chunkRequest) }
-        if (cached.shouldEmitCacheFirst) {
-            emit(cached.items)
-        }
-
-        if (!cached.isComplete && !chunkRequest.isOverLimit) {
-            val refreshed = withContext(defaultDispatcher) {
-                loadChunks(chunkRequest.keys, asOf)
-                readCachedWatchtowerDefinitions(chunkRequest).items
-            }
-            if (!cached.shouldEmitCacheFirst || refreshed != cached.items) {
-                emit(refreshed)
-            }
-        } else if (!cached.shouldEmitCacheFirst) {
-            emit(cached.items)
-        }
-    }.distinctUntilChanged()
-
-    suspend fun getWatchtowerDefinitions(
-        bounds: GeoBounds,
-        asOf: Instant,
-    ): List<WatchtowerDefinition> = withContext(defaultDispatcher) {
-        val chunkRequest = bounds.toWatchtowerChunkRequest()
-        val cached = readCachedWatchtowerDefinitions(chunkRequest)
-        if (cached.isComplete || chunkRequest.isOverLimit) {
-            return@withContext cached.items
-        }
-
-        loadChunks(chunkRequest.keys, asOf)
-        readCachedWatchtowerDefinitions(chunkRequest).items
-    }
-
-    suspend fun getWatchtowerDefinition(id: String): WatchtowerDefinition? =
-        source.fetchWatchtowerDefinition(id)
-
     private suspend fun readCachedResourceSpawns(
         request: ResourceChunkRequest,
     ): AreaCacheRead<ResourceSpawn> {
@@ -130,20 +89,6 @@ class MapObjectAreaStore @Inject constructor(
                 .distinctBy(ResourceSpawn::id)
                 .filter { spawn -> request.matches(spawn) }
                 .sortedBy(ResourceSpawn::id),
-            isComplete = cached.isCompleteFor(request.keys),
-            shouldEmitCacheFirst = cached.hasAnyCachedChunk,
-        )
-    }
-
-    private suspend fun readCachedWatchtowerDefinitions(
-        request: WatchtowerChunkRequest,
-    ): AreaCacheRead<WatchtowerDefinition> {
-        val cached = cache.readWatchtowerChunks(request.keys)
-        return AreaCacheRead(
-            items = cached.items
-                .distinctBy(WatchtowerDefinition::id)
-                .filter { definition -> request.bounds.contains(definition.location) }
-                .sortedBy(WatchtowerDefinition::id),
             isComplete = cached.isCompleteFor(request.keys),
             shouldEmitCacheFirst = cached.hasAnyCachedChunk,
         )
@@ -172,10 +117,7 @@ class MapObjectAreaStore @Inject constructor(
         asOf: Instant,
         activeDayEpoch: Long,
     ) {
-        val isCached = when (key.family) {
-            MapObjectFamily.RESOURCE_SPAWN -> cache.readResourceChunks(listOf(key)).isCompleteFor(listOf(key))
-            MapObjectFamily.WATCHTOWER -> cache.readWatchtowerChunks(listOf(key)).isCompleteFor(listOf(key))
-        }
+        val isCached = cache.readResourceChunks(listOf(key)).isCompleteFor(listOf(key))
         if (isCached) {
             return
         }
@@ -196,21 +138,10 @@ class MapObjectAreaStore @Inject constructor(
             x = key.x,
             y = key.y,
         )
-        val watchtowerKey = watchtowerChunkKey(
-            zoom = key.zoom,
-            x = key.x,
-            y = key.y,
-        )
 
         cache.putResourceChunk(
             key = resourceKey,
             spawns = response.resourceSpawns.filter { spawn -> chunkBounds.contains(spawn.position) },
-        )
-        cache.putWatchtowerChunk(
-            key = watchtowerKey,
-            definitions = response.watchtowerDefinitions.filter { definition ->
-                chunkBounds.contains(definition.location)
-            },
         )
     }
 
@@ -243,22 +174,6 @@ class MapObjectAreaStore @Inject constructor(
             bounds = bounds,
             center = center,
             radiusMeters = radiusMeters,
-            isOverLimit = keys.size.toLong() > MAX_AREA_CHUNKS,
-        )
-    }
-
-    private fun GeoBounds.toWatchtowerChunkRequest(): WatchtowerChunkRequest {
-        val keys = toChunkKeys { tile ->
-            watchtowerChunkKey(
-                zoom = tile.zoom,
-                x = tile.x,
-                y = tile.y,
-            )
-        }
-
-        return WatchtowerChunkRequest(
-            keys = keys,
-            bounds = this,
             isOverLimit = keys.size.toLong() > MAX_AREA_CHUNKS,
         )
     }
@@ -314,12 +229,6 @@ class MapObjectAreaStore @Inject constructor(
         val bounds: GeoBounds?,
         val center: GeoPoint?,
         val radiusMeters: Double?,
-        val isOverLimit: Boolean,
-    )
-
-    private data class WatchtowerChunkRequest(
-        val keys: List<MapObjectChunkKey>,
-        val bounds: GeoBounds,
         val isOverLimit: Boolean,
     )
 

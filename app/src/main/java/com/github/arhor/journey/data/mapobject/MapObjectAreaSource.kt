@@ -2,7 +2,6 @@ package com.github.arhor.journey.data.mapobject
 
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.ResourceSpawn
-import com.github.arhor.journey.domain.model.WatchtowerDefinition
 import java.time.Instant
 
 interface MapObjectAreaSource {
@@ -16,6 +15,4 @@ interface MapObjectAreaSource {
         spawnId: String,
         asOf: Instant,
     ): ResourceSpawn?
-
-    suspend fun fetchWatchtowerDefinition(id: String): WatchtowerDefinition?
 }

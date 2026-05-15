@@ -1,44 +1,44 @@
 package com.github.arhor.journey.data.repository
 
-import com.github.arhor.journey.data.local.db.dao.HeroResourceDao
-import com.github.arhor.journey.data.local.db.entity.HeroResourceEntity
-import com.github.arhor.journey.data.mapper.toDomain
 import com.github.arhor.journey.domain.TransactionRunner
 import com.github.arhor.journey.domain.model.HeroResource
 import com.github.arhor.journey.domain.repository.HeroInventoryRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class RoomHeroResourcesRepository @Inject constructor(
-    private val dao: HeroResourceDao,
     private val transactionRunner: TransactionRunner,
 ) : HeroInventoryRepository {
+    private val mutex = Mutex()
+    private val state = MutableStateFlow<Map<ResourceKey, HeroResource>>(emptyMap())
 
     override fun observeAll(heroId: String): Flow<List<HeroResource>> =
-        dao.observeAll(heroId)
-            .map { entities -> entities.map { it.toDomain() } }
+        state.map { values ->
+            values.values
+                .filter { resource -> resource.heroId == heroId }
+                .sortedBy(HeroResource::resourceTypeId)
+        }
 
     override fun observeAmount(
         heroId: String,
         resourceTypeId: String,
     ): Flow<Int> =
-        dao.observeAmount(
-            heroId = heroId,
-            typeId = resourceTypeId,
-        ).map { amount -> amount ?: 0 }
+        state.map { values ->
+            values[ResourceKey(heroId = heroId, resourceTypeId = resourceTypeId)]?.amount ?: 0
+        }
 
     override suspend fun getAmount(
         heroId: String,
         resourceTypeId: String,
     ): Int =
-        dao.getAmount(
-            heroId = heroId,
-            typeId = resourceTypeId,
-        ) ?: 0
+        state.value[ResourceKey(heroId = heroId, resourceTypeId = resourceTypeId)]?.amount ?: 0
 
     override suspend fun setAmount(
         heroId: String,
@@ -49,19 +49,14 @@ class RoomHeroResourcesRepository @Inject constructor(
         require(amount >= 0) { "Resource amount must not be negative." }
 
         return transactionRunner.runInTransaction {
-            dao.upsert(
-                HeroResourceEntity(
-                    heroId = heroId,
-                    typeId = resourceTypeId,
-                    amount = amount,
-                    updatedAt = updatedAt,
-                ),
-            )
-
-            getRequiredResource(
+            val updated = HeroResource(
                 heroId = heroId,
                 resourceTypeId = resourceTypeId,
-            ).toDomain()
+                amount = amount,
+                updatedAt = updatedAt,
+            )
+            upsertResource(updated)
+            updated
         }
     }
 
@@ -74,17 +69,16 @@ class RoomHeroResourcesRepository @Inject constructor(
         require(amount > 0) { "Added resource amount must be greater than zero." }
 
         return transactionRunner.runInTransaction {
-            dao.incrementAmount(
-                heroId = heroId,
-                typeId = resourceTypeId,
-                amountDelta = amount,
-                updatedAt = updatedAt,
-            )
-
-            getRequiredResource(
+            val key = ResourceKey(heroId = heroId, resourceTypeId = resourceTypeId)
+            val previous = state.value[key]?.amount ?: 0
+            val updated = HeroResource(
                 heroId = heroId,
                 resourceTypeId = resourceTypeId,
-            ).toDomain()
+                amount = previous + amount,
+                updatedAt = updatedAt,
+            )
+            upsertResource(updated)
+            updated
         }
     }
 
@@ -97,34 +91,30 @@ class RoomHeroResourcesRepository @Inject constructor(
         require(amount > 0) { "Spent resource amount must be greater than zero." }
 
         return transactionRunner.runInTransaction {
-            val updatedRows = dao.decrementAmountIfEnough(
-                heroId = heroId,
-                typeId = resourceTypeId,
-                amountDelta = amount,
+            val key = ResourceKey(heroId = heroId, resourceTypeId = resourceTypeId)
+            val previous = state.value[key] ?: return@runInTransaction null
+            if (previous.amount < amount) {
+                return@runInTransaction null
+            }
+            val updated = previous.copy(
+                amount = previous.amount - amount,
                 updatedAt = updatedAt,
             )
-
-            if (updatedRows == 0) {
-                null
-            } else {
-                getRequiredResource(
-                    heroId = heroId,
-                    resourceTypeId = resourceTypeId,
-                ).toDomain()
-            }
+            upsertResource(updated)
+            updated
         }
     }
 
-    private suspend fun getRequiredResource(
-        heroId: String,
-        resourceTypeId: String,
-    ): HeroResourceEntity =
-        requireNotNull(
-            dao.getById(
-                heroId = heroId,
-                typeId = resourceTypeId,
-            ),
-        ) {
-            "Hero resource must exist after mutation for heroId=$heroId resourceTypeId=$resourceTypeId."
+    private suspend fun upsertResource(resource: HeroResource) {
+        mutex.withLock {
+            val updated = state.value.toMutableMap()
+            updated[ResourceKey(heroId = resource.heroId, resourceTypeId = resource.resourceTypeId)] = resource
+            state.value = updated.toMap()
         }
+    }
+
+    private data class ResourceKey(
+        val heroId: String,
+        val resourceTypeId: String,
+    )
 }

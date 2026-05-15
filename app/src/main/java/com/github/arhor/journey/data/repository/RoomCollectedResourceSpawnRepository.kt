@@ -1,46 +1,60 @@
 package com.github.arhor.journey.data.repository
 
-import com.github.arhor.journey.data.local.db.dao.CollectedResourceSpawnDao
-import com.github.arhor.journey.data.mapper.toDomain
-import com.github.arhor.journey.data.mapper.toEntity
 import com.github.arhor.journey.domain.model.CollectedResourceSpawn
 import com.github.arhor.journey.domain.repository.CollectedResourceSpawnRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class RoomCollectedResourceSpawnRepository @Inject constructor(
-    private val dao: CollectedResourceSpawnDao,
 ) : CollectedResourceSpawnRepository {
+    private val mutex = Mutex()
+    private val state = MutableStateFlow<Map<SpawnKey, CollectedResourceSpawn>>(emptyMap())
 
     override fun observeAll(heroId: String): Flow<List<CollectedResourceSpawn>> =
-        dao.observeAll(heroId)
-            .map { entities -> entities.map { it.toDomain() } }
+        state.map { values ->
+            values.values
+                .filter { spawn -> spawn.heroId == heroId }
+                .sortedBy(CollectedResourceSpawn::spawnId)
+        }
 
     override suspend fun isCollected(
         heroId: String,
         spawnId: String,
     ): Boolean =
-        dao.exists(
-            heroId = heroId,
-            spawnId = spawnId,
-        )
+        state.value.containsKey(SpawnKey(heroId = heroId, spawnId = spawnId))
 
     override suspend fun markCollected(
         heroId: String,
         spawnId: String,
         resourceTypeId: String,
         collectedAt: Instant,
-    ): Boolean =
-        dao.insert(
-            CollectedResourceSpawn(
+    ): Boolean {
+        val key = SpawnKey(heroId = heroId, spawnId = spawnId)
+        return mutex.withLock {
+            if (state.value.containsKey(key)) {
+                return@withLock false
+            }
+            val updated = state.value.toMutableMap()
+            updated[key] = CollectedResourceSpawn(
                 heroId = heroId,
                 spawnId = spawnId,
                 typeId = resourceTypeId,
                 collectedAt = collectedAt,
-            ).toEntity(),
-        ) != -1L
+            )
+            state.value = updated.toMap()
+            true
+        }
+    }
+
+    private data class SpawnKey(
+        val heroId: String,
+        val spawnId: String,
+    )
 }
