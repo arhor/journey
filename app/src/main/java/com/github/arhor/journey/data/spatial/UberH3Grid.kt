@@ -5,9 +5,10 @@ import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.spatial.H3Grid
 import com.uber.h3core.H3Core
 import com.uber.h3core.LengthUnit
+import com.uber.h3core.PolygonToCellsFlags
+import com.uber.h3core.util.LatLng
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.ceil
 
 @Singleton
 class UberH3Grid internal constructor(
@@ -40,22 +41,19 @@ class UberH3Grid internal constructor(
         h3.getHexagonEdgeLengthAvg(resolution, LengthUnit.m)
 
     override fun cellsInBounds(bounds: GeoBounds, resolution: Int): List<String> {
-        val center = GeoPoint(
-            lat = (bounds.south + bounds.north) / 2.0,
-            lon = (bounds.west + bounds.east) / 2.0,
+        val outline = listOf(
+            LatLng(bounds.south, bounds.west),
+            LatLng(bounds.south, bounds.east),
+            LatLng(bounds.north, bounds.east),
+            LatLng(bounds.north, bounds.west),
         )
-        val centerCell = cellId(center.lat, center.lon, resolution)
-        val edgeLengthMeters = averageEdgeLengthMeters(resolution)
-        val diagonalMeters = maxOf(
-            center.distanceTo(GeoPoint(lat = bounds.north, lon = bounds.east)),
-            center.distanceTo(GeoPoint(lat = bounds.north, lon = bounds.west)),
-            center.distanceTo(GeoPoint(lat = bounds.south, lon = bounds.east)),
-            center.distanceTo(GeoPoint(lat = bounds.south, lon = bounds.west)),
-        )
-        val radius = ceil(diagonalMeters / edgeLengthMeters).toInt().coerceAtLeast(1)
 
-        return gridDisk(centerCell, radius)
-            .filter { candidateCellId -> bounds.contains(cellCenter(candidateCellId)) }
+        return h3.polygonToCellAddressesExperimental(
+            outline,
+            null,
+            resolution,
+            PolygonToCellsFlags.containment_overlapping,
+        )
             .distinct()
             .sorted()
     }
