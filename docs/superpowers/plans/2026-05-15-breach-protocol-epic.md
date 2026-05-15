@@ -1390,18 +1390,18 @@ git commit -m "feat: render breach map markers"
 - Test: `app/src/test/java/com/github/arhor/journey/feature/map/fow/H3FogRevealMapperTest.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/feature/map/fow/FogOfWarControllerTest.kt`
 
-- [ ] **Step 1: Write mapper test**
+- [x] **Step 1: Write mapper test**
 
 Test that one H3 cell boundary maps to a non-empty set of canonical fog tiles by checking tile and cell boundary
 intersection.
 
-- [ ] **Step 2: Run mapper test and verify failure**
+- [x] **Step 2: Run mapper test and verify failure**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.feature.map.fow.H3FogRevealMapperTest"`
 
 Expected: FAIL because mapper does not exist.
 
-- [ ] **Step 3: Implement mapper**
+- [x] **Step 3: Implement mapper**
 
 Inputs:
 
@@ -1414,17 +1414,17 @@ fun revealTilesForCells(
 
 Use `H3Grid.cellBoundary(cellId)` to build bounds, then reuse existing tile range and geometry intersection helpers where possible.
 
-- [ ] **Step 4: Replace watchtower reveal in controller**
+- [x] **Step 4: Replace watchtower reveal in controller**
 
 Inject `ObserveControlledBreachRevealCellsUseCase` and `H3FogRevealMapper`. Convert controlled cells to persistent tile mask inside `FogOfWarController`.
 
-- [ ] **Step 5: Run fog tests**
+- [x] **Step 5: Run fog tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.feature.map.fow.FogOfWarControllerTest"`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
