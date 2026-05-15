@@ -4,9 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.R
-import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
-import com.github.arhor.journey.core.common.map
 import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
@@ -30,7 +28,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -88,8 +85,6 @@ class MapViewModel @Inject constructor(
             initialValue = Output.Success(MapStyle.defaultStyle),
         )
 
-    private var cachedVisibleObjects: List<MapObjectUiModel> = emptyList()
-
     override fun buildUiState(): Flow<MapUiState> =
         observeBaseUiState()
             .map { it.toUiState() }
@@ -97,33 +92,16 @@ class MapViewModel @Inject constructor(
 
     private fun observeBaseUiState(): Flow<MapBaseUiState> =
         combine(
-            combine(
-                _state,
-                fogOfWarController.uiState,
-                trackingSession,
-            ) { state, fogOfWar, session ->
-                UiStateInputs(
-                    state = state,
-                    fogOfWar = fogOfWar,
-                    trackingSessionOutput = session,
-                )
-            },
-            combine(
-                observeVisibleWorldObjects(),
-                selectedMapStyle,
-            ) { visibleWorldObjects, selectedMapStyle ->
-                UiStateStyleInputs(
-                    visibleWorldObjectsOutput = visibleWorldObjects,
-                    selectedMapStyleOutput = selectedMapStyle,
-                )
-            },
-        ) { inputs, styleInputs ->
+            _state,
+            fogOfWarController.uiState,
+            trackingSession,
+            selectedMapStyle,
+        ) { state, fogOfWar, trackingSessionOutput, selectedMapStyleOutput ->
             intoBaseUiState(
-                state = inputs.state,
-                trackingSessionOutput = inputs.trackingSessionOutput,
-                fogOfWar = inputs.fogOfWar,
-                visibleWorldObjectsOutput = styleInputs.visibleWorldObjectsOutput,
-                selectedMapStyleOutput = styleInputs.selectedMapStyleOutput,
+                state = state,
+                trackingSessionOutput = trackingSessionOutput,
+                fogOfWar = fogOfWar,
+                selectedMapStyleOutput = selectedMapStyleOutput,
             )
         }
             .catch {
@@ -134,9 +112,6 @@ class MapViewModel @Inject constructor(
                 )
             }
             .distinctUntilChanged()
-
-    private fun observeVisibleWorldObjects(): Flow<Output<VisibleWorldObjects, DomainError>> =
-        flowOf(Output.Success(VisibleWorldObjects()))
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
@@ -215,24 +190,15 @@ class MapViewModel @Inject constructor(
 
     private fun intoBaseUiState(
         state: State,
-        trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
+        trackingSessionOutput: Output<ExplorationTrackingSession, *>,
         fogOfWar: FogOfWarUiState,
-        visibleWorldObjectsOutput: Output<VisibleWorldObjects, DomainError>,
-        selectedMapStyleOutput: Output<MapStyle, DomainError>,
+        selectedMapStyleOutput: Output<MapStyle, *>,
     ): MapBaseUiState = if (state.failureMessage == null) {
         val trackingSessionValue = when (trackingSessionOutput) {
             is Output.Success -> trackingSessionOutput.value
             is Output.Failure -> {
                 return MapBaseUiState.Failure(
                     errorMessage = trackingSessionOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
-                )
-            }
-        }
-        val visibleWorldObjects = when (visibleWorldObjectsOutput) {
-            is Output.Success -> visibleWorldObjectsOutput.value
-            is Output.Failure -> {
-                return MapBaseUiState.Failure(
-                    errorMessage = visibleWorldObjectsOutput.error.resolveMessage(MAP_LOADING_FAILED_MESSAGE),
                 )
             }
         }
@@ -245,8 +211,6 @@ class MapViewModel @Inject constructor(
             }
         }
 
-        val resolvedVisibleObjects = reuseVisibleObjects(visibleWorldObjects.objects)
-
         MapBaseUiState.Content(
             cameraPosition = state.cameraPosition,
             cameraUpdateOrigin = state.cameraUpdateOrigin,
@@ -258,7 +222,7 @@ class MapViewModel @Inject constructor(
             isStartupSplashVisible = state.startupGate.isSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
             mapStyleUri = selectedMapStyle.value,
-            visibleObjects = resolvedVisibleObjects,
+            visibleObjects = emptyList(),
             fogOfWar = fogOfWar,
         )
     } else {
@@ -432,33 +396,6 @@ class MapViewModel @Inject constructor(
             val visibleObjects: List<MapObjectUiModel>,
             val fogOfWar: FogOfWarUiState,
         ) : MapBaseUiState
-    }
-
-    @Immutable
-    private data class UiStateInputs(
-        val state: State,
-        val fogOfWar: FogOfWarUiState,
-        val trackingSessionOutput: Output<ExplorationTrackingSession, DomainError>,
-    )
-
-    @Immutable
-    private data class UiStateStyleInputs(
-        val visibleWorldObjectsOutput: Output<VisibleWorldObjects, DomainError>,
-        val selectedMapStyleOutput: Output<MapStyle, DomainError>,
-    )
-
-    @Immutable
-    private data class VisibleWorldObjects(
-        val objects: List<MapObjectUiModel> = emptyList(),
-    )
-
-    private fun reuseVisibleObjects(visibleObjects: List<MapObjectUiModel>): List<MapObjectUiModel> {
-        if (cachedVisibleObjects == visibleObjects) {
-            return cachedVisibleObjects
-        }
-
-        cachedVisibleObjects = visibleObjects
-        return visibleObjects
     }
 
     private companion object {
