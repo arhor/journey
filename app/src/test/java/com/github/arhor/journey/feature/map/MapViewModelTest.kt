@@ -69,7 +69,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose empty visible objects when query window changes`() = runTest {
+    fun `uiState should expose empty visible objects when viewport changes`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
@@ -165,7 +165,6 @@ class MapViewModelTest {
                 },
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
-                mapObjectQueryWindowPolicy = MapObjectQueryWindowPolicy(),
             ),
         )
     }

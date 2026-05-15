@@ -12,7 +12,6 @@ import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
@@ -44,9 +43,7 @@ private data class State(
     val isUserInteractingCamera: Boolean = false,
     val northResetRequestToken: Int = 0,
     val isAwaitingLocationPermissionResult: Boolean = false,
-    val visibleBounds: GeoBounds? = null,
     val viewportSize: MapViewportSize? = null,
-    val resourceQueryWindow: GeoBounds? = null,
     val failureMessage: String? = null,
     val startupGate: MapStartupGateState = MapStartupGateState(),
 )
@@ -70,7 +67,6 @@ class MapViewModel @Inject constructor(
     private val fogOfWarControllerFactory: FogOfWarController.Factory,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
-    private val mapObjectQueryWindowPolicy: MapObjectQueryWindowPolicy,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -345,16 +341,6 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
-        _state.update { state ->
-            state.copy(
-                visibleBounds = intent.visibleBounds,
-                resourceQueryWindow = mapObjectQueryWindowPolicy.resolveQueryWindow(
-                    visibleBounds = intent.visibleBounds,
-                    currentQueryWindow = state.resourceQueryWindow,
-                ),
-            )
-        }
-
         fogOfWarController.updateViewport(intent.visibleBounds)
     }
 
