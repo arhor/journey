@@ -103,6 +103,12 @@ internal fun MapContent(
             dispatch,
         )
 
+        BreachProtocolOverlay(
+            state = state.breachProtocol,
+            dispatch = dispatch,
+            modifier = Modifier.fillMaxSize(),
+        )
+
         if (state.isStartupSplashVisible) {
             StartupSplashOverlay(
                 message = stringResource(state.startupSplashMessage),

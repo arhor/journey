@@ -24,6 +24,16 @@
     <string name="map_view_location_loading_message">Waiting for your location...</string>
     <string name="map_view_startup_loading_message">Preparing map view and acquiring your location...</string>
     <string name="map_view_startup_timeout_message">Map startup is taking longer than expected. Continuing...</string>
+    <string name="breach_pulse_button">Pulse</string>
+    <string name="breach_scanning">Scanning nearby hex cells...</string>
+    <string name="breach_signal_strength">Signal strength: %1$d%%</string>
+    <string name="breach_distance_meters">%1$d m away</string>
+    <string name="breach_start_upload">Start upload</string>
+    <string name="breach_upload_progress">Upload progress: %1$d%%</string>
+    <string name="breach_upload_continue">Advance upload</string>
+    <string name="breach_cancel_upload">Cancel upload</string>
+    <string name="breach_complete_message">Control established in %1$s.</string>
+    <string name="breach_dismiss_button">Dismiss</string>
     <string name="settings_title">Settings</string>
     <string name="settings_map_style_title">Map Style</string>
     <string name="settings_map_credits_title">Map Credits</string>
