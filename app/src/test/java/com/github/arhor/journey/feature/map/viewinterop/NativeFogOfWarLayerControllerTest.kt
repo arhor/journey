@@ -11,8 +11,14 @@ import com.github.arhor.journey.feature.map.fow.model.HIDDEN_EXPLORED_LAYER_ID
 import com.github.arhor.journey.feature.map.fow.model.HIDDEN_EXPLORED_OPACITY
 import com.github.arhor.journey.feature.map.fow.model.HIDDEN_EXPLORED_SOURCE_ID
 import com.github.arhor.journey.feature.map.fow.model.fogOfWarLayerSpecs
+import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.model.MapObjectKind
+import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Test
@@ -21,6 +27,42 @@ import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Point
 
 class NativeFogOfWarLayerControllerTest {
+
+    @Test
+    fun `updateMapLayerControllers should forward fog state to native fog controller`() {
+        // Given
+        val fogLayerController = mockk<NativeFogOfWarLayerController>(relaxed = true)
+        val objectLayerController = mockk<MapObjectLayerController>(relaxed = true)
+        val fogOfWar = FogOfWarRenderState(
+            activeRenderData = renderData("active"),
+        )
+        val visibleObjects = listOf(
+            MapObjectUiModel(
+                id = "breach-node:v1:h3r9:cell-1",
+                kind = MapObjectKind.BreachNode,
+                title = "District 9",
+                description = null,
+                position = LatLng(latitude = 50.45, longitude = 30.52),
+                radiusMeters = 35,
+                isDiscovered = true,
+            ),
+        )
+
+        every { fogLayerController.update(fogOfWar) } returns Unit
+        every { objectLayerController.update(visibleObjects) } returns Unit
+
+        // When
+        updateMapLayerControllers(
+            fogLayerController = fogLayerController,
+            fogOfWar = fogOfWar,
+            objectLayerController = objectLayerController,
+            visibleObjects = visibleObjects,
+        )
+
+        // Then
+        verify(exactly = 1) { fogLayerController.update(fogOfWar) }
+        verify(exactly = 1) { objectLayerController.update(visibleObjects) }
+    }
 
     @Test
     fun `nativeFogOfWarLayerSpecs should return hidden explored layer first then handoff and active fog layers`() {

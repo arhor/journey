@@ -113,7 +113,7 @@ fun MapLibreViewMapScreen(
             modifier = modifier,
             styleUri = styleUri,
             visibleObjects = visibleObjects,
-//            fogOfWar = fogOfWar,
+            fogOfWar = fogOfWar,
             onViewportChanged = onViewportChanged,
             onObjectTapped = onObjectTapped,
             onCameraGestureStarted = onCameraGestureStarted,
@@ -261,7 +261,7 @@ private fun LegacyMapLibreMap(
     modifier: Modifier = Modifier,
     styleUri: String,
     visibleObjects: List<MapObjectUiModel>,
-//    fogOfWar: FogOfWarRenderState,
+    fogOfWar: FogOfWarRenderState,
     onViewportChanged: (GeoBounds) -> Unit,
     onObjectTapped: (String) -> Unit,
     onCameraGestureStarted: (CameraPositionState) -> Unit,
@@ -292,7 +292,7 @@ private fun LegacyMapLibreMap(
                 factory = { context ->
                     MapLibre.getInstance(context)
 
-//                    val fogLayerController = NativeFogOfWarLayerController()
+                    val fogLayerController = NativeFogOfWarLayerController()
                     val objectLayerController = MapObjectLayerController()
                     val objectTapController = MapObjectTapController(
                         objectLayerController = objectLayerController,
@@ -361,7 +361,7 @@ private fun LegacyMapLibreMap(
                             startupController = startupController,
                             startupGateController = startupGateController,
                             renderReadinessListeners = renderReadinessListeners,
-//                            fogLayerController = fogLayerController,
+                            fogLayerController = fogLayerController,
                             objectLayerController = objectLayerController,
                             objectTapController = objectTapController,
                             viewportReporter = viewportReporter,
@@ -373,9 +373,9 @@ private fun LegacyMapLibreMap(
                         mapView.configureLocationAwareMap(
                             styleUri = styleUri,
                             visibleObjects = visibleObjects,
-//                            fogOfWar = fogOfWar,
+                            fogOfWar = fogOfWar,
                             startupController = startupController,
-//                            fogLayerController = fogLayerController,
+                            fogLayerController = fogLayerController,
                             objectLayerController = objectLayerController,
                             objectTapController = objectTapController,
                             viewportReporter = viewportReporter,
@@ -385,8 +385,12 @@ private fun LegacyMapLibreMap(
                 },
                 update = { mapView ->
                     mapViewHandles[mapView]?.let { handle ->
-//                        handle.fogLayerController.update(fogOfWar)
-                        handle.objectLayerController.update(visibleObjects)
+                        updateMapLayerControllers(
+                            fogLayerController = handle.fogLayerController,
+                            fogOfWar = fogOfWar,
+                            objectLayerController = handle.objectLayerController,
+                            visibleObjects = visibleObjects,
+                        )
                     }
                 },
                 onRelease = { mapView ->
@@ -394,6 +398,7 @@ private fun LegacyMapLibreMap(
                         handle.startupController.cleanup()
                         handle.startupGateController.cleanup()
                         mapView.detachRenderReadinessListeners(handle.renderReadinessListeners)
+                        handle.fogLayerController.cleanup()
                         handle.objectTapController.cleanup()
                         handle.objectLayerController.cleanup()
                         handle.viewportReporter.cleanup()
@@ -413,9 +418,9 @@ private fun LegacyMapLibreMap(
 private fun MapView.configureLocationAwareMap(
     styleUri: String,
     visibleObjects: List<MapObjectUiModel>,
-//    fogOfWar: FogOfWarRenderState,
+    fogOfWar: FogOfWarRenderState,
     startupController: MapLocationStartupController,
-//    fogLayerController: NativeFogOfWarLayerController,
+    fogLayerController: NativeFogOfWarLayerController,
     objectLayerController: MapObjectLayerController,
     objectTapController: MapObjectTapController,
     viewportReporter: NativeMapViewportReporter,
@@ -428,8 +433,8 @@ private fun MapView.configureLocationAwareMap(
         map.setStyleDefinition(styleUri) { style ->
             if (startupController.isReleased) return@setStyleDefinition
 
-//            fogLayerController.attach(style)
-//            fogLayerController.update(fogOfWar)
+            fogLayerController.attach(style)
+            fogLayerController.update(fogOfWar)
             objectLayerController.attach(style)
             objectLayerController.update(visibleObjects)
             objectTapController.attach(map)
@@ -530,13 +535,23 @@ private data class MapViewHandle(
     val startupController: MapLocationStartupController,
     val startupGateController: MapStartupGateController,
     val renderReadinessListeners: MapRenderReadinessListeners,
-//    val fogLayerController: NativeFogOfWarLayerController,
+    val fogLayerController: NativeFogOfWarLayerController,
     val objectLayerController: MapObjectLayerController,
     val objectTapController: MapObjectTapController,
     val viewportReporter: NativeMapViewportReporter,
     val cameraGestureController: NativeCameraGestureController,
     val loadFailureListener: MapView.OnDidFailLoadingMapListener,
 )
+
+internal fun updateMapLayerControllers(
+    fogLayerController: NativeFogOfWarLayerController,
+    fogOfWar: FogOfWarRenderState,
+    objectLayerController: MapObjectLayerController,
+    visibleObjects: List<MapObjectUiModel>,
+) {
+    fogLayerController.update(fogOfWar)
+    objectLayerController.update(visibleObjects)
+}
 
 private data class MapRenderReadinessListeners(
     val frameListener: MapView.OnDidFinishRenderingFrameListener,

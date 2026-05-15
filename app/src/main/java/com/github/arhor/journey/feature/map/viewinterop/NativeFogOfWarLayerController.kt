@@ -33,6 +33,18 @@ internal class NativeFogOfWarLayerController {
         style?.let { applyState(it, state) }
     }
 
+    fun cleanup() {
+        style?.let { style ->
+            for (spec in lastState.fogOfWarLayerSpecs()) {
+                style.removeLayer(spec.layerId)
+                style.removeSource(spec.sourceId)
+            }
+        }
+        style = null
+        lastGeoJsonBySourceId.clear()
+        lastVisibilityByLayerId.clear()
+    }
+
     private fun ensureLayers(style: Style) {
         for (spec in lastState.fogOfWarLayerSpecs()) {
             if (style.getSourceAs<GeoJsonSource>(spec.sourceId) == null) {
