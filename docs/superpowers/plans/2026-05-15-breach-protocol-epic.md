@@ -128,7 +128,7 @@ Tickets 2-7 add the new Breach Protocol files:
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/MapRoute.kt`
 - Modify: `app/src/main/res/values/strings.xml`
 
-- [ ] **Step 1: Write the expected navigation shape**
+- [x] **Step 1: Write the expected navigation shape**
 
 Edit `AppNavGraph.kt` to remove the character graph import and keep only map/settings graphs:
 
@@ -152,13 +152,13 @@ fun MapRoute(
 )
 ```
 
-- [ ] **Step 2: Run compile and observe unresolved references**
+- [x] **Step 2: Run compile and observe unresolved references**
 
 Run: `./gradlew :app:compileDebugKotlin -q`
 
 Expected: FAIL with unresolved `HeroDestination`, `heroGraph`, or `onOpenHero` references before all imports and callers are cleaned.
 
-- [ ] **Step 3: Delete the character feature files and strings**
+- [x] **Step 3: Delete the character feature files and strings**
 
 Remove the listed `feature/hero` files. Remove these strings from `app/src/main/res/values/strings.xml`:
 
@@ -172,13 +172,13 @@ Remove the listed `feature/hero` files. Remove these strings from `app/src/main/
 <string name="hero_nav_label">Hero</string>
 ```
 
-- [ ] **Step 4: Run focused compile**
+- [x] **Step 4: Run focused compile**
 
 Run: `./gradlew :app:compileDebugKotlin -q`
 
 Expected: FAIL only on remaining domain/data references removed by Task 1.2, Task 1.3, and Task 1.4.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -199,7 +199,7 @@ git commit -m "refactor: remove character summary navigation"
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/presentation/MapWorldObjectPresenter.kt`
 - Modify: `app/src/main/java/com/github/arhor/journey/data/di/RepositoryModule.kt`
 
-- [ ] **Step 1: Remove watchtower state from map state types**
+- [x] **Step 1: Remove watchtower state from map state types**
 
 In `MapUiState.Content`, remove:
 
@@ -215,7 +215,7 @@ data object ClaimSelectedWatchtower : MapIntent
 data object UpgradeSelectedWatchtower : MapIntent
 ```
 
-- [ ] **Step 2: Remove watchtower dependencies from `MapViewModel` constructor**
+- [x] **Step 2: Remove watchtower dependencies from `MapViewModel` constructor**
 
 Delete constructor dependencies:
 
@@ -230,7 +230,7 @@ private val selectedWatchtowerPresenter: SelectedWatchtowerPresenter,
 
 Remove watchtower selected state fields from private `State`.
 
-- [ ] **Step 3: Keep map content compiling with resources only**
+- [x] **Step 3: Keep map content compiling with resources only**
 
 Temporarily reduce `observeVisibleWorldObjects()` to resource spawn objects only:
 
@@ -246,7 +246,7 @@ private fun observeVisibleWorldObjects(): Flow<Output<VisibleWorldObjects, Domai
 
 Keep this until Ticket 6 adds breach node objects.
 
-- [ ] **Step 4: Remove watchtower bindings**
+- [x] **Step 4: Remove watchtower bindings**
 
 Delete these bindings from `RepositoryModule.kt`:
 
@@ -255,17 +255,17 @@ fun bindWatchtowerDefinitionTileSource(impl: LocalGeneratedMapObjectAreaSource):
 fun bindWatchtowerRepository(impl: DeterministicWatchtowerRepository): WatchtowerRepository
 ```
 
-- [ ] **Step 5: Delete watchtower files and tests**
+- [x] **Step 5: Delete watchtower files and tests**
 
 Delete watchtower files and tests from the File Structure Map.
 
-- [ ] **Step 6: Run compile**
+- [x] **Step 6: Run compile**
 
 Run: `./gradlew :app:compileDebugKotlin -q`
 
 Expected: FAIL only on database/map-object references removed in Task 1.3 and character/player-stat references removed in Task 1.4.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -283,7 +283,7 @@ git commit -m "refactor: remove watchtower gameplay surface"
 - Modify: `app/src/androidTest/java/com/github/arhor/journey/data/local/db/JourneyDatabaseMigrationTest.kt`
 - Delete: old DAO/entity files listed in the File Structure Map.
 
-- [ ] **Step 1: Write migration test for schema cleanup**
+- [x] **Step 1: Write migration test for schema cleanup**
 
 Add a migration test:
 
@@ -319,13 +319,13 @@ fun migrate5To6_should_drop_old_gameplay_foundation_tables() {
 }
 ```
 
-- [ ] **Step 2: Run migration test and verify failure**
+- [x] **Step 2: Run migration test and verify failure**
 
 Run: `./gradlew :app:assembleDebugAndroidTest`
 
 Expected: FAIL because `MIGRATION_5_6` and `breach_node_state` do not exist.
 
-- [ ] **Step 3: Update `JourneyDatabase`**
+- [x] **Step 3: Update `JourneyDatabase`**
 
 Set database version to `6`, remove old entities, and add migration:
 
@@ -371,7 +371,7 @@ val MIGRATION_5_6 = Migration(5, 6) { db ->
 
 Append it to `MIGRATIONS`.
 
-- [ ] **Step 4: Update `DatabaseModule`**
+- [x] **Step 4: Update `DatabaseModule`**
 
 Keep only:
 
@@ -387,13 +387,13 @@ fun provideTransactionRunner(db: JourneyDatabase): TransactionRunner = RoomTrans
 
 Ticket 2 adds `BreachNodeStateDao`.
 
-- [ ] **Step 5: Run validation**
+- [x] **Step 5: Run validation**
 
 Run: `./gradlew :app:assembleDebugAndroidTest`
 
 Expected: PASS for Android test source compilation. Device execution is not required for this compile gate.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -414,7 +414,7 @@ git commit -m "refactor: remove old gameplay persistence"
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/MapViewModel.kt`
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/presentation/MapWorldObjectPresenter.kt`
 
-- [ ] **Step 1: Remove resource collection dependencies from map state**
+- [x] **Step 1: Remove resource collection dependencies from map state**
 
 Remove constructor dependency:
 
@@ -429,23 +429,23 @@ private fun observeVisibleWorldObjects(): Flow<Output<VisibleWorldObjects, Domai
     flowOf(Output.Success(VisibleWorldObjects()))
 ```
 
-- [ ] **Step 2: Delete old inventory and resource collection files**
+- [x] **Step 2: Delete old inventory and resource collection files**
 
 Delete the old player inventory, collected-spawn, and player-resource files. Keep `ResourceType.kt` only if another remaining file imports it after compile cleanup.
 
-- [ ] **Step 3: Run repository-wide reference check**
+- [x] **Step 3: Run repository-wide reference check**
 
 Run: `rg -n "Hero|hero|Energy|energy|Watchtower|watchtower|HeroResource|CollectedResource" app/src/main/java app/src/test/java app/src/androidTest/java`
 
 Expected: no output except historical migration SQL strings inside migration tests when those strings are required to create legacy schemas.
 
-- [ ] **Step 4: Run compile**
+- [x] **Step 4: Run compile**
 
 Run: `./gradlew :app:compileDebugKotlin -q`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -466,7 +466,7 @@ git commit -m "refactor: remove old player inventory foundation"
 - Create: `app/src/test/java/com/github/arhor/journey/core/testing/FakeH3Grid.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/data/spatial/UberH3GridTest.kt`
 
-- [ ] **Step 1: Write adapter contract test**
+- [x] **Step 1: Write adapter contract test**
 
 Create `UberH3GridTest.kt`:
 
@@ -500,13 +500,13 @@ class UberH3GridTest {
 }
 ```
 
-- [ ] **Step 2: Run test and verify failure**
+- [x] **Step 2: Run test and verify failure**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.data.spatial.UberH3GridTest"`
 
 Expected: FAIL because `UberH3Grid` does not exist.
 
-- [ ] **Step 3: Implement adapter**
+- [x] **Step 3: Implement adapter**
 
 Create `H3Grid.kt`:
 
@@ -655,13 +655,13 @@ fun hexAround(center: GeoPoint): List<GeoPoint> =
     )
 ```
 
-- [ ] **Step 4: Run adapter test**
+- [x] **Step 4: Run adapter test**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.data.spatial.UberH3GridTest"`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -678,7 +678,7 @@ git commit -m "feat: add H3 spatial adapter"
 - Create: `app/src/main/java/com/github/arhor/journey/domain/internal/BreachNodeGeneration.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/domain/internal/BreachNodeGenerationTest.kt`
 
-- [ ] **Step 1: Write generation tests**
+- [x] **Step 1: Write generation tests**
 
 Create tests:
 
@@ -719,13 +719,13 @@ class BreachNodeGenerationTest {
 }
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.domain.internal.BreachNodeGenerationTest"`
 
 Expected: FAIL because breach generation does not exist.
 
-- [ ] **Step 3: Add models**
+- [x] **Step 3: Add models**
 
 Create `BreachNodeDefinition.kt`:
 
@@ -743,7 +743,7 @@ data class BreachNodeDefinition(
 
 Create `BreachNodeState.kt`, `BreachNodeRecord.kt`, `BreachNodePhase.kt`, `BreachNode.kt`, and `ControlledBreachRevealSnapshot.kt` with fields from the spec.
 
-- [ ] **Step 4: Implement generation**
+- [x] **Step 4: Implement generation**
 
 Create `BreachBalance.kt`:
 
@@ -788,13 +788,13 @@ object BreachNodeGeneration {
 }
 ```
 
-- [ ] **Step 5: Run generation tests**
+- [x] **Step 5: Run generation tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.domain.internal.BreachNodeGenerationTest"`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -817,7 +817,7 @@ git commit -m "feat: add breach node generation"
 - Modify: `app/src/main/java/com/github/arhor/journey/data/di/RepositoryModule.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/data/repository/DeterministicBreachNodeRepositoryTest.kt`
 
-- [ ] **Step 1: Write repository tests**
+- [x] **Step 1: Write repository tests**
 
 Create tests that use `FakeH3Grid` and an in-memory fake DAO:
 
@@ -843,13 +843,13 @@ fun `getInBounds should compose generated definitions with persisted states`() =
 }
 ```
 
-- [ ] **Step 2: Run repository test and verify failure**
+- [x] **Step 2: Run repository test and verify failure**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.data.repository.DeterministicBreachNodeRepositoryTest"`
 
 Expected: FAIL because repository files do not exist.
 
-- [ ] **Step 3: Add DAO/entity and database wiring**
+- [x] **Step 3: Add DAO/entity and database wiring**
 
 Create entity:
 
@@ -870,7 +870,7 @@ data class BreachNodeStateEntity(
 
 Create DAO with `observeByCellIds`, `getByCellIds`, `getById`, `getByH3CellId`, `upsert`, and `markControlled`.
 
-- [ ] **Step 4: Add repository contract and implementation**
+- [x] **Step 4: Add repository contract and implementation**
 
 Repository contract:
 
@@ -889,7 +889,7 @@ interface BreachNodeRepository {
 
 Implementation composes `BreachNodeGeneration.definitionsForCells(...)` with DAO state rows.
 
-- [ ] **Step 5: Bind repository**
+- [x] **Step 5: Bind repository**
 
 Add to `RepositoryModule.kt`:
 
@@ -900,7 +900,7 @@ fun bindBreachNodeRepository(impl: DeterministicBreachNodeRepository): BreachNod
 
 Add `provideBreachNodeStateDao` to `DatabaseModule.kt`.
 
-- [ ] **Step 6: Run tests and compile**
+- [x] **Step 6: Run tests and compile**
 
 Run:
 
@@ -911,7 +911,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
@@ -930,7 +930,7 @@ git commit -m "feat: add breach node persistence"
 - Create: `app/src/main/java/com/github/arhor/journey/domain/model/error/BreachNodeError.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/domain/usecase/FindNearestBreachNodeUseCaseTest.kt`
 
-- [ ] **Step 1: Write nearest scan tests**
+- [x] **Step 1: Write nearest scan tests**
 
 Tests must cover: nearest uncontrolled result, no candidates, controlled candidates filtered, lockdown candidates filtered.
 
@@ -951,13 +951,13 @@ fun `invoke should return nearest uncontrolled breach when candidates exist in s
 }
 ```
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.domain.usecase.FindNearestBreachNodeUseCaseTest"`
 
 Expected: FAIL because use case does not exist.
 
-- [ ] **Step 3: Implement use case**
+- [x] **Step 3: Implement use case**
 
 Use `H3Grid.cellId`, `H3Grid.gridDisk`, and repository `getForCells`. Scan range starts with `1_000.0` meters. H3 disk radius is:
 
@@ -969,13 +969,13 @@ val ringRadius = ceil(BreachBalance.SCAN_RANGE_METERS / h3Grid.averageEdgeLength
 
 Return `Output.Failure(BreachNodeError.NotFound)` when there is no candidate.
 
-- [ ] **Step 4: Run scan tests**
+- [x] **Step 4: Run scan tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.domain.usecase.FindNearestBreachNodeUseCaseTest"`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -994,7 +994,7 @@ git commit -m "feat: add breach scan rule"
 - Create: `ObserveVisibleBreachNodesUseCase.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/domain/usecase/BreachNodeUseCaseTest.kt`
 
-- [ ] **Step 1: Write rule tests**
+- [x] **Step 1: Write rule tests**
 
 Cover:
 
@@ -1004,13 +1004,13 @@ Cover:
 - controlled reveal emits controlled H3 cells in bounds;
 - visible breaches include discovered and controlled nodes.
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.domain.usecase.BreachNodeUseCaseTest"`
 
 Expected: FAIL because use cases do not exist.
 
-- [ ] **Step 3: Implement use cases**
+- [x] **Step 3: Implement use cases**
 
 `CompleteBreachUseCase` signature:
 
@@ -1031,13 +1031,13 @@ if (distanceMeters > record.definition.interactionRadiusMeters) {
 }
 ```
 
-- [ ] **Step 4: Run use case tests**
+- [x] **Step 4: Run use case tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.domain.usecase.BreachNodeUseCaseTest"`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -1057,7 +1057,7 @@ git commit -m "feat: add breach completion rules"
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/MapIntent.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/feature/map/MapViewModelTest.kt`
 
-- [ ] **Step 1: Add failing ViewModel test for idle state**
+- [x] **Step 1: Add failing ViewModel test for idle state**
 
 ```kotlin
 @Test
@@ -1073,13 +1073,13 @@ fun `uiState should expose idle breach protocol state before pulse`() = runTest 
 }
 ```
 
-- [ ] **Step 2: Run test and verify failure**
+- [x] **Step 2: Run test and verify failure**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.feature.map.MapViewModelTest"`
 
 Expected: FAIL because `breachProtocol` does not exist.
 
-- [ ] **Step 3: Add UI state**
+- [x] **Step 3: Add UI state**
 
 Create:
 
@@ -1108,7 +1108,7 @@ sealed interface BreachProtocolUiState {
 
 Add `val breachProtocol: BreachProtocolUiState` to `MapUiState.Content`.
 
-- [ ] **Step 4: Add intents**
+- [x] **Step 4: Add intents**
 
 Add:
 
@@ -1120,13 +1120,13 @@ data object CancelBreachUpload : MapIntent
 data object DismissBreachPanel : MapIntent
 ```
 
-- [ ] **Step 5: Run test**
+- [x] **Step 5: Run test**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.feature.map.MapViewModelTest"`
 
 Expected: PASS for the new idle-state test after fixture updates.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -1142,15 +1142,15 @@ git commit -m "feat: expose breach protocol map state"
 - Modify: `MapViewModel.kt`
 - Modify: `MapViewModelTest.kt`
 
-- [ ] **Step 1: Add failing pulse test**
+- [x] **Step 1: Add failing pulse test**
 
 Test that `PulseClicked` calls `FindNearestBreachNodeUseCase` with current location and moves to `SignalLocked`.
 
-- [ ] **Step 2: Add failing upload completion test**
+- [x] **Step 2: Add failing upload completion test**
 
 Test that `StartBreachUpload`, repeated `BreachUploadTick`, and completion call `CompleteBreachUseCase`.
 
-- [ ] **Step 3: Implement session state**
+- [x] **Step 3: Implement session state**
 
 Add private state:
 
@@ -1169,7 +1169,7 @@ private fun signalStrengthPercent(distanceMeters: Double?): Int =
         ?: 0
 ```
 
-- [ ] **Step 4: Implement handlers**
+- [x] **Step 4: Implement handlers**
 
 Handlers:
 
@@ -1181,13 +1181,13 @@ Handlers:
 
 Use `CompleteBreachUseCase` when progress reaches 100.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.feature.map.MapViewModelTest"`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
