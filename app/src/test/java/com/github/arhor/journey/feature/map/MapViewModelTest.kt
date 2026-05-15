@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
+import com.github.arhor.journey.domain.model.BreachNode
 import com.github.arhor.journey.domain.model.BreachNodeDefinition
+import com.github.arhor.journey.domain.model.BreachNodePhase
 import com.github.arhor.journey.domain.model.BreachNodeRecord
 import com.github.arhor.journey.domain.model.BreachNodeState
 import com.github.arhor.journey.domain.model.ExplorationTileRange
@@ -33,6 +35,11 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
+import com.github.arhor.journey.feature.map.model.BreachMarkerState
+import com.github.arhor.journey.feature.map.model.LatLng
+import com.github.arhor.journey.feature.map.model.MapObjectKind
+import com.github.arhor.journey.feature.map.model.MapObjectUiModel
+import com.github.arhor.journey.feature.map.presentation.BreachNodePresenter
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -282,6 +289,62 @@ class MapViewModelTest {
         }
     }
 
+    @Test
+    fun `uiState should expose breach visible objects when viewport changes`() = runTest {
+        // Given
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val breachNode = visibleBreachNode(
+            id = "breach-node:v1:h3r9:cell-visible",
+            cellId = "cell-visible",
+            phase = BreachNodePhase.DISCOVERED,
+            canStartUpload = true,
+        )
+        val observeVisibleBreachNodes = mockk<ObserveVisibleBreachNodesUseCase>()
+        val fixture = createFixture(
+            observeVisibleBreachNodes = observeVisibleBreachNodes,
+        )
+        every { observeVisibleBreachNodes.invoke(any()) } returns flowOf(Output.Success(listOf(breachNode)))
+        val visibleRange = ExplorationTileRange(
+            zoom = CANONICAL_ZOOM,
+            minX = 10,
+            maxX = 11,
+            minY = 20,
+            maxY = 21,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(
+                MapIntent.CameraViewportChanged(
+                    visibleBounds = visibleBoundsInside(visibleRange),
+                ),
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.uiState.value as MapUiState.Content
+            actual.visibleObjects shouldBe listOf(
+                MapObjectUiModel(
+                    id = breachNode.definition.id,
+                    kind = MapObjectKind.BreachNode,
+                    title = breachNode.definition.districtName,
+                    description = breachNode.definition.description,
+                    position = LatLng(
+                        latitude = breachNode.definition.location.lat,
+                        longitude = breachNode.definition.location.lon,
+                    ),
+                    radiusMeters = breachNode.definition.interactionRadiusMeters.toInt(),
+                    isDiscovered = true,
+                    markerState = BreachMarkerState.UPLOAD_READY,
+                ),
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
     private suspend fun MapViewModel.awaitContent(
         predicate: (MapUiState.Content) -> Boolean = { true },
     ): MapUiState.Content = uiState
@@ -319,6 +382,36 @@ class MapViewModelTest {
                 lockdownUntil = null,
                 updatedAt = FIXED_INSTANT,
             ),
+        )
+
+    private fun visibleBreachNode(
+        id: String,
+        cellId: String,
+        phase: BreachNodePhase,
+        canStartUpload: Boolean,
+    ): BreachNode =
+        BreachNode(
+            definition = BreachNodeDefinition(
+                id = id,
+                h3CellId = cellId,
+                districtName = "district-$cellId",
+                description = "Recovered node",
+                location = GeoPoint(lat = 50.45, lon = 30.52),
+                interactionRadiusMeters = 35.0,
+                controlledH3CellIds = setOf(cellId),
+            ),
+            state = BreachNodeState(
+                breachNodeId = id,
+                h3CellId = cellId,
+                discoveredAt = FIXED_INSTANT,
+                controlledAt = null,
+                lockdownUntil = null,
+                updatedAt = FIXED_INSTANT,
+            ),
+            phase = phase,
+            distanceMeters = null,
+            canDiscover = false,
+            canStartUpload = canStartUpload,
         )
 
     private data class Fixture(
@@ -377,6 +470,7 @@ class MapViewModelTest {
                 completeBreach = completeBreach,
                 observeVisibleBreachNodes = observeVisibleBreachNodes,
                 observeControlledBreachRevealCells = observeControlledBreachRevealCells,
+                breachNodePresenter = BreachNodePresenter(),
             ),
         )
     }

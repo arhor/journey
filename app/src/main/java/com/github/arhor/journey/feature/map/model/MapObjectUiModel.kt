@@ -12,10 +12,12 @@ data class MapObjectUiModel(
     val radiusMeters: Int,
     val isDiscovered: Boolean,
     val isHiddenByFog: Boolean = false,
+    val markerState: BreachMarkerState? = null,
 )
 
 enum class MapObjectKind(
     val idPrefix: String,
 ) {
+    BreachNode(idPrefix = "breach"),
     GenericObject(idPrefix = "obj"),
 }

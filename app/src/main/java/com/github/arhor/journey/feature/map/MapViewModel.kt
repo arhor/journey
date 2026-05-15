@@ -4,7 +4,9 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.R
+import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.common.map as mapOutput
 import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
 import com.github.arhor.journey.domain.internal.BreachBalance
@@ -14,6 +16,7 @@ import com.github.arhor.journey.domain.model.BreachNodeRecord
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
+import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
@@ -31,6 +34,7 @@ import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import com.github.arhor.journey.feature.map.model.MapViewportSize
+import com.github.arhor.journey.feature.map.presentation.BreachNodePresenter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +42,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -51,6 +57,7 @@ private data class State(
     val northResetRequestToken: Int = 0,
     val isAwaitingLocationPermissionResult: Boolean = false,
     val viewportSize: MapViewportSize? = null,
+    val visibleBounds: GeoBounds? = null,
     val failureMessage: String? = null,
     val breachProtocol: BreachProtocolUiState = BreachProtocolUiState.Idle,
     val lockedBreach: BreachNode? = null,
@@ -91,6 +98,7 @@ class MapViewModel @Inject constructor(
     private val completeBreach: CompleteBreachUseCase,
     private val observeVisibleBreachNodes: ObserveVisibleBreachNodesUseCase,
     private val observeControlledBreachRevealCells: ObserveControlledBreachRevealCellsUseCase,
+    private val breachNodePresenter: BreachNodePresenter,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -111,6 +119,25 @@ class MapViewModel @Inject constructor(
             started = SharingStarted.Eagerly,
             initialValue = Output.Success(MapStyle.defaultStyle),
         )
+    private val visibleBreachObjects: Flow<Output<List<MapObjectUiModel>, DomainError>> = _state
+        .map { state -> state.visibleBounds }
+        .distinctUntilChanged()
+        .flatMapLatest { bounds ->
+            if (bounds == null) {
+                flowOf<Output<List<MapObjectUiModel>, DomainError>>(Output.Success(emptyList()))
+            } else {
+                observeVisibleBreachNodes(bounds).map { output ->
+                    output.mapOutput { visibleBreaches ->
+                        visibleBreaches.map(breachNodePresenter::present)
+                    }
+                }
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = Output.Success(emptyList()),
+        )
 
     override fun buildUiState(): Flow<MapUiState> =
         observeBaseUiState()
@@ -123,12 +150,14 @@ class MapViewModel @Inject constructor(
             fogOfWarController.uiState,
             trackingSession,
             selectedMapStyle,
-        ) { state, fogOfWar, trackingSessionOutput, selectedMapStyleOutput ->
+            visibleBreachObjects,
+        ) { state, fogOfWar, trackingSessionOutput, selectedMapStyleOutput, visibleBreachObjectsOutput ->
             intoBaseUiState(
                 state = state,
                 trackingSessionOutput = trackingSessionOutput,
                 fogOfWar = fogOfWar,
                 selectedMapStyleOutput = selectedMapStyleOutput,
+                visibleBreachObjectsOutput = visibleBreachObjectsOutput,
             )
         }
             .catch {
@@ -225,6 +254,7 @@ class MapViewModel @Inject constructor(
         trackingSessionOutput: Output<ExplorationTrackingSession, *>,
         fogOfWar: FogOfWarUiState,
         selectedMapStyleOutput: Output<MapStyle, *>,
+        visibleBreachObjectsOutput: Output<List<MapObjectUiModel>, *>,
     ): MapBaseUiState = if (state.failureMessage == null) {
         val trackingSessionValue = when (trackingSessionOutput) {
             is Output.Success -> trackingSessionOutput.value
@@ -255,7 +285,10 @@ class MapViewModel @Inject constructor(
             isStartupSplashVisible = state.startupGate.isSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
             mapStyleUri = selectedMapStyle.value,
-            visibleObjects = emptyList(),
+            visibleObjects = when (visibleBreachObjectsOutput) {
+                is Output.Success -> visibleBreachObjectsOutput.value
+                is Output.Failure -> emptyList()
+            },
             fogOfWar = fogOfWar,
         )
     } else {
@@ -339,6 +372,13 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onCameraViewportChanged(intent: MapIntent.CameraViewportChanged) {
+        _state.update { state ->
+            if (state.visibleBounds == intent.visibleBounds) {
+                state
+            } else {
+                state.copy(visibleBounds = intent.visibleBounds)
+            }
+        }
         fogOfWarController.updateViewport(intent.visibleBounds)
     }
 
