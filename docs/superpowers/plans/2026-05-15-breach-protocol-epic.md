@@ -1207,7 +1207,7 @@ git commit -m "feat: add breach map session flow"
 - Modify: `app/src/main/res/values/strings.xml`
 - Test: `app/src/androidTest/java/com/github/arhor/journey/feature/map/MapScreenTest.kt`
 
-- [ ] **Step 1: Add Compose tests**
+- [x] **Step 1: Add Compose tests**
 
 Add tests for:
 
@@ -1216,13 +1216,13 @@ Add tests for:
 - upload state shows progress text;
 - tapping Pulse dispatches `MapIntent.PulseClicked`.
 
-- [ ] **Step 2: Run Android test compile**
+- [x] **Step 2: Run Android test compile**
 
 Run: `./gradlew :app:assembleDebugAndroidTest`
 
 Expected: FAIL because overlay does not exist.
 
-- [ ] **Step 3: Implement overlay**
+- [x] **Step 3: Implement overlay**
 
 Create `BreachProtocolOverlay`:
 
@@ -1252,13 +1252,13 @@ internal fun BreachProtocolOverlay(
 
 Wire it in `MapContent` above the startup splash.
 
-- [ ] **Step 4: Run Android test compile**
+- [x] **Step 4: Run Android test compile**
 
 Run: `./gradlew :app:assembleDebugAndroidTest`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
