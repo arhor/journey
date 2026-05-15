@@ -1279,25 +1279,25 @@ git commit -m "feat: add breach protocol overlays"
 - Modify: `app/src/main/java/com/github/arhor/journey/feature/map/MapViewModel.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/feature/map/presentation/BreachNodePresenterTest.kt`
 
-- [ ] **Step 1: Write presenter tests**
+- [x] **Step 1: Write presenter tests**
 
 Test discovered, upload-ready, controlled, and lockdown marker states.
 
-- [ ] **Step 2: Implement presenter**
+- [x] **Step 2: Implement presenter**
 
 Add `MapObjectKind.BreachNode(idPrefix = "breach")`. Create `BreachNodePresenter.present(...)` returning `MapObjectUiModel`.
 
-- [ ] **Step 3: Update ViewModel visible objects**
+- [x] **Step 3: Update ViewModel visible objects**
 
 Combine `ObserveVisibleBreachNodesUseCase` with breach presenter. Keep resource objects absent.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.github.arhor.journey.feature.map.presentation.BreachNodePresenterTest"`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
