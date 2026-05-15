@@ -14,13 +14,10 @@ data class MapObjectUiModel(
     val isDiscovered: Boolean,
     val isHiddenByFog: Boolean = false,
     val resourceType: ResourceType? = null,
-    val watchtowerMarkerState: WatchtowerMarkerState? = null,
-    val watchtowerLevel: Int? = null,
 )
 
 enum class MapObjectKind(
     val idPrefix: String,
 ) {
     ResourceSpawn(idPrefix = "spawn"),
-    Watchtower(idPrefix = "watchtower"),
 }

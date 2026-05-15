@@ -12,9 +12,8 @@ import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.domain.model.WatchtowerRevealSnapshot
+import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.usecase.GetPackedExploredTilesUseCase
-import com.github.arhor.journey.domain.usecase.ObserveClaimedWatchtowerRevealTilesUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
@@ -51,7 +50,6 @@ class FogOfWarController @AssistedInject constructor(
     private val observeExplorationTileRuntimeConfig: ObserveExplorationTileRuntimeConfigUseCase,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val observePackedExploredTiles: ObservePackedExploredTilesUseCase,
-    private val observeClaimedWatchtowerRevealTiles: ObserveClaimedWatchtowerRevealTilesUseCase,
     private val getPackedExploredTiles: GetPackedExploredTilesUseCase,
     private val renderDataFactory: FowRenderDataFactory,
     private val fogOfWarCalculator: FogOfWarCalculator,
@@ -144,15 +142,14 @@ class FogOfWarController @AssistedInject constructor(
     private fun observePersistentWatchtowerReveal(
         buffer: FogBufferRegion,
         canonicalZoom: Int,
-    ): Flow<Output<WatchtowerRevealSnapshot, DomainError>> = observeClaimedWatchtowerRevealTiles(
-        bounds = buffer.bufferedBounds,
-        canonicalZoom = canonicalZoom,
+    ): Flow<Output<PersistentRevealSnapshot, DomainError>> = flowOf(
+        Output.Success(PersistentRevealSnapshot()),
     )
 
     private suspend fun prepareFogBufferData(
         buffer: FogBufferRegion,
         exploredTiles: PackedTileSet,
-        persistentRevealSnapshot: WatchtowerRevealSnapshot,
+        persistentRevealSnapshot: PersistentRevealSnapshot,
         liveVisibilityTileMask: PackedTileMask,
     ): DisplayedFogData {
         val persistentVisibilityTileMask = PackedTileMask.fromTiles(persistentRevealSnapshot.tiles)
@@ -489,7 +486,7 @@ class FogOfWarController @AssistedInject constructor(
                         startObservingDisplayedFogBuffer(
                             buffer = buffer,
                             seedExploredTiles = displayedFogData.exploredTiles,
-                            seedPersistentRevealSnapshot = WatchtowerRevealSnapshot(
+                            seedPersistentRevealSnapshot = PersistentRevealSnapshot(
                                 tiles = displayedFogData.persistentVisibilityTileMask.tiles,
                                 revision = displayedFogData.persistentVisibilityRevision,
                             ),
@@ -562,7 +559,7 @@ class FogOfWarController @AssistedInject constructor(
     private fun startObservingDisplayedFogBuffer(
         buffer: FogBufferRegion,
         seedExploredTiles: PackedTileSet? = null,
-        seedPersistentRevealSnapshot: WatchtowerRevealSnapshot? = null,
+        seedPersistentRevealSnapshot: PersistentRevealSnapshot? = null,
     ) {
         fogJobs.cancelDisplayedObservation()
         fogJobs.displayedObservation = scope.launch {
@@ -808,7 +805,13 @@ class FogOfWarController @AssistedInject constructor(
     @Immutable
     private data class ObservedFogBufferSnapshot(
         val exploredTiles: PackedTileSet,
-        val persistentRevealSnapshot: WatchtowerRevealSnapshot,
+        val persistentRevealSnapshot: PersistentRevealSnapshot,
+    )
+
+    @Immutable
+    private data class PersistentRevealSnapshot(
+        val tiles: Set<MapTile> = emptySet(),
+        val revision: Int = 0,
     )
 
     private fun PackedTileSet.countVisibleTiles(

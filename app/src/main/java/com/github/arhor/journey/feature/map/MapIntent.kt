@@ -55,12 +55,6 @@ sealed interface MapIntent {
         val objectId: String,
     ) : MapIntent
 
-    data object DismissWatchtowerSheet : MapIntent
-
-    data object ClaimSelectedWatchtower : MapIntent
-
-    data object UpgradeSelectedWatchtower : MapIntent
-
     data class MapLoadFailed(
         val message: String? = null,
     ) : MapIntent
