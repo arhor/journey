@@ -69,7 +69,6 @@ class MapScreenTest {
             startupSplashMessage = R.string.map_view_startup_loading_message,
             mapStyleUri = "asset://map/styles/cyberpunk.json",
             visibleObjects = emptyList(),
-            selectedWatchtower = null,
             fogOfWar = FogOfWarUiState(),
         )
 }
