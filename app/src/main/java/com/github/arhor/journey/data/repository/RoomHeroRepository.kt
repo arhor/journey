@@ -46,8 +46,9 @@ class RoomHeroRepository @Inject constructor(
     }
 
     private fun ensureSeededIfMissing() {
-        if (currentHero.value == null) {
-            currentHero.value = DefaultHeroSeed.create(clock.instant())
-        }
+        currentHero.compareAndSet(
+            expect = null,
+            update = DefaultHeroSeed.create(clock.instant()),
+        )
     }
 }
