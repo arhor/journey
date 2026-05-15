@@ -12,15 +12,13 @@ unless a more deeply nested `AGENTS.md` overrides it.
 - Dependency injection uses Hilt.
 - Persistence uses Room and DataStore.
 - Maps use MapLibre. Map style assets live under `app/src/main/assets/map/styles`.
-- Godot minigame sources live under `app/src/main/godot`; exported Android pack output is generated under the Gradle
-  build directory.
 
 ## Repository Layout
 
 - `settings.gradle.kts`: includes only `:app`.
 - `build.gradle.kts`: shared Kotlin compiler options and test defaults.
 - `gradle/libs.versions.toml`: dependency and plugin versions.
-- `app/build.gradle.kts`: Android, Compose, Hilt, Room, MapLibre, and Godot export configuration.
+- `app/build.gradle.kts`: Android, Compose, Hilt, Room, and MapLibre configuration.
 - `app/src/main/java/com/github/arhor/journey/core`: shared app primitives, UI components, and navigation.
 - `app/src/main/java/com/github/arhor/journey/data`: Room, DataStore, repositories, mappers, local generation.
 - `app/src/main/java/com/github/arhor/journey/domain`: models, repository contracts, use cases, domain policies.
@@ -43,11 +41,6 @@ Use the narrowest relevant command for the files changed.
   `./gradlew :app:assembleDebugAndroidTest`
 - Compile Hilt instrumentation-test sources after DI changes affecting `androidTest`:
   `./gradlew :app:hiltJavaCompileDebugAndroidTest`
-- Export Godot pack only when Godot sources or export behavior changed:
-  `./gradlew :app:exportGodotPack`
-
-`exportGodotPack` requires `godot.bin` in Gradle properties, `local.properties`, or the `GODOT_BIN` environment
-variable.
 
 ## Coding Conventions
 
@@ -85,14 +78,6 @@ variable.
 - Keep tile, viewport, and fog-of-war calculations deterministic and unit tested.
 - Avoid querying or rendering map objects without considering the active viewport/query-window policy.
 - Keep map style IDs and asset URIs consistent with `MapStyle` and `app/src/main/assets/map/styles`.
-
-## Godot Notes
-
-- Do not edit generated Godot export output in `build`.
-- Edit source Godot files under `app/src/main/godot`.
-- Keep `.gd`, `.tscn`, `.tres`, `.uid`, imported assets, and related `.import` files together when changing Godot
-  content.
-- Only require a Godot export check when the Godot project or export configuration changes.
 
 ## Documentation And Planning
 

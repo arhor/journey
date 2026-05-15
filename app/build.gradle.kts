@@ -11,20 +11,12 @@ plugins {
     idea
 }
 
-val godotOutputAssetsDir = layout.buildDirectory.dir("generated/godot/assets")
-val godotOutputPckBundle = layout.buildDirectory.file("generated/godot/assets/minigame.pck")
-val godotProjectDir = layout.projectDirectory.dir("src/main/godot")
-val godotBinaryPath = providers.gradleOrLocalProperty("godot.bin").orEnvVariable("GODOT_BIN")
-
 val nativeSourceDir = layout.projectDirectory.dir("src/main/cpp")
 val nativeOutputDir = layout.projectDirectory.dir(".cxx")
 
 idea {
     module {
-        sourceDirs.add(godotProjectDir.asFile)
         sourceDirs.add(nativeSourceDir.asFile)
-
-        generatedSourceDirs.add(godotOutputAssetsDir.get().asFile)
 
         excludeDirs.add(nativeOutputDir.asFile)
     }
@@ -49,7 +41,6 @@ android {
         ndk {
             abiFilters += listOf(
                 "arm64-v8a",
-                "x86_64",
             )
         }
 
@@ -64,12 +55,6 @@ android {
 
     androidResources {
         noCompress.add("pck")
-    }
-
-    sourceSets {
-        getByName("main") {
-            assets.directories += godotOutputAssetsDir.get().asFile.absolutePath
-        }
     }
 
     externalNativeBuild {
@@ -122,7 +107,6 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.navigation.compose)
-    implementation(libs.godot)
     implementation(libs.h3.android)
     implementation(libs.hilt.android)
     implementation(libs.javax.inject)
@@ -153,29 +137,6 @@ dependencies {
     androidTestImplementation(libs.kotest.assertions.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.mockk.android)
-}
-
-tasks {
-    val exportGodotPack by registering(Exec::class) {
-        group = "godot"
-        description = "Exports Godot project into generated Android assets directory"
-
-        inputs.dir(godotProjectDir)
-        outputs.dir(godotOutputAssetsDir)
-
-        commandLine(
-            godotBinaryPath.get(),
-            "--headless",
-            "--path", godotProjectDir.asFile,
-            "--export-pack",
-            "Android",
-            godotOutputPckBundle.get().asFile.absolutePath,
-        )
-
-        doFirst {
-            godotOutputAssetsDir.get().asFile.mkdirs()
-        }
-    }
 }
 
 fun ProviderFactory.gradleOrLocalProperty(propertyName: String): Provider<String> =

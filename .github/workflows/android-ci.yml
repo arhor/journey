@@ -26,7 +26,6 @@ concurrency:
 
 env:
   JAVA_VERSION: '17'
-  GODOT_VERSION: '4.6.2'
 
 jobs:
   build:
@@ -46,29 +45,6 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Setup Godot
-        shell: bash
-        run: |
-          set -euxo pipefail
-          
-          GODOT_BINARY_NAME="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
-          GODOT_ARCHIVE_NAME="${GODOT_BINARY_NAME}.zip"
-          
-          GODOT_DIR="$RUNNER_TEMP/godot"
-          GODOT_ZIP="$RUNNER_TEMP/$GODOT_ARCHIVE_NAME"
-          GODOT_BIN_PATH="$GODOT_DIR/$GODOT_BINARY_NAME"
-          
-          mkdir -p "$GODOT_DIR"
-          
-          curl -L \
-            "https://downloads.godotengine.org/?version=${GODOT_VERSION}&flavor=stable&slug=linux.x86_64.zip&platform=linux.64" \
-            -o "$GODOT_ZIP"
-          
-          unzip -q "$GODOT_ZIP" -d "$GODOT_DIR"
-          chmod +x "$GODOT_BIN_PATH"
-          
-          echo "GODOT_BIN=$GODOT_BIN_PATH" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
