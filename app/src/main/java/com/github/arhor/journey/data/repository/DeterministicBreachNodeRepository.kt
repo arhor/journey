@@ -52,7 +52,7 @@ class DeterministicBreachNodeRepository @Inject constructor(
         val definition = BreachNodeGeneration.definitionForCell(h3CellId, h3Grid) ?: return null
 
         return definition.toRecord(
-            state = dao.getById(id)?.toDomain(),
+            state = dao.getByH3CellId(h3CellId)?.toDomain(),
         )
     }
 
@@ -71,14 +71,10 @@ class DeterministicBreachNodeRepository @Inject constructor(
         updatedAt: Instant,
     ): Boolean {
         val definition = BreachNodeGeneration.definitionForCell(h3CellId, h3Grid) ?: return false
-        if (definition.id != id) {
-            return false
-        }
-
-        val existing = dao.getById(id)
+        val existing = dao.getByH3CellId(h3CellId)
         dao.upsert(
             entity = BreachNodeStateEntity(
-                breachNodeId = id,
+                breachNodeId = existing?.breachNodeId ?: definition.id,
                 h3CellId = h3CellId,
                 discoveredAt = discoveredAt,
                 controlledAt = existing?.controlledAt,
@@ -96,12 +92,9 @@ class DeterministicBreachNodeRepository @Inject constructor(
         updatedAt: Instant,
     ): Boolean {
         val definition = BreachNodeGeneration.definitionForCell(h3CellId, h3Grid) ?: return false
-        if (definition.id != id) {
-            return false
-        }
-
+        val existing = dao.getByH3CellId(h3CellId)
         val updatedRows = dao.markControlled(
-            id = id,
+            id = existing?.breachNodeId ?: definition.id,
             h3CellId = h3CellId,
             controlledAt = controlledAt,
             updatedAt = updatedAt,
@@ -110,10 +103,9 @@ class DeterministicBreachNodeRepository @Inject constructor(
             return true
         }
 
-        val existing = dao.getById(id)
         dao.upsert(
             entity = BreachNodeStateEntity(
-                breachNodeId = id,
+                breachNodeId = existing?.breachNodeId ?: definition.id,
                 h3CellId = h3CellId,
                 discoveredAt = existing?.discoveredAt,
                 controlledAt = controlledAt,

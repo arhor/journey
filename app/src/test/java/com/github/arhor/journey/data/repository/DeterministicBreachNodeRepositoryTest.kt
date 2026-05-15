@@ -78,6 +78,65 @@ class DeterministicBreachNodeRepositoryTest {
     }
 
     @Test
+    fun `upsertDiscovered should insert a new row when no persisted state exists yet`() = runTest {
+        // Given
+        val cellId = OCCUPIED_CELL_ID
+        val dao = FakeBreachNodeStateDao(states = emptyList())
+        val subject = DeterministicBreachNodeRepository(
+            dao = dao,
+            h3Grid = FakeH3Grid(centers = mapOf(cellId to GeoPoint(lat = 50.45, lon = 30.52))),
+        )
+
+        // When
+        val actual = subject.upsertDiscovered(
+            id = "breach-node:v1:h3r9:$cellId",
+            h3CellId = cellId,
+            discoveredAt = Instant.parse("2026-05-15T10:00:00Z"),
+            updatedAt = Instant.parse("2026-05-15T10:01:00Z"),
+        )
+
+        // Then
+        actual shouldBe true
+        dao.states.size shouldBe 1
+        dao.states.single().breachNodeId shouldBe "breach-node:v1:h3r9:$cellId"
+        dao.states.single().discoveredAt shouldBe Instant.parse("2026-05-15T10:00:00Z")
+    }
+
+    @Test
+    fun `upsertDiscovered should update the existing row when the generator id changes`() = runTest {
+        // Given
+        val cellId = OCCUPIED_CELL_ID
+        val dao = FakeBreachNodeStateDao(
+            states = listOf(
+                breachNodeStateEntity(
+                    breachNodeId = "breach-node:v0:h3r9:$cellId",
+                    h3CellId = cellId,
+                    discoveredAt = Instant.parse("2026-05-15T09:00:00Z"),
+                    updatedAt = Instant.parse("2026-05-15T09:00:00Z"),
+                ),
+            ),
+        )
+        val subject = DeterministicBreachNodeRepository(
+            dao = dao,
+            h3Grid = FakeH3Grid(centers = mapOf(cellId to GeoPoint(lat = 50.45, lon = 30.52))),
+        )
+
+        // When
+        val actual = subject.upsertDiscovered(
+            id = "breach-node:v1:h3r9:$cellId",
+            h3CellId = cellId,
+            discoveredAt = Instant.parse("2026-05-15T10:00:00Z"),
+            updatedAt = Instant.parse("2026-05-15T10:01:00Z"),
+        )
+
+        // Then
+        actual shouldBe true
+        dao.states.size shouldBe 1
+        dao.states.single().breachNodeId shouldBe "breach-node:v0:h3r9:$cellId"
+        dao.states.single().discoveredAt shouldBe Instant.parse("2026-05-15T10:00:00Z")
+    }
+
+    @Test
     fun `observeControlledCells should emit controlled cells that fall within the requested bounds`() =
         runTest {
             // Given
@@ -114,7 +173,32 @@ class DeterministicBreachNodeRepositoryTest {
 
             // Then
             actual shouldBe setOf(controlledCell)
-        }
+    }
+
+    @Test
+    fun `markControlled should insert a new row when none exists yet`() = runTest {
+        // Given
+        val cellId = OCCUPIED_CELL_ID
+        val dao = FakeBreachNodeStateDao(states = emptyList())
+        val subject = DeterministicBreachNodeRepository(
+            dao = dao,
+            h3Grid = FakeH3Grid(centers = mapOf(cellId to GeoPoint(lat = 50.45, lon = 30.52))),
+        )
+
+        // When
+        val actual = subject.markControlled(
+            id = "breach-node:v1:h3r9:$cellId",
+            h3CellId = cellId,
+            controlledAt = Instant.parse("2026-05-15T10:09:00Z"),
+            updatedAt = Instant.parse("2026-05-15T10:10:00Z"),
+        )
+
+        // Then
+        actual shouldBe true
+        dao.states.size shouldBe 1
+        dao.states.single().controlledAt shouldBe Instant.parse("2026-05-15T10:09:00Z")
+        dao.states.single().breachNodeId shouldBe "breach-node:v1:h3r9:$cellId"
+    }
 
     @Test
     fun `markControlled should update the stored breach state when a known node is provided`() =
