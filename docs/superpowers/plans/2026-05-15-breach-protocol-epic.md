@@ -1483,25 +1483,25 @@ git commit -m "feat: render controlled breach fog reveal"
 
 - Modify: none unless failures reveal a real defect.
 
-- [ ] **Step 1: Run JVM tests**
+- [x] **Step 1: Run JVM tests**
 
 Run: `./gradlew :app:testDebugUnitTest`
 
 Expected: PASS.
 
-- [ ] **Step 2: Compile Kotlin**
+- [x] **Step 2: Compile Kotlin**
 
 Run: `./gradlew :app:compileDebugKotlin -q`
 
 Expected: PASS.
 
-- [ ] **Step 3: Assemble Android tests**
+- [x] **Step 3: Assemble Android tests**
 
 Run: `./gradlew :app:assembleDebugAndroidTest`
 
 Expected: PASS.
 
-- [ ] **Step 4: Search for removed concepts**
+- [x] **Step 4: Search for removed concepts**
 
 Run:
 
@@ -1510,6 +1510,9 @@ rg -n "Hero|hero|Energy|energy|Watchtower|watchtower" app/src/main/java app/src/
 ```
 
 Expected: no production references. Migration tests may contain legacy SQL strings needed to verify deletion.
+
+Observed result: remaining matches are limited to legacy schema migration SQL in `JourneyDatabase.kt`
+and `JourneyDatabaseMigrationTest.kt`; no live gameplay/runtime references remain.
 
 - [ ] **Step 5: Commit validation fixes**
 
