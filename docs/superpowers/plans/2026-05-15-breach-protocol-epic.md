@@ -1314,17 +1314,17 @@ git commit -m "feat: present breach map objects"
 - Create: `app/src/main/java/com/github/arhor/journey/feature/map/viewinterop/MapObjectLayerController.kt`
 - Test: `app/src/test/java/com/github/arhor/journey/feature/map/viewinterop/MapObjectLayerControllerTest.kt`
 
-- [ ] **Step 1: Add rendering path decision**
+- [x] **Step 1: Add rendering path decision**
 
 Use a MapLibre GeoJSON source with circle layers. This avoids a screen-projection bridge and keeps marker hit-testing in
 MapLibre.
 
-- [ ] **Step 2: Add test for object list diffing**
+- [x] **Step 2: Add test for object list diffing**
 
 Test that the controller converts map objects to GeoJSON features sorted by id and keeps object ids in feature
 properties.
 
-- [ ] **Step 3: Implement `MapObjectLayerController`**
+- [x] **Step 3: Implement `MapObjectLayerController`**
 
 Controller responsibilities:
 
@@ -1340,7 +1340,7 @@ internal class MapObjectLayerController {
 Use one `GeoJsonSource` named `journey-map-objects-source` and one `CircleLayer` named
 `journey-breach-node-circle-layer`. Each feature must include an `objectId` string property.
 
-- [ ] **Step 4: Pass objects through map screen**
+- [x] **Step 4: Pass objects through map screen**
 
 Add `visibleObjects` parameter to `MapLibreViewMapScreen`:
 
@@ -1351,7 +1351,7 @@ onObjectTapped: (String) -> Unit = {},
 
 Wire from `MapScreen`.
 
-- [ ] **Step 5: Implement marker tap dispatch**
+- [x] **Step 5: Implement marker tap dispatch**
 
 Marker tap must call:
 
@@ -1359,7 +1359,7 @@ Marker tap must call:
 dispatch(MapIntent.BreachNodeTapped(objectId))
 ```
 
-- [ ] **Step 6: Run compile and focused tests**
+- [x] **Step 6: Run compile and focused tests**
 
 Run:
 
@@ -1370,7 +1370,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 
