@@ -8,6 +8,15 @@ sealed interface BreachNodeError : DomainError {
         override val message: String = "Breach node not found."
     }
 
+    data class NotInRange(
+        val id: String,
+        val distanceMeters: Double,
+        val interactionRadiusMeters: Double,
+    ) : BreachNodeError {
+        override val message: String =
+            "Breach node $id is not in range: distance=${distanceMeters.toInt()}m, radius=${interactionRadiusMeters.toInt()}m."
+    }
+
     data class Unexpected(
         val operation: String,
         override val cause: Throwable,
