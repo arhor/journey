@@ -7,13 +7,23 @@ import com.github.arhor.journey.R
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
+import com.github.arhor.journey.domain.internal.BreachBalance
+import com.github.arhor.journey.domain.model.BreachNode
+import com.github.arhor.journey.domain.model.BreachNodePhase
+import com.github.arhor.journey.domain.model.BreachNodeRecord
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
+import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
+import com.github.arhor.journey.domain.usecase.CompleteBreachUseCase
+import com.github.arhor.journey.domain.usecase.DiscoverBreachNodeUseCase
+import com.github.arhor.journey.domain.usecase.FindNearestBreachNodeUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
+import com.github.arhor.journey.domain.usecase.ObserveControlledBreachRevealCellsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
+import com.github.arhor.journey.domain.usecase.ObserveVisibleBreachNodesUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarUiState
@@ -43,8 +53,19 @@ private data class State(
     val viewportSize: MapViewportSize? = null,
     val failureMessage: String? = null,
     val breachProtocol: BreachProtocolUiState = BreachProtocolUiState.Idle,
+    val lockedBreach: BreachNode? = null,
+    val uploadProgressPercent: Int = 0,
+    val breachPhase: BreachSessionPhase = BreachSessionPhase.IDLE,
     val startupGate: MapStartupGateState = MapStartupGateState(),
 )
+
+private enum class BreachSessionPhase {
+    IDLE,
+    SCANNING,
+    SIGNAL_LOCKED,
+    UPLOADING,
+    COMPLETED,
+}
 
 @Immutable
 private data class MapStartupGateState(
@@ -65,6 +86,11 @@ class MapViewModel @Inject constructor(
     private val fogOfWarControllerFactory: FogOfWarController.Factory,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
+    private val findNearestBreachNode: FindNearestBreachNodeUseCase,
+    private val discoverBreachNode: DiscoverBreachNodeUseCase,
+    private val completeBreach: CompleteBreachUseCase,
+    private val observeVisibleBreachNodes: ObserveVisibleBreachNodesUseCase,
+    private val observeControlledBreachRevealCells: ObserveControlledBreachRevealCellsUseCase,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -369,24 +395,189 @@ class MapViewModel @Inject constructor(
     }
 
     private suspend fun onPulseClicked() {
-        Unit
+        val actorLocation = currentActorLocation() ?: return
+        _state.update { state ->
+            state.copy(
+                breachProtocol = BreachProtocolUiState.Scanning,
+                breachPhase = BreachSessionPhase.SCANNING,
+                lockedBreach = null,
+                uploadProgressPercent = 0,
+            )
+        }
+
+        when (val result = findNearestBreachNode(actorLocation)) {
+            is Output.Success -> {
+                val record = result.value
+                val distanceMeters = actorLocation.distanceTo(record.definition.location)
+                val canStartUpload = distanceMeters <= record.definition.interactionRadiusMeters
+                if (canStartUpload) {
+                    discoverBreachNode(
+                        id = record.definition.id,
+                        actorLocation = actorLocation,
+                    )
+                }
+
+                val lockedBreach = record.toLockedBreach(
+                    distanceMeters = distanceMeters,
+                    canStartUpload = canStartUpload,
+                )
+                _state.update { state ->
+                    state.copy(
+                        breachProtocol = lockedBreach.toSignalLockedUiState(),
+                        lockedBreach = lockedBreach,
+                        uploadProgressPercent = 0,
+                        breachPhase = BreachSessionPhase.SIGNAL_LOCKED,
+                    )
+                }
+            }
+
+            is Output.Failure -> {
+                _state.update { state ->
+                    state.copy(
+                        breachProtocol = BreachProtocolUiState.Idle,
+                        lockedBreach = null,
+                        uploadProgressPercent = 0,
+                        breachPhase = BreachSessionPhase.IDLE,
+                    )
+                }
+            }
+        }
     }
 
     private fun onStartBreachUpload() {
-        Unit
+        val lockedBreach = _state.value.lockedBreach ?: return
+        if (!lockedBreach.canStartUpload) {
+            return
+        }
+
+        _state.update { state ->
+            state.copy(
+                breachProtocol = BreachProtocolUiState.Uploading(
+                    breachNodeId = lockedBreach.definition.id,
+                    districtName = lockedBreach.definition.districtName,
+                    progressPercent = 0,
+                ),
+                uploadProgressPercent = 0,
+                breachPhase = BreachSessionPhase.UPLOADING,
+            )
+        }
     }
 
     private suspend fun onBreachUploadTick() {
-        Unit
+        val state = _state.value
+        val lockedBreach = state.lockedBreach ?: return
+        if (state.breachPhase != BreachSessionPhase.UPLOADING) {
+            return
+        }
+
+        val nextProgress = (state.uploadProgressPercent + BREACH_UPLOAD_TICK_PERCENT)
+            .coerceAtMost(100)
+
+        if (nextProgress < 100) {
+            _state.update {
+                it.copy(
+                    breachProtocol = BreachProtocolUiState.Uploading(
+                        breachNodeId = lockedBreach.definition.id,
+                        districtName = lockedBreach.definition.districtName,
+                        progressPercent = nextProgress,
+                    ),
+                    uploadProgressPercent = nextProgress,
+                )
+            }
+            return
+        }
+
+        val actorLocation = currentActorLocation() ?: return
+        when (
+            val result = completeBreach(
+                id = lockedBreach.definition.id,
+                actorLocation = actorLocation,
+            )
+        ) {
+            is Output.Success -> {
+                _state.update {
+                    it.copy(
+                        breachProtocol = BreachProtocolUiState.Completed(
+                            districtName = lockedBreach.definition.districtName,
+                        ),
+                        uploadProgressPercent = 100,
+                        breachPhase = BreachSessionPhase.COMPLETED,
+                    )
+                }
+            }
+
+            is Output.Failure -> {
+                _state.update {
+                    it.copy(
+                        breachProtocol = lockedBreach.toSignalLockedUiState(),
+                        uploadProgressPercent = 0,
+                        breachPhase = BreachSessionPhase.SIGNAL_LOCKED,
+                    )
+                }
+            }
+        }
     }
 
     private fun onCancelBreachUpload() {
-        Unit
+        val lockedBreach = _state.value.lockedBreach
+        _state.update {
+            if (lockedBreach == null) {
+                it.copy(
+                    breachProtocol = BreachProtocolUiState.Idle,
+                    uploadProgressPercent = 0,
+                    breachPhase = BreachSessionPhase.IDLE,
+                )
+            } else {
+                it.copy(
+                    breachProtocol = lockedBreach.toSignalLockedUiState(),
+                    uploadProgressPercent = 0,
+                    breachPhase = BreachSessionPhase.SIGNAL_LOCKED,
+                )
+            }
+        }
     }
 
     private fun onDismissBreachPanel() {
-        Unit
+        _state.update {
+            it.copy(
+                breachProtocol = BreachProtocolUiState.Idle,
+                lockedBreach = null,
+                uploadProgressPercent = 0,
+                breachPhase = BreachSessionPhase.IDLE,
+            )
+        }
     }
+
+    private fun currentActorLocation(): GeoPoint? =
+        (trackingSession.value as? Output.Success)?.value?.lastKnownLocation
+
+    private fun BreachNodeRecord.toLockedBreach(
+        distanceMeters: Double,
+        canStartUpload: Boolean,
+    ): BreachNode =
+        BreachNode(
+            definition = definition,
+            state = state,
+            phase = BreachNodePhase.SIGNAL_LOCKED,
+            distanceMeters = distanceMeters,
+            canDiscover = canStartUpload,
+            canStartUpload = canStartUpload,
+        )
+
+    private fun BreachNode.toSignalLockedUiState(): BreachProtocolUiState.SignalLocked =
+        BreachProtocolUiState.SignalLocked(
+            breachNodeId = definition.id,
+            districtName = definition.districtName,
+            distanceMeters = distanceMeters?.toInt(),
+            signalStrengthPercent = signalStrengthPercent(distanceMeters),
+            canStartUpload = canStartUpload,
+            disabledReason = if (canStartUpload) null else "Move closer to start upload.",
+        )
+
+    private fun signalStrengthPercent(distanceMeters: Double?): Int =
+        distanceMeters
+            ?.let { distance -> (100 - ((distance / BreachBalance.SCAN_RANGE_METERS) * 100)).toInt().coerceIn(0, 100) }
+            ?: 0
 
     private fun MutableStateFlow<State>.updateStartupGateForSession(
         sessionId: Long,
@@ -438,5 +629,6 @@ class MapViewModel @Inject constructor(
             "Current location is not available yet."
         const val TRACKING_START_FAILED_MESSAGE =
             "Failed to start exploration tracking."
+        const val BREACH_UPLOAD_TICK_PERCENT = 25
     }
 }
