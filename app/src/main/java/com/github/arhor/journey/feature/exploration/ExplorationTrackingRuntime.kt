@@ -172,7 +172,7 @@ class ExplorationTrackingRuntime @Inject constructor(
             return
         }
 
-        val newlyClearedTiles = when (val result = revealExplorationTilesAtLocation(update.location)) {
+        when (val result = revealExplorationTilesAtLocation(update.location)) {
             is Output.Success -> result.value
             is Output.Failure -> {
                 lastRevealedTiles = revealTiles
