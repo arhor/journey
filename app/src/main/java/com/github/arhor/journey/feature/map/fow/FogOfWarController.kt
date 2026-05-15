@@ -14,6 +14,7 @@ import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.usecase.GetPackedExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveControlledBreachRevealCellsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
@@ -51,6 +52,8 @@ class FogOfWarController @AssistedInject constructor(
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val observePackedExploredTiles: ObservePackedExploredTilesUseCase,
     private val getPackedExploredTiles: GetPackedExploredTilesUseCase,
+    private val observeControlledBreachRevealCells: ObserveControlledBreachRevealCellsUseCase,
+    private val h3FogRevealMapper: H3FogRevealMapper,
     private val renderDataFactory: FowRenderDataFactory,
     private val fogOfWarCalculator: FogOfWarCalculator,
     @Assisted private val scope: CoroutineScope,
@@ -139,12 +142,22 @@ class FogOfWarController @AssistedInject constructor(
         }
         ?: flowOf(Output.Success(PackedTileSet.Empty))
 
-    private fun observePersistentWatchtowerReveal(
+    private fun observePersistentBreachReveal(
         buffer: FogBufferRegion,
         canonicalZoom: Int,
-    ): Flow<Output<PersistentRevealSnapshot, DomainError>> = flowOf(
-        Output.Success(PersistentRevealSnapshot()),
-    )
+    ): Flow<Output<PersistentRevealSnapshot, DomainError>> =
+        observeControlledBreachRevealCells(buffer.bufferedBounds)
+            .map { output ->
+                output.map { controlledCellIds ->
+                    PersistentRevealSnapshot(
+                        tiles = h3FogRevealMapper.revealTilesForCells(
+                            h3CellIds = controlledCellIds,
+                            canonicalZoom = canonicalZoom,
+                        ),
+                        revision = controlledCellIds.hashCode(),
+                    )
+                }
+            }
 
     private suspend fun prepareFogBufferData(
         buffer: FogBufferRegion,
@@ -512,7 +525,7 @@ class FogOfWarController @AssistedInject constructor(
         buffer: FogBufferRegion,
         exploredTiles: PackedTileSet,
     ): DisplayedFogData? = try {
-        val persistentRevealSnapshot = when (val result = observePersistentWatchtowerReveal(
+        val persistentRevealSnapshot = when (val result = observePersistentBreachReveal(
             buffer = buffer,
             canonicalZoom = _state.value.canonicalZoom,
         ).first()) {
@@ -567,7 +580,7 @@ class FogOfWarController @AssistedInject constructor(
 
             combine(
                 observeFogExploredTiles(buffer.bufferedTileRange),
-                observePersistentWatchtowerReveal(
+                observePersistentBreachReveal(
                     buffer = buffer,
                     canonicalZoom = _state.value.canonicalZoom,
                 ),

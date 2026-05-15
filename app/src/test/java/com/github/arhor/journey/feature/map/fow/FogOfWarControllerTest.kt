@@ -1,20 +1,27 @@
 package com.github.arhor.journey.feature.map.fow
 
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.testing.FakeH3Grid
+import com.github.arhor.journey.core.testing.hexAround
 import com.github.arhor.journey.core.testing.MainDispatcherRule
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
+import com.github.arhor.journey.domain.internal.tileAt
 import com.github.arhor.journey.domain.model.ExplorationTileRange
 import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.GeoBounds
+import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapTile
+import com.github.arhor.journey.domain.model.error.BreachNodeError
 import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.usecase.GetPackedExploredTilesUseCase
+import com.github.arhor.journey.domain.usecase.ObserveControlledBreachRevealCellsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
@@ -24,6 +31,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -292,21 +300,72 @@ class FogOfWarControllerTest {
             }
         }
 
+    @Test
+    fun `updateViewport should expose controlled breach reveal tiles in visibility state`() = runTest {
+        // Given
+        val controllerScope = CoroutineScope(StandardTestDispatcher(testScheduler) + Job())
+        val controlledCellId = "cell-1"
+        val controlledCenter = GeoPoint(lat = 50.4500, lon = 30.5200)
+        val controlledBounds = bounds(
+            ExplorationTileRange(
+                zoom = CANONICAL_ZOOM,
+                minX = tileAt(controlledCenter, CANONICAL_ZOOM).x,
+                maxX = tileAt(controlledCenter, CANONICAL_ZOOM).x,
+                minY = tileAt(controlledCenter, CANONICAL_ZOOM).y,
+                maxY = tileAt(controlledCenter, CANONICAL_ZOOM).y,
+            ),
+        )
+        val controlledCellsFlow = MutableStateFlow<Output<Set<String>, BreachNodeError>>(
+            Output.Success(setOf(controlledCellId)),
+        )
+        val fixture = createFixture(
+            scope = controllerScope,
+            exploredTiles = emptySet(),
+            controlledCellsFlow = controlledCellsFlow,
+            h3FogRevealMapper = H3FogRevealMapper(
+                h3Grid = FakeH3Grid(
+                    boundaries = mapOf(controlledCellId to hexAround(controlledCenter)),
+                ),
+            ),
+        )
+
+        try {
+            // When
+            fixture.controller.updateViewport(controlledBounds)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.controller.visibilityState.first { visibilityState ->
+                visibilityState.visibilityTileMask.isNotEmpty()
+            }
+            actual.visibilityTileMask shouldContain tileAt(controlledCenter, CANONICAL_ZOOM)
+        } finally {
+            controllerScope.cancel()
+            advanceUntilIdle()
+        }
+    }
+
     private fun createFixture(
         scope: CoroutineScope,
         exploredTiles: Set<MapTile>,
         packedExploredTiles: LongArray = exploredTiles.toPackedLongArray(),
         runtimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
+        controlledCellsFlow: Flow<Output<Set<String>, BreachNodeError>> =
+            MutableStateFlow(Output.Success(emptySet())),
         observePackedExploredTilesFlowFactory: (ExplorationTileRange) -> PackedExploredTilesFlow =
             { MutableStateFlow(Output.Success(packedExploredTiles)) },
         getPackedExploredTiles: suspend (ExplorationTileRange) -> Output<LongArray, UseCaseError> =
             { Output.Success(packedExploredTiles) },
+        h3FogRevealMapper: H3FogRevealMapper = H3FogRevealMapper(
+            h3Grid = FakeH3Grid(),
+        ),
     ): Fixture {
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val observePackedExploredTiles = mockk<ObservePackedExploredTilesUseCase>()
         val getPackedExploredTilesUseCase = mockk<GetPackedExploredTilesUseCase>()
+        val observeControlledBreachRevealCells = mockk<ObserveControlledBreachRevealCellsUseCase>()
         val configFlow =
             MutableStateFlow<Output<ExplorationTileRuntimeConfig, UseCaseError>>(Output.Success(runtimeConfig))
         val trackingSessionFlow =
@@ -317,6 +376,7 @@ class FogOfWarControllerTest {
         every { observePackedExploredTiles.invoke(any()) } answers {
             observePackedExploredTilesFlowFactory(firstArg())
         }
+        every { observeControlledBreachRevealCells.invoke(any()) } returns controlledCellsFlow
         coEvery { getPackedExploredTilesUseCase.invoke(any()) } coAnswers {
             getPackedExploredTiles(firstArg())
         }
@@ -327,6 +387,8 @@ class FogOfWarControllerTest {
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 observePackedExploredTiles = observePackedExploredTiles,
                 getPackedExploredTiles = getPackedExploredTilesUseCase,
+                observeControlledBreachRevealCells = observeControlledBreachRevealCells,
+                h3FogRevealMapper = h3FogRevealMapper,
                 renderDataFactory = FowRenderDataFactory(),
                 fogOfWarCalculator = FogOfWarCalculator(),
                 scope = scope,

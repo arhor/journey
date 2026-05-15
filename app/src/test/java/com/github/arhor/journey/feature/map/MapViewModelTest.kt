@@ -4,6 +4,7 @@ package com.github.arhor.journey.feature.map
 
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.Output
+import com.github.arhor.journey.core.testing.FakeH3Grid
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.BreachNode
@@ -35,6 +36,7 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
+import com.github.arhor.journey.feature.map.fow.H3FogRevealMapper
 import com.github.arhor.journey.feature.map.model.BreachMarkerState
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
@@ -458,6 +460,8 @@ class MapViewModelTest {
                         observeExplorationTrackingSession = observeExplorationTrackingSession,
                         observePackedExploredTiles = observePackedExploredTiles,
                         getPackedExploredTiles = getPackedExploredTiles,
+                        observeControlledBreachRevealCells = observeControlledBreachRevealCells,
+                        h3FogRevealMapper = H3FogRevealMapper(FakeH3Grid()),
                         renderDataFactory = FowRenderDataFactory(),
                         fogOfWarCalculator = FogOfWarCalculator(),
                         scope = scope,
