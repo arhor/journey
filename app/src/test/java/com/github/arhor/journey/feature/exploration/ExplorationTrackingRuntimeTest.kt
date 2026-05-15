@@ -2,13 +2,11 @@ package com.github.arhor.journey.feature.exploration
 
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.testing.MainDispatcherRule
+import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.ExplorationTileRuntimeConfigHolder
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.UserLocationFix
-import com.github.arhor.journey.domain.model.error.CollectResourceSpawnError
-import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
@@ -16,13 +14,8 @@ import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -39,12 +32,10 @@ class ExplorationTrackingRuntimeTest {
         // Given
         val userLocationSource = FakeUserLocationSource()
         val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
@@ -56,7 +47,6 @@ class ExplorationTrackingRuntimeTest {
             elapsedRealtimeNanos = 1_000L,
         )
         coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -68,7 +58,6 @@ class ExplorationTrackingRuntimeTest {
 
         // Then
         coVerify(exactly = 1) { revealExplorationTilesAtLocation.invoke(location) }
-        coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(location) }
         runtime.snapshot().status shouldBe ExplorationTrackingStatus.TRACKING
         runtime.snapshot().lastKnownLocation shouldBe location
         runtime.snapshot().lastKnownLocationFix shouldBe locationFix
@@ -78,12 +67,11 @@ class ExplorationTrackingRuntimeTest {
     fun `handleLocationUpdate should expose disabled state when providers are unavailable`() = runTest {
         // Given
         val userLocationSource = FakeUserLocationSource()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>(relaxed = true)
+        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>(relaxed = true)
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
-            revealExplorationTilesAtLocation = mockk(relaxed = true),
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
+            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
 
@@ -96,21 +84,18 @@ class ExplorationTrackingRuntimeTest {
         // Then
         runtime.snapshot().isActive shouldBe true
         runtime.snapshot().status shouldBe ExplorationTrackingStatus.LOCATION_SERVICES_DISABLED
-        coVerify(exactly = 0) { collectNearbyResourceSpawns.invoke(any()) }
+        coVerify(exactly = 0) { revealExplorationTilesAtLocation.invoke(any()) }
     }
 
     @Test
     fun `stop should move session inactive and preserve the most recent cadence`() = runTest {
         // Given
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = FakeUserLocationSource(),
             revealExplorationTilesAtLocation = mockk(relaxed = true),
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = ExplorationTileRuntimeConfigHolder(),
         )
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.setCadence(ExplorationTrackingCadence.FOREGROUND)
@@ -131,17 +116,14 @@ class ExplorationTrackingRuntimeTest {
         val userLocationSource = FakeUserLocationSource()
         val configHolder = ExplorationTileRuntimeConfigHolder()
         val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = configHolder,
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
         coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -154,7 +136,6 @@ class ExplorationTrackingRuntimeTest {
 
         // Then
         coVerify(exactly = 2) { revealExplorationTilesAtLocation.invoke(location) }
-        coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(location) }
     }
 
     @Test
@@ -163,17 +144,14 @@ class ExplorationTrackingRuntimeTest {
         val userLocationSource = FakeUserLocationSource()
         val configHolder = ExplorationTileRuntimeConfigHolder()
         val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
         val runtime = ExplorationTrackingRuntime(
             appScope = backgroundScope,
             userLocationSource = userLocationSource,
             revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
             configHolder = configHolder,
         )
         val location = GeoPoint(lat = 40.7128, lon = -74.0060)
         coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
 
         // When
         runtime.startIfNeeded()
@@ -186,150 +164,6 @@ class ExplorationTrackingRuntimeTest {
 
         // Then
         coVerify(exactly = 2) { revealExplorationTilesAtLocation.invoke(location) }
-        coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(location) }
-    }
-
-    @Test
-    fun `startIfNeeded should trigger nearby collection for distinct location buckets even when reveal tiles are unchanged`() = runTest {
-        // Given
-        val userLocationSource = FakeUserLocationSource()
-        val configHolder = ExplorationTileRuntimeConfigHolder().apply {
-            setCanonicalZoom(1)
-        }
-        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
-        val runtime = ExplorationTrackingRuntime(
-            appScope = backgroundScope,
-            userLocationSource = userLocationSource,
-            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
-            configHolder = configHolder,
-        )
-        val firstLocation = GeoPoint(lat = 40.7128, lon = -74.0060)
-        val secondLocation = GeoPoint(lat = 40.7134, lon = -74.0066)
-        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
-
-        // When
-        runtime.startIfNeeded()
-        runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(firstLocation.toUserLocationFix()))
-        runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(secondLocation.toUserLocationFix()))
-        runCurrent()
-
-        // Then
-        coVerify(exactly = 1) { revealExplorationTilesAtLocation.invoke(firstLocation) }
-        coVerify(exactly = 2) {
-            collectNearbyResourceSpawns.invoke(any())
-        }
-        coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(firstLocation) }
-        coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(secondLocation) }
-    }
-
-    @Test
-    fun `stop should reset nearby collection guard for the next session`() = runTest {
-        // Given
-        val userLocationSource = FakeUserLocationSource()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
-        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
-        val runtime = ExplorationTrackingRuntime(
-            appScope = backgroundScope,
-            userLocationSource = userLocationSource,
-            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
-            configHolder = ExplorationTileRuntimeConfigHolder(),
-        )
-        val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
-        coEvery { collectNearbyResourceSpawns.invoke(any()) } returns Output.Success(emptyList())
-
-        // When
-        runtime.startIfNeeded()
-        runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
-        runCurrent()
-        runtime.stop()
-        runCurrent()
-        runtime.startIfNeeded()
-        runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
-        runCurrent()
-
-        // Then
-        coVerify(exactly = 2) { collectNearbyResourceSpawns.invoke(location) }
-    }
-
-    @Test
-    fun `startIfNeeded should advance nearby collection guard when batch completes with failed item outputs`() = runTest {
-        // Given
-        val userLocationSource = FakeUserLocationSource()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
-        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>()
-        val runtime = ExplorationTrackingRuntime(
-            appScope = backgroundScope,
-            userLocationSource = userLocationSource,
-            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
-            configHolder = ExplorationTileRuntimeConfigHolder(),
-        )
-        val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        coEvery { revealExplorationTilesAtLocation.invoke(any()) } returns Output.Success(emptySet())
-
-        coEvery {
-            collectNearbyResourceSpawns.invoke(location)
-        } returns Output.Success(
-            listOf(
-                Output.Failure(CollectResourceSpawnError.AlreadyCollected("spawn-1")),
-            ),
-        )
-
-        // When
-        runtime.startIfNeeded()
-        runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
-        runCurrent()
-        userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
-        runCurrent()
-
-        // Then
-        coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(location) }
-    }
-
-    @Test
-    fun `startIfNeeded should stop further location handling when nearby collection is cancelled`() = runTest {
-        // Given
-        val appScope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
-        val userLocationSource = FakeUserLocationSource()
-        val collectNearbyResourceSpawns = mockk<CollectNearbyResourceSpawnsUseCase>()
-        val revealExplorationTilesAtLocation = mockk<RevealExplorationTilesAtLocationUseCase>(relaxed = true)
-        val runtime = ExplorationTrackingRuntime(
-            appScope = appScope,
-            userLocationSource = userLocationSource,
-            revealExplorationTilesAtLocation = revealExplorationTilesAtLocation,
-            collectNearbyResourceSpawns = collectNearbyResourceSpawns,
-            configHolder = ExplorationTileRuntimeConfigHolder(),
-        )
-        val location = GeoPoint(lat = 40.7128, lon = -74.0060)
-        val cancellation = CancellationException("Nearby collection cancelled.")
-
-        coEvery { collectNearbyResourceSpawns.invoke(location) } throws cancellation
-
-        // When
-        try {
-            runtime.startIfNeeded()
-            runCurrent()
-            userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
-            advanceUntilIdle()
-            userLocationSource.emit(UserLocationUpdate.Available(location.toUserLocationFix()))
-            advanceUntilIdle()
-
-            // Then
-            coVerify(exactly = 1) { collectNearbyResourceSpawns.invoke(location) }
-            coVerify(exactly = 0) { revealExplorationTilesAtLocation.invoke(any()) }
-        } finally {
-            appScope.cancel()
-        }
     }
 
     private fun GeoPoint.toUserLocationFix(): UserLocationFix =

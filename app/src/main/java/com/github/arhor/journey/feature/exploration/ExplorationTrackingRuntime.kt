@@ -8,12 +8,9 @@ import com.github.arhor.journey.domain.model.MapTile
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
-import com.github.arhor.journey.domain.model.GeoPoint
-import com.github.arhor.journey.domain.usecase.CollectNearbyResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.RevealExplorationTilesAtLocationUseCase
 import com.github.arhor.journey.feature.exploration.location.UserLocationSource
 import com.github.arhor.journey.feature.exploration.location.UserLocationUpdate
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -24,16 +21,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.roundToInt
-
-private const val NEARBY_COLLECTION_BUCKET_SCALE = 10_000.0
 
 @Singleton
 class ExplorationTrackingRuntime @Inject constructor(
     @AppCoroutineScope private val appScope: CoroutineScope,
     private val userLocationSource: UserLocationSource,
     private val revealExplorationTilesAtLocation: RevealExplorationTilesAtLocationUseCase,
-    private val collectNearbyResourceSpawns: CollectNearbyResourceSpawnsUseCase,
     private val configHolder: ExplorationTileRuntimeConfigHolder,
 ) {
     private val cadence = MutableStateFlow(ExplorationTrackingCadence.BACKGROUND)
@@ -45,7 +38,6 @@ class ExplorationTrackingRuntime @Inject constructor(
 
     private var trackingJob: Job? = null
     private var lastRevealedTiles: Set<MapTile> = emptySet()
-    private var lastNearbyCollectionBucket: NearbyCollectionBucket? = null
 
     fun observeSession(): Flow<ExplorationTrackingSession> = session.asStateFlow()
 
@@ -108,7 +100,6 @@ class ExplorationTrackingRuntime @Inject constructor(
         trackingJob?.cancel()
         trackingJob = null
         lastRevealedTiles = emptySet()
-        lastNearbyCollectionBucket = null
 
         session.update {
             it.copy(
@@ -160,8 +151,6 @@ class ExplorationTrackingRuntime @Inject constructor(
             )
         }
 
-        maybeCollectNearbyResources(location = update.location)
-
         val config = configHolder.snapshot()
         val revealTiles = revealTilesAround(
             point = update.location,
@@ -181,38 +170,4 @@ class ExplorationTrackingRuntime @Inject constructor(
         }
         lastRevealedTiles = revealTiles
     }
-
-    private suspend fun maybeCollectNearbyResources(location: GeoPoint) {
-        val bucket = location.toNearbyCollectionBucket()
-        if (bucket == lastNearbyCollectionBucket) {
-            return
-        }
-
-        try {
-            when (collectNearbyResourceSpawns(location)) {
-                is Output.Success -> {
-                    lastNearbyCollectionBucket = bucket
-                }
-
-                is Output.Failure -> {
-                    lastNearbyCollectionBucket = bucket
-                }
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Throwable) {
-            // Keep nearby collection best-effort without swallowing structured cancellation.
-        }
-    }
-
-    private fun GeoPoint.toNearbyCollectionBucket(): NearbyCollectionBucket =
-        NearbyCollectionBucket(
-            latBucket = (lat * NEARBY_COLLECTION_BUCKET_SCALE).roundToInt(),
-            lonBucket = (lon * NEARBY_COLLECTION_BUCKET_SCALE).roundToInt(),
-        )
-
-    private data class NearbyCollectionBucket(
-        val latBucket: Int,
-        val lonBucket: Int,
-    )
 }

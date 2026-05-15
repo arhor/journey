@@ -6,21 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.R
 import com.github.arhor.journey.core.common.DomainError
 import com.github.arhor.journey.core.common.Output
-import com.github.arhor.journey.core.common.fold
 import com.github.arhor.journey.core.common.map
 import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
-import com.github.arhor.journey.domain.model.ExplorationTileRuntimeConfig
 import com.github.arhor.journey.domain.model.ExplorationTrackingCadence
 import com.github.arhor.journey.domain.model.ExplorationTrackingSession
 import com.github.arhor.journey.domain.model.ExplorationTrackingStatus
 import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.MapStyle
-import com.github.arhor.journey.domain.model.MapTile
-import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
-import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
-import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObserveSelectedMapStyleUseCase
 import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUseCase
@@ -30,7 +24,6 @@ import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import com.github.arhor.journey.feature.map.model.MapViewportSize
-import com.github.arhor.journey.feature.map.presentation.MapWorldObjectPresenter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,7 +31,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -74,14 +66,11 @@ private data class MapStartupGateState(
 @HiltViewModel
 @Suppress("CanBeParameter")
 class MapViewModel @Inject constructor(
-    private val observeCollectibleResourceSpawns: ObserveCollectibleResourceSpawnsUseCase,
-    private val getExplorationTileRuntimeConfig: GetExplorationTileRuntimeConfigUseCase,
     private val observeSelectedMapStyle: ObserveSelectedMapStyleUseCase,
     private val fogOfWarControllerFactory: FogOfWarController.Factory,
     private val observeExplorationTrackingSession: ObserveExplorationTrackingSessionUseCase,
     private val startExplorationTrackingSession: StartExplorationTrackingSessionUseCase,
     private val mapObjectQueryWindowPolicy: MapObjectQueryWindowPolicy,
-    private val mapWorldObjectPresenter: MapWorldObjectPresenter,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -89,10 +78,6 @@ class MapViewModel @Inject constructor(
         fogOfWarControllerFactory.create(viewModelScope)
     }
 
-    private val initialTileRuntimeConfig = getExplorationTileRuntimeConfig().fold(
-        onSuccess = { it },
-        onFailure = { ExplorationTileRuntimeConfig() },
-    )
     private val _state = MutableStateFlow(State())
     private val trackingSession = observeExplorationTrackingSession()
         .stateIn(
@@ -155,58 +140,7 @@ class MapViewModel @Inject constructor(
             .distinctUntilChanged()
 
     private fun observeVisibleWorldObjects(): Flow<Output<VisibleWorldObjects, DomainError>> =
-        observeVisibleResourceSpawnObjects()
-            .map { output ->
-                output.map { resourceSpawnObjects ->
-                    VisibleWorldObjects(objects = resourceSpawnObjects)
-                }
-            }
-            .distinctUntilChanged()
-
-    private fun observeVisibleResourceSpawnObjects(): Flow<Output<List<MapObjectUiModel>, DomainError>> =
-        combine(
-            observeResourceDerivedData(),
-            observeFogVisibilitySnapshot(),
-        ) { resourceDerivedDataOutput, fogVisibility ->
-            resourceDerivedDataOutput.map { resourceDerivedData ->
-                val canonicalZoom = fogVisibility.canonicalZoom
-                    .takeIf { it > 0 }
-                    ?: initialTileRuntimeConfig.canonicalZoom
-
-                mapWorldObjectPresenter.presentResourceSpawns(
-                    resourceSpawns = resourceDerivedData.resourceSpawns,
-                    canonicalZoom = canonicalZoom,
-                    visibilityTileMask = fogVisibility.visibilityTileMask,
-                )
-            }
-        }
-            .distinctUntilChanged()
-
-    private fun observeFogVisibilitySnapshot(): Flow<FogVisibilitySnapshot> =
-        fogOfWarController.visibilityState
-            .map { visibilityState ->
-                FogVisibilitySnapshot(
-                    canonicalZoom = visibilityState.canonicalZoom,
-                    visibilityTileMask = visibilityState.visibilityTileMask,
-                )
-            }
-            .distinctUntilChanged()
-
-    private fun observeResourceDerivedData(): Flow<Output<ResourceDerivedData, DomainError>> =
-        _state
-            .map { state -> state.resourceQueryWindow }
-            .distinctUntilChanged()
-            .flatMapLatest { queryBounds ->
-                observeVisibleResourceSpawns(queryBounds)
-                    .map { resourceSpawnsOutput ->
-                        resourceSpawnsOutput.map { resourceSpawns ->
-                            ResourceDerivedData(
-                                queryWindow = queryBounds,
-                                resourceSpawns = resourceSpawns,
-                            )
-                        }
-                    }
-            }
+        flowOf(Output.Success(VisibleWorldObjects()))
 
     override suspend fun handleIntent(intent: MapIntent) {
         when (intent) {
@@ -227,12 +161,6 @@ class MapViewModel @Inject constructor(
             is MapIntent.MapLoadFailed -> onMapLoadFailed(intent)
         }
     }
-
-    private fun observeVisibleResourceSpawns(
-        queryBounds: GeoBounds?,
-    ): Flow<Output<List<ResourceSpawn>, DomainError>> = queryBounds
-        ?.let(observeCollectibleResourceSpawns::invoke)
-        ?: flowOf(Output.Success(emptyList()))
 
     private suspend fun onMapOpened() {
         startTrackingSessionIfNeeded()
@@ -534,20 +462,8 @@ class MapViewModel @Inject constructor(
     )
 
     @Immutable
-    private data class ResourceDerivedData(
-        val queryWindow: GeoBounds?,
-        val resourceSpawns: List<ResourceSpawn>,
-    )
-
-    @Immutable
     private data class VisibleWorldObjects(
         val objects: List<MapObjectUiModel> = emptyList(),
-    )
-
-    @Immutable
-    private data class FogVisibilitySnapshot(
-        val canonicalZoom: Int,
-        val visibilityTileMask: Set<MapTile>,
     )
 
     private fun reuseVisibleObjects(visibleObjects: List<MapObjectUiModel>): List<MapObjectUiModel> {

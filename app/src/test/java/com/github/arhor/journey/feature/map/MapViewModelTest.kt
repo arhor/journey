@@ -13,13 +13,9 @@ import com.github.arhor.journey.domain.model.GeoBounds
 import com.github.arhor.journey.domain.model.GeoPoint
 import com.github.arhor.journey.domain.model.MapStyle
 import com.github.arhor.journey.domain.model.MapTile
-import com.github.arhor.journey.domain.model.ResourceSpawn
 import com.github.arhor.journey.domain.model.error.StartExplorationTrackingSessionError
-import com.github.arhor.journey.domain.model.error.UseCaseError
 import com.github.arhor.journey.domain.repository.AppSettingsRepository
-import com.github.arhor.journey.domain.usecase.GetExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.GetPackedExploredTilesUseCase
-import com.github.arhor.journey.domain.usecase.ObserveCollectibleResourceSpawnsUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTileRuntimeConfigUseCase
 import com.github.arhor.journey.domain.usecase.ObserveExplorationTrackingSessionUseCase
 import com.github.arhor.journey.domain.usecase.ObservePackedExploredTilesUseCase
@@ -28,7 +24,6 @@ import com.github.arhor.journey.domain.usecase.StartExplorationTrackingSessionUs
 import com.github.arhor.journey.feature.map.fow.FogOfWarCalculator
 import com.github.arhor.journey.feature.map.fow.FogOfWarController
 import com.github.arhor.journey.feature.map.fow.FowRenderDataFactory
-import com.github.arhor.journey.feature.map.presentation.MapWorldObjectPresenter
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.every
@@ -49,7 +44,6 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
-import org.junit.AfterClass
 import org.junit.Test
 
 class MapViewModelTest {
@@ -75,20 +69,11 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should include resource spawns when query window contains them`() = runTest {
+    fun `uiState should expose empty visible objects when query window changes`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
 
         // Given
         val fixture = createFixture(
-            resourceSpawns = listOf(
-                resourceSpawn(
-                    id = "cell-1-slot-0",
-                    resourceTypeId = "scrap",
-                    lat = 50.46,
-                    lon = 30.53,
-                    collectionRadiusMeters = 24.0,
-                ),
-            ),
             trackingSession = ExplorationTrackingSession(
                 lastKnownLocation = GeoPoint(lat = 50.45, lon = 30.52),
             ),
@@ -112,14 +97,11 @@ class MapViewModelTest {
 
             // When
             val actual = fixture.viewModel.awaitContent { content ->
-                content.visibleObjects.any { it.id == "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0" }
+                content.visibleObjects.isEmpty()
             }
 
             // Then
-            actual.visibleObjects.map { it.id }.toSet() shouldBe setOf("${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0")
-            actual.visibleObjects
-                .first { it.id == "${RESOURCE_SPAWN_ID_PREFIX}:cell-1-slot-0" }
-                .title shouldBe "Scrap"
+            actual.visibleObjects shouldBe emptyList()
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -136,6 +118,7 @@ class MapViewModelTest {
         advanceTimeBy(5_000L)
         runCurrent()
         advanceUntilIdle()
+        Dispatchers.resetMain()
     }
 
     private data class Fixture(
@@ -143,17 +126,14 @@ class MapViewModelTest {
     )
 
     private fun createFixture(
-        resourceSpawns: List<ResourceSpawn> = emptyList(),
         exploredTiles: Set<MapTile> = emptySet(),
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
         selectedMapStyle: MapStyle = MapStyle.defaultStyle,
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: Output<Unit, StartExplorationTrackingSessionError> = Output.Success(Unit),
     ): Fixture {
-        val observeCollectibleResourceSpawns = mockk<ObserveCollectibleResourceSpawnsUseCase>()
         val observePackedExploredTiles = mockk<ObservePackedExploredTilesUseCase>()
         val getPackedExploredTiles = mockk<GetPackedExploredTilesUseCase>()
-        val getExplorationTileRuntimeConfig = mockk<GetExplorationTileRuntimeConfigUseCase>()
         val appSettingsRepository = FakeAppSettingsRepository(selectedMapStyle)
         val observeExplorationTileRuntimeConfig = mockk<ObserveExplorationTileRuntimeConfigUseCase>()
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
@@ -161,11 +141,9 @@ class MapViewModelTest {
 
         val trackingSessionFlow = MutableStateFlow(trackingSession)
 
-        every { observeCollectibleResourceSpawns.invoke(any()) } returns MutableStateFlow(Output.Success(resourceSpawns))
         every { observePackedExploredTiles.invoke(any()) } returns MutableStateFlow(
             Output.Success(exploredTiles.toPackedLongArray()),
         )
-        every { getExplorationTileRuntimeConfig.invoke() } returns Output.Success(tileRuntimeConfig)
         every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(Output.Success(tileRuntimeConfig))
         every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow.map { Output.Success(it) }
         coEvery { getPackedExploredTiles.invoke(any()) } returns Output.Success(exploredTiles.toPackedLongArray())
@@ -173,8 +151,6 @@ class MapViewModelTest {
 
         return Fixture(
             viewModel = MapViewModel(
-                observeCollectibleResourceSpawns = observeCollectibleResourceSpawns,
-                getExplorationTileRuntimeConfig = getExplorationTileRuntimeConfig,
                 observeSelectedMapStyle = ObserveSelectedMapStyleUseCase(appSettingsRepository),
                 fogOfWarControllerFactory = { scope ->
                     FogOfWarController(
@@ -190,7 +166,6 @@ class MapViewModelTest {
                 observeExplorationTrackingSession = observeExplorationTrackingSession,
                 startExplorationTrackingSession = startTrackingSession,
                 mapObjectQueryWindowPolicy = MapObjectQueryWindowPolicy(),
-                mapWorldObjectPresenter = MapWorldObjectPresenter(),
             ),
         )
     }
@@ -209,19 +184,6 @@ class MapViewModelTest {
             Output.Success(Unit)
     }
 
-    private fun resourceSpawn(
-        id: String,
-        resourceTypeId: String,
-        lat: Double,
-        lon: Double,
-        collectionRadiusMeters: Double,
-    ): ResourceSpawn = ResourceSpawn(
-        id = id,
-        typeId = resourceTypeId,
-        position = GeoPoint(lat = lat, lon = lon),
-        collectionRadiusMeters = collectionRadiusMeters,
-    )
-
     private fun visibleBoundsInside(range: ExplorationTileRange): GeoBounds =
         bounds(range).let { bounds ->
             GeoBounds(
@@ -236,13 +198,6 @@ class MapViewModelTest {
         map(MapTile::packedValue).toLongArray()
 
     private companion object {
-        @JvmStatic
-        @AfterClass
-        fun resetMainDispatcherAfterClass() {
-            Dispatchers.resetMain()
-        }
-
         const val VIEWPORT_BOUNDS_EPSILON = 1e-6
-        const val RESOURCE_SPAWN_ID_PREFIX = "spawn"
     }
 }
