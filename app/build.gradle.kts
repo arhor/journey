@@ -1,5 +1,6 @@
 @file:Suppress("ChromeOsAbiSupport", "UnstableApiUsage", "unused")
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
@@ -47,7 +48,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments += listOf(
-                    "-DANDROID_STL=c++_static",
+                    "-DANDROID_STL=c++_shared",
                 )
             }
         }
@@ -82,6 +83,22 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.addAll(
+            "-XXLanguage:+ContextParameters",
+            "-XXLanguage:+PropertyParamAnnotationDefaultTargetMode",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=kotlin.contracts.ExperimentalContracts",
+            "-opt-in=kotlin.contracts.ExperimentalExtendedContracts",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=kotlinx.coroutines.FlowPreview",
+            "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
+        )
     }
 }
 
@@ -137,6 +154,12 @@ dependencies {
     androidTestImplementation(libs.kotest.assertions.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.mockk.android)
+}
+
+tasks {
+    withType<Test>().configureEach {
+        failOnNoDiscoveredTests = false
+    }
 }
 
 fun ProviderFactory.gradleOrLocalProperty(propertyName: String): Provider<String> =

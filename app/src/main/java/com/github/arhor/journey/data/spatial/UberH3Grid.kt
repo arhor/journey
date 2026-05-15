@@ -11,12 +11,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class UberH3Grid internal constructor(
-    private val h3: H3Core,
-) : H3Grid {
-
-    @Inject
-    constructor() : this(H3Core.newInstance())
+class UberH3Grid @Inject constructor() : H3Grid {
 
     override fun cellId(lat: Double, lon: Double, resolution: Int): String =
         h3.latLngToCellAddress(lat, lon, resolution)
@@ -59,5 +54,16 @@ class UberH3Grid internal constructor(
         )
             .distinct()
             .sorted()
+    }
+
+    companion object {
+        private val h3: H3Core by lazy {
+            // Workaround for h3-android native artifact missing NEEDED libm.so.
+            // libh3-java.so references math symbol `cos`, but the published Android
+            // library does not declare libm.so in DT_NEEDED. Loading libc++_shared
+            // first makes the required runtime dependency available before H3 loads.
+            System.loadLibrary("c++_shared")
+            H3Core.newSystemInstance()
+        }
     }
 }

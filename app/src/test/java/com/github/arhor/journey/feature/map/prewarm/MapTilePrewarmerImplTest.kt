@@ -13,7 +13,6 @@ import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -27,9 +26,9 @@ class MapTilePrewarmerImplTest {
     fun `prewarm should pass fetched cache metadata through to the cache writer`() = runTest {
         // Given
         val writer =
-            _root_ide_package_.com.github.arhor.journey.feature.map.prewarm.RecordingMapTileCacheWriter()
+            RecordingMapTileCacheWriter()
         val fetcher =
-            _root_ide_package_.com.github.arhor.journey.feature.map.prewarm.RecordingMapTileResourceFetcher(
+            RecordingMapTileResourceFetcher(
                 responses = mapOf(
                     EXPECTED_TILE_URL to FetchedMapResource(
                         url = EXPECTED_TILE_URL,
@@ -66,9 +65,9 @@ class MapTilePrewarmerImplTest {
     fun `prewarm should cancel the previous job when a new request arrives with the same key`() = runTest {
         // Given
         val writer =
-            _root_ide_package_.com.github.arhor.journey.feature.map.prewarm.RecordingMapTileCacheWriter()
+            RecordingMapTileCacheWriter()
         val fetcher =
-            _root_ide_package_.com.github.arhor.journey.feature.map.prewarm.RecordingMapTileResourceFetcher(
+            RecordingMapTileResourceFetcher(
                 delayMillis = 100,
                 responses = mapOf(
                     EXPECTED_TILE_URL to FetchedMapResource(

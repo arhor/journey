@@ -56,7 +56,7 @@ class MapTileStyleResolverTest {
             // When
             val actual = resolver.resolve(
                 style = style,
-                fetcher = _root_ide_package_.com.github.arhor.journey.feature.map.prewarm.FakeMapTileResourceFetcher(),
+                fetcher = FakeMapTileResourceFetcher(),
                 pixelRatio = 2f,
             )
 
@@ -87,7 +87,7 @@ class MapTileStyleResolverTest {
             value = styleUrl,
         )
         val fetcher =
-            _root_ide_package_.com.github.arhor.journey.feature.map.prewarm.FakeMapTileResourceFetcher(
+            FakeMapTileResourceFetcher(
                 responses = mapOf(
                     styleUrl to fetchedResource(
                         url = styleUrl,

@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.hilt) apply false
@@ -9,26 +6,4 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.ksp) apply false
     alias(libs.plugins.kotlin.serialization) apply false
-}
-
-subprojects {
-    tasks.withType<KotlinCompile>().configureEach {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_17)
-            freeCompilerArgs.addAll(
-                "-XXLanguage:+ContextParameters",
-                "-XXLanguage:+PropertyParamAnnotationDefaultTargetMode",
-                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-                "-opt-in=kotlin.contracts.ExperimentalContracts",
-                "-opt-in=kotlin.contracts.ExperimentalExtendedContracts",
-                "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
-                "-opt-in=kotlinx.coroutines.FlowPreview",
-                "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
-            )
-        }
-    }
-
-    tasks.withType<Test>().configureEach {
-        failOnNoDiscoveredTests = false
-    }
 }
