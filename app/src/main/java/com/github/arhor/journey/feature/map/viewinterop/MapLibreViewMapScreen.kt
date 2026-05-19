@@ -12,8 +12,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
-import android.view.MotionEvent
-import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -50,19 +48,14 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.github.arhor.journey.R
 import com.github.arhor.journey.domain.model.GeoBounds
-import com.github.arhor.journey.feature.map.BEARING_DEGREES_PER_PIXEL
 import com.github.arhor.journey.feature.map.DEFAULT_CAMERA_MAX_TILT
 import com.github.arhor.journey.feature.map.DEFAULT_CAMERA_MIN_TILT
-import com.github.arhor.journey.feature.map.TILT_DEGREES_PER_PIXEL
 import com.github.arhor.journey.feature.map.fow.model.FogOfWarRenderState
-import com.github.arhor.journey.feature.map.gesture.PlayerCenteredCameraGestureTracker
 import com.github.arhor.journey.feature.map.model.CameraPositionState
 import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.LatLng as FeatureLatLng
 import com.github.arhor.journey.feature.map.gesture.normalizeBearing
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
-import org.maplibre.android.camera.CameraPosition
-import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.MapLibre
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.location.LocationComponentActivationOptions
@@ -479,7 +472,6 @@ private fun MapView.configureLocationAwareMap(
                 null,
             )
             cameraGestureController.attach(
-                mapView = this,
                 map = map,
             )
 
@@ -494,10 +486,10 @@ private fun MapLibreMap.configureUiSettings() {
         isAttributionEnabled = false
         isLogoEnabled = false
 
-        isScrollGesturesEnabled = false
-        isHorizontalScrollGesturesEnabled = false
-        isRotateGesturesEnabled = false
-        isTiltGesturesEnabled = false
+        isScrollGesturesEnabled = true
+        isHorizontalScrollGesturesEnabled = true
+        isRotateGesturesEnabled = true
+        isTiltGesturesEnabled = true
         isZoomGesturesEnabled = true
         isDoubleTapGesturesEnabled = true
         isQuickZoomGesturesEnabled = true
@@ -675,18 +667,8 @@ private class NativeCameraGestureController(
     private val onCameraGestureStarted: (CameraPositionState) -> Unit,
     private val onCameraSettled: (CameraPositionState, CameraUpdateOrigin) -> Unit,
 ) {
-    private var mapView: MapView? = null
     private var map: MapLibreMap? = null
-    private var latestUserLocation: LatLng? = null
     private var lastCameraMoveOrigin: CameraUpdateOrigin = CameraUpdateOrigin.PROGRAMMATIC
-    private var isCustomCameraGestureActive = false
-
-    private val cameraGestureTracker = PlayerCenteredCameraGestureTracker(
-        bearingDegreesPerPixel = BEARING_DEGREES_PER_PIXEL,
-        tiltDegreesPerPixel = TILT_DEGREES_PER_PIXEL,
-        minTilt = DEFAULT_CAMERA_MIN_TILT,
-        maxTilt = DEFAULT_CAMERA_MAX_TILT,
-    )
 
     private val cameraMoveStartedListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
         lastCameraMoveOrigin = if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
@@ -695,72 +677,23 @@ private class NativeCameraGestureController(
             CameraUpdateOrigin.PROGRAMMATIC
         }
 
-        if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE && !isCustomCameraGestureActive) {
+        if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
             map?.readCurrentCameraState()?.let(onCameraGestureStarted)
         }
     }
 
     private val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
-        if (isCustomCameraGestureActive) {
-            return@OnCameraIdleListener
-        }
-
         map?.readCurrentCameraState()?.let { position ->
             onCameraSettled(position, lastCameraMoveOrigin)
         }
     }
 
-    private val touchListener = View.OnTouchListener { _, event ->
-        val map = map ?: return@OnTouchListener false
-        val currentPosition = map.cameraPosition
-        val update = cameraGestureTracker.onMotionEvent(
-            action = event.actionMasked,
-            x = event.x,
-            y = event.y,
-            pointerCount = event.pointerCount,
-            currentBearing = currentPosition.bearing,
-            currentTilt = currentPosition.tilt,
-        )
-
-        if (update.didStartInteraction) {
-            map.locationComponent.setCameraMode(CameraMode.NONE)
-            isCustomCameraGestureActive = true
-            map.readCurrentCameraState()?.let(onCameraGestureStarted)
-        }
-
-        if (update.bearing != null && update.tilt != null) {
-            map.moveCameraToUserCenteredPosition(
-                target = latestUserLocation ?: currentPosition.target,
-                bearing = update.bearing,
-                tilt = update.tilt,
-            )
-        }
-
-        if (update.didEndInteraction && isCustomCameraGestureActive) {
-            isCustomCameraGestureActive = false
-            val settledPosition = map.readCurrentCameraState()
-            restoreTrackingCameraMode(map)
-            settledPosition?.let { position ->
-                onCameraSettled(position, CameraUpdateOrigin.USER)
-            }
-        }
-
-        if (isCustomCameraGestureActive) {
-            true
-        } else {
-            false
-        }
-    }
-
     fun attach(
-        mapView: MapView,
         map: MapLibreMap,
     ) {
         cleanup()
 
-        this.mapView = mapView
         this.map = map
-        mapView.setOnTouchListener(touchListener)
         map.addOnCameraMoveStartedListener(cameraMoveStartedListener)
         map.addOnCameraIdleListener(cameraIdleListener)
     }
@@ -769,34 +702,11 @@ private class NativeCameraGestureController(
         map?.removeOnCameraMoveStartedListener(cameraMoveStartedListener)
         map?.removeOnCameraIdleListener(cameraIdleListener)
 
-        mapView?.setOnTouchListener(null)
-        mapView = null
         map = null
-        latestUserLocation = null
-        isCustomCameraGestureActive = false
         lastCameraMoveOrigin = CameraUpdateOrigin.PROGRAMMATIC
     }
 
-    fun onLocationUpdated(location: Location) {
-        val mapTarget = LatLng(location.latitude, location.longitude)
-        latestUserLocation = mapTarget
-
-        val map = map ?: return
-        if (isCustomCameraGestureActive || map.locationComponent.cameraMode == CameraMode.NONE) {
-            map.moveCameraToUserCenteredPosition(target = mapTarget)
-        }
-    }
-
-    private fun restoreTrackingCameraMode(map: MapLibreMap) {
-        map.locationComponent.setCameraMode(
-            CameraMode.TRACKING,
-            0L,
-            null,
-            null,
-            null,
-            null,
-        )
-    }
+    fun onLocationUpdated(location: Location) = Unit
 }
 
 private fun MapLibreMap.readCurrentCameraState(): CameraPositionState? {
@@ -811,23 +721,6 @@ private fun MapLibreMap.readCurrentCameraState(): CameraPositionState? {
         tilt = cameraPosition.tilt.coerceIn(DEFAULT_CAMERA_MIN_TILT, DEFAULT_CAMERA_MAX_TILT),
         centerAltitudeMeters = normalizeCenterAltitudeMeters(cameraPosition.centerAltitude),
     )
-}
-
-private fun MapLibreMap.moveCameraToUserCenteredPosition(
-    target: LatLng? = cameraPosition.target,
-    bearing: Double = cameraPosition.bearing,
-    tilt: Double = cameraPosition.tilt,
-) {
-    val resolvedTarget = target ?: return
-    val currentPosition = cameraPosition
-    val updatedPosition = CameraPosition.Builder(currentPosition)
-        .target(resolvedTarget)
-        .bearing(normalizeBearing(bearing))
-        .tilt(tilt.coerceIn(DEFAULT_CAMERA_MIN_TILT, DEFAULT_CAMERA_MAX_TILT))
-        .zoom(currentPosition.zoom)
-        .build()
-
-    moveCamera(CameraUpdateFactory.newCameraPosition(updatedPosition))
 }
 
 internal fun normalizeCenterAltitudeMeters(centerAltitudeMeters: Double): Double? {
