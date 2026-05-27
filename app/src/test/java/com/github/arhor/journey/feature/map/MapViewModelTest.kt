@@ -5,6 +5,7 @@ package com.github.arhor.journey.feature.map
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.testing.FakeH3Grid
+import com.github.arhor.journey.core.testing.MainDispatcherRule
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.BreachNode
@@ -47,7 +48,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -58,11 +58,10 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.Ignore
+import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
@@ -70,10 +69,14 @@ import java.time.Instant
 
 class MapViewModelTest {
 
+    private val mainDispatcher = StandardTestDispatcher()
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule(mainDispatcher)
+
     @Test
-    fun `uiState should expose idle breach protocol state before pulse`() = runTest {
+    fun `uiState should expose idle breach protocol state before pulse`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val fixture = createFixture()
 
         try {
@@ -88,9 +91,8 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose signal locked breach protocol state after pulse`() = runTest {
+    fun `uiState should expose signal locked breach protocol state after pulse`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
         val breachRecord = breachRecord(
             id = "breach-node:v1:h3r9:cell-1",
@@ -151,9 +153,8 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should complete breach upload after repeated ticks`() = runTest {
+    fun `uiState should complete breach upload after repeated ticks`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
         val breachRecord = breachRecord(
             id = "breach-node:v1:h3r9:cell-2",
@@ -237,8 +238,7 @@ class MapViewModelTest {
 
     @Test
     @Ignore("flaky")
-    fun `uiState should expose selected map style uri`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    fun `uiState should expose selected map style uri`() = runTest(mainDispatcher.scheduler) {
 
         // Given
         val fixture = createFixture(
@@ -257,8 +257,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose empty visible objects when viewport changes`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    fun `uiState should expose empty visible objects when viewport changes`() = runTest(mainDispatcher.scheduler) {
 
         // Given
         val fixture = createFixture(
@@ -297,9 +296,8 @@ class MapViewModelTest {
 
     @Test
     @Ignore("flaky")
-    fun `uiState should expose breach visible objects when viewport changes`() = runTest {
+    fun `uiState should expose breach visible objects when viewport changes`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val breachNode = visibleBreachNode(
             id = "breach-node:v1:h3r9:cell-visible",
             cellId = "cell-visible",
@@ -363,7 +361,6 @@ class MapViewModelTest {
         advanceTimeBy(5_000L)
         runCurrent()
         advanceUntilIdle()
-        Dispatchers.resetMain()
     }
 
     private fun breachRecord(

@@ -1,9 +1,11 @@
 package com.github.arhor.journey.core.ui
 
+import androidx.lifecycle.viewModelScope
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -41,7 +44,7 @@ class MviViewModelTest {
             viewModel.handledIntents shouldBe listOf(7)
             viewModel.uiState.value shouldBe 7
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
     }
 
@@ -63,7 +66,7 @@ class MviViewModelTest {
             // Then
             effectDeferred.await() shouldBe "handled:3"
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
     }
 
@@ -82,7 +85,7 @@ class MviViewModelTest {
             // Then
             viewModel.buildUiStateCalls shouldBe 0
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
     }
 
@@ -107,7 +110,7 @@ class MviViewModelTest {
             viewModel.handledIntents shouldBe listOf(1, 2, 3)
             viewModel.uiState.value shouldBe 3
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
     }
 
@@ -133,7 +136,7 @@ class MviViewModelTest {
             // Then
             viewModel.handledIntents shouldBe listOf(1, 2)
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
     }
 
@@ -154,7 +157,7 @@ class MviViewModelTest {
             // Then
             viewModel.handledIntents shouldBe emptyList()
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
     }
 
@@ -190,7 +193,7 @@ class MviViewModelTest {
             // Then
             effectsDeferred.await() shouldBe listOf("handled:1", "handled:2")
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
     }
 
@@ -209,8 +212,15 @@ class MviViewModelTest {
             // Then
             currentState shouldBe -1
         } finally {
-            Dispatchers.resetMain()
+            tearDownMainDispatcher(viewModel)
         }
+    }
+
+    private fun TestScope.tearDownMainDispatcher(viewModel: MviViewModel<*, *, *>) {
+        viewModel.viewModelScope.cancel()
+        runCurrent()
+        advanceUntilIdle()
+        Dispatchers.resetMain()
     }
 
     private class TestMviViewModel : MviViewModel<Int, String, Int>(
