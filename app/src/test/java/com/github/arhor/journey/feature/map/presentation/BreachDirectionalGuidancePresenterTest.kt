@@ -64,6 +64,59 @@ class BreachDirectionalGuidancePresenterTest {
     }
 
     @Test
+    fun `present should return on target when actor is exactly at upload radius boundary`() {
+        // Given
+        val actorLocation = GeoPoint(lat = 0.0, lon = 0.0)
+        val breachLocation = GeoPoint(lat = 0.0, lon = 1.0)
+        val exactDistanceMeters = actorLocation.distanceTo(breachLocation)
+        val breach = breachNode(
+            location = breachLocation,
+            interactionRadiusMeters = exactDistanceMeters,
+        )
+
+        // When
+        val actual = subject.present(
+            breach = breach,
+            actorLocation = actorLocation,
+        )
+
+        // Then
+        actual shouldBe BreachDirectionalGuidanceUiState.OnTarget(
+            breachNodeId = breach.definition.id,
+            districtName = breach.definition.districtName,
+            distanceMeters = exactDistanceMeters.toInt(),
+            canStartUpload = true,
+        )
+    }
+
+    @Test
+    fun `present should return floating arrow when actor is just outside upload radius boundary`() {
+        // Given
+        val actorLocation = GeoPoint(lat = 0.0, lon = 0.0)
+        val breachLocation = GeoPoint(lat = 0.0, lon = 1.0)
+        val exactDistanceMeters = actorLocation.distanceTo(breachLocation)
+        val breach = breachNode(
+            location = breachLocation,
+            interactionRadiusMeters = exactDistanceMeters - 0.001,
+        )
+
+        // When
+        val actual = subject.present(
+            breach = breach,
+            actorLocation = actorLocation,
+        )
+
+        // Then
+        actual shouldBe BreachDirectionalGuidanceUiState.FloatingArrow(
+            breachNodeId = breach.definition.id,
+            districtName = breach.definition.districtName,
+            bearingDegrees = 90.0,
+            distanceMeters = exactDistanceMeters.toInt(),
+            canStartUpload = false,
+        )
+    }
+
+    @Test
     fun `present should return unavailable when actor location is missing`() {
         // Given
         val breach = breachNode(
