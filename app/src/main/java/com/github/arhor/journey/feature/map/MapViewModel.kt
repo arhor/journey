@@ -9,7 +9,6 @@ import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.common.map as mapOutput
 import com.github.arhor.journey.core.common.resolveMessage
 import com.github.arhor.journey.core.ui.MviViewModel
-import com.github.arhor.journey.domain.internal.BreachBalance
 import com.github.arhor.journey.domain.model.BreachNode
 import com.github.arhor.journey.domain.model.BreachNodePhase
 import com.github.arhor.journey.domain.model.BreachNodeRecord
@@ -35,6 +34,7 @@ import com.github.arhor.journey.feature.map.model.CameraUpdateOrigin
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
 import com.github.arhor.journey.feature.map.model.MapViewportSize
 import com.github.arhor.journey.feature.map.presentation.BreachNodePresenter
+import com.github.arhor.journey.feature.map.presentation.BreachDirectionalGuidancePresenter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,6 +99,7 @@ class MapViewModel @Inject constructor(
     private val observeVisibleBreachNodes: ObserveVisibleBreachNodesUseCase,
     private val observeControlledBreachRevealCells: ObserveControlledBreachRevealCellsUseCase,
     private val breachNodePresenter: BreachNodePresenter,
+    private val breachDirectionalGuidancePresenter: BreachDirectionalGuidancePresenter,
 ) : MviViewModel<MapUiState, MapEffect, MapIntent>(
     initialState = MapUiState.Loading,
 ) {
@@ -282,6 +283,7 @@ class MapViewModel @Inject constructor(
             explorationTrackingCadence = trackingSessionValue.cadence,
             explorationTrackingStatus = trackingSessionValue.status,
             breachProtocol = state.breachProtocol,
+            breachGuidance = state.resolveBreachGuidanceUiState(trackingSessionValue),
             isStartupSplashVisible = state.startupGate.isSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
             mapStyleUri = selectedMapStyle.value,
@@ -304,6 +306,7 @@ class MapViewModel @Inject constructor(
                 explorationTrackingCadence = explorationTrackingCadence,
                 explorationTrackingStatus = explorationTrackingStatus,
                 breachProtocol = breachProtocol,
+                breachGuidance = breachGuidance,
                 isStartupSplashVisible = isStartupSplashVisible,
                 startupSplashMessage = startupSplashMessage,
                 mapStyleUri = mapStyleUri,
@@ -609,15 +612,21 @@ class MapViewModel @Inject constructor(
             breachNodeId = definition.id,
             districtName = definition.districtName,
             distanceMeters = distanceMeters?.toInt(),
-            signalStrengthPercent = signalStrengthPercent(distanceMeters),
             canStartUpload = canStartUpload,
             disabledReason = if (canStartUpload) null else "Move closer to start upload.",
         )
 
-    private fun signalStrengthPercent(distanceMeters: Double?): Int =
-        distanceMeters
-            ?.let { distance -> (100 - ((distance / BreachBalance.SCAN_RANGE_METERS) * 100)).toInt().coerceIn(0, 100) }
-            ?: 0
+    private fun State.resolveBreachGuidanceUiState(
+        trackingSession: ExplorationTrackingSession,
+    ): BreachDirectionalGuidanceUiState =
+        if (breachPhase != BreachSessionPhase.SIGNAL_LOCKED || lockedBreach == null) {
+            BreachDirectionalGuidanceUiState.Hidden
+        } else {
+            breachDirectionalGuidancePresenter.present(
+                breach = lockedBreach,
+                actorLocation = trackingSession.lastKnownLocation,
+            )
+        }
 
     private fun MutableStateFlow<State>.updateStartupGateForSession(
         sessionId: Long,
@@ -650,6 +659,7 @@ class MapViewModel @Inject constructor(
             val explorationTrackingCadence: ExplorationTrackingCadence,
             val explorationTrackingStatus: ExplorationTrackingStatus,
             val breachProtocol: BreachProtocolUiState,
+            val breachGuidance: BreachDirectionalGuidanceUiState,
             val isStartupSplashVisible: Boolean,
             val startupSplashMessage: Int,
             val mapStyleUri: String,

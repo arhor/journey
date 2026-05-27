@@ -108,10 +108,6 @@ private fun SignalPanel(
                 text = state.districtName,
                 style = MaterialTheme.typography.titleMedium,
             )
-            Text(
-                text = stringResource(R.string.breach_signal_strength, state.signalStrengthPercent),
-                style = MaterialTheme.typography.bodyLarge,
-            )
             state.distanceMeters?.let { distanceMeters ->
                 Text(
                     text = stringResource(R.string.breach_distance_meters, distanceMeters),

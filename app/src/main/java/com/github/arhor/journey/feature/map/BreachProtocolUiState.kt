@@ -15,7 +15,6 @@ sealed interface BreachProtocolUiState {
         val breachNodeId: String,
         val districtName: String,
         val distanceMeters: Int?,
-        val signalStrengthPercent: Int,
         val canStartUpload: Boolean,
         val disabledReason: String?,
     ) : BreachProtocolUiState
