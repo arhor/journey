@@ -282,7 +282,7 @@ class MapViewModel @Inject constructor(
             isExplorationTrackingActive = trackingSessionValue.isActive,
             explorationTrackingCadence = trackingSessionValue.cadence,
             explorationTrackingStatus = trackingSessionValue.status,
-            breachProtocol = state.breachProtocol,
+            breachProtocol = state.resolveBreachProtocolUiState(trackingSessionValue),
             breachGuidance = state.resolveBreachGuidanceUiState(trackingSessionValue),
             isStartupSplashVisible = state.startupGate.isSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
@@ -464,9 +464,14 @@ class MapViewModel @Inject constructor(
                     distanceMeters = distanceMeters,
                     canStartUpload = canStartUpload,
                 )
+                val liveTrackingSession = currentTrackingSession() ?: ExplorationTrackingSession(
+                    isActive = true,
+                    status = ExplorationTrackingStatus.TRACKING,
+                    lastKnownLocation = actorLocation,
+                )
                 _state.update { state ->
                     state.copy(
-                        breachProtocol = lockedBreach.toSignalLockedUiState(),
+                        breachProtocol = lockedBreach.resolveSignalLockedUiState(liveTrackingSession),
                         lockedBreach = lockedBreach,
                         uploadProgressPercent = 0,
                         breachPhase = BreachSessionPhase.SIGNAL_LOCKED,
@@ -488,8 +493,10 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onStartBreachUpload() {
+        val trackingSession = currentTrackingSession() ?: return
         val lockedBreach = _state.value.lockedBreach ?: return
-        if (!lockedBreach.canStartUpload) {
+        val liveSignalLockedUiState = lockedBreach.resolveSignalLockedUiState(trackingSession)
+        if (!liveSignalLockedUiState.canStartUpload) {
             return
         }
 
@@ -550,9 +557,18 @@ class MapViewModel @Inject constructor(
             }
 
             is Output.Failure -> {
+                val trackingSession = currentTrackingSession()
                 _state.update {
                     it.copy(
-                        breachProtocol = lockedBreach.toSignalLockedUiState(),
+                        breachProtocol = if (trackingSession == null) {
+                            lockedBreach.toSignalLockedUiState(
+                                distanceMeters = lockedBreach.distanceMeters?.toInt(),
+                                canStartUpload = lockedBreach.canStartUpload,
+                                disabledReason = if (lockedBreach.canStartUpload) null else "Move closer to start upload.",
+                            )
+                        } else {
+                            lockedBreach.resolveSignalLockedUiState(trackingSession)
+                        },
                         uploadProgressPercent = 0,
                         breachPhase = BreachSessionPhase.SIGNAL_LOCKED,
                     )
@@ -562,6 +578,7 @@ class MapViewModel @Inject constructor(
     }
 
     private fun onCancelBreachUpload() {
+        val trackingSession = currentTrackingSession()
         val lockedBreach = _state.value.lockedBreach
         _state.update {
             if (lockedBreach == null) {
@@ -572,7 +589,15 @@ class MapViewModel @Inject constructor(
                 )
             } else {
                 it.copy(
-                    breachProtocol = lockedBreach.toSignalLockedUiState(),
+                    breachProtocol = if (trackingSession == null) {
+                        lockedBreach.toSignalLockedUiState(
+                            distanceMeters = lockedBreach.distanceMeters?.toInt(),
+                            canStartUpload = lockedBreach.canStartUpload,
+                            disabledReason = if (lockedBreach.canStartUpload) null else "Move closer to start upload.",
+                        )
+                    } else {
+                        lockedBreach.resolveSignalLockedUiState(trackingSession)
+                    },
                     uploadProgressPercent = 0,
                     breachPhase = BreachSessionPhase.SIGNAL_LOCKED,
                 )
@@ -607,13 +632,46 @@ class MapViewModel @Inject constructor(
             canStartUpload = canStartUpload,
         )
 
-    private fun BreachNode.toSignalLockedUiState(): BreachProtocolUiState.SignalLocked =
+    private fun BreachNode.resolveSignalLockedUiState(
+        trackingSession: ExplorationTrackingSession,
+    ): BreachProtocolUiState.SignalLocked =
+        when (val guidance = breachDirectionalGuidancePresenter.present(this, trackingSession.lastKnownLocation)) {
+            BreachDirectionalGuidanceUiState.Hidden -> toSignalLockedUiState(
+                distanceMeters = distanceMeters?.toInt(),
+                canStartUpload = canStartUpload,
+                disabledReason = if (canStartUpload) null else "Move closer to start upload.",
+            )
+
+            is BreachDirectionalGuidanceUiState.Unavailable -> toSignalLockedUiState(
+                distanceMeters = distanceMeters?.toInt(),
+                canStartUpload = false,
+                disabledReason = guidance.message,
+            )
+
+            is BreachDirectionalGuidanceUiState.FloatingArrow -> toSignalLockedUiState(
+                distanceMeters = guidance.distanceMeters,
+                canStartUpload = guidance.canStartUpload,
+                disabledReason = if (guidance.canStartUpload) null else "Move closer to start upload.",
+            )
+
+            is BreachDirectionalGuidanceUiState.OnTarget -> toSignalLockedUiState(
+                distanceMeters = guidance.distanceMeters,
+                canStartUpload = guidance.canStartUpload,
+                disabledReason = null,
+            )
+        }
+
+    private fun BreachNode.toSignalLockedUiState(
+        distanceMeters: Int?,
+        canStartUpload: Boolean,
+        disabledReason: String?,
+    ): BreachProtocolUiState.SignalLocked =
         BreachProtocolUiState.SignalLocked(
             breachNodeId = definition.id,
             districtName = definition.districtName,
-            distanceMeters = distanceMeters?.toInt(),
+            distanceMeters = distanceMeters,
             canStartUpload = canStartUpload,
-            disabledReason = if (canStartUpload) null else "Move closer to start upload.",
+            disabledReason = disabledReason,
         )
 
     private fun State.resolveBreachGuidanceUiState(
@@ -627,6 +685,18 @@ class MapViewModel @Inject constructor(
                 actorLocation = trackingSession.lastKnownLocation,
             )
         }
+
+    private fun State.resolveBreachProtocolUiState(
+        trackingSession: ExplorationTrackingSession,
+    ): BreachProtocolUiState =
+        if (breachPhase != BreachSessionPhase.SIGNAL_LOCKED || lockedBreach == null) {
+            breachProtocol
+        } else {
+            lockedBreach.resolveSignalLockedUiState(trackingSession)
+        }
+
+    private fun currentTrackingSession(): ExplorationTrackingSession? =
+        (trackingSession.value as? Output.Success)?.value
 
     private fun MutableStateFlow<State>.updateStartupGateForSession(
         sessionId: Long,
