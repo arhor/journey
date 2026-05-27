@@ -21,7 +21,6 @@ class BreachDirectionalGuidancePresenterTest {
         val breach = breachNode(
             location = GeoPoint(lat = 0.0, lon = 1.0),
             interactionRadiusMeters = 30.0,
-            canStartUpload = false,
         )
 
         // When
@@ -41,13 +40,12 @@ class BreachDirectionalGuidancePresenterTest {
     }
 
     @Test
-    fun `present should return on target when actor can start upload`() {
+    fun `present should return on target when actor is within upload radius`() {
         // Given
         val actorLocation = GeoPoint(lat = 50.45, lon = 30.52)
         val breach = breachNode(
             location = actorLocation,
             interactionRadiusMeters = 30.0,
-            canStartUpload = true,
         )
 
         // When
@@ -71,7 +69,6 @@ class BreachDirectionalGuidancePresenterTest {
         val breach = breachNode(
             location = GeoPoint(lat = 50.45, lon = 30.52),
             interactionRadiusMeters = 30.0,
-            canStartUpload = false,
         )
 
         // When
@@ -91,7 +88,6 @@ class BreachDirectionalGuidancePresenterTest {
     private fun breachNode(
         location: GeoPoint,
         interactionRadiusMeters: Double,
-        canStartUpload: Boolean,
     ): BreachNode =
         BreachNode(
             definition = BreachNodeDefinition(
@@ -112,8 +108,8 @@ class BreachDirectionalGuidancePresenterTest {
                 updatedAt = Instant.parse("2026-05-01T10:15:30Z"),
             ),
             phase = BreachNodePhase.SIGNAL_LOCKED,
-            distanceMeters = if (canStartUpload) 0.0 else 111_194.9,
-            canDiscover = canStartUpload,
-            canStartUpload = canStartUpload,
+            distanceMeters = null,
+            canDiscover = false,
+            canStartUpload = false,
         )
 }

@@ -19,22 +19,23 @@ class BreachDirectionalGuidancePresenter @Inject constructor() {
             )
         }
 
-        val distanceMeters = actorLocation.distanceTo(breach.definition.location).toInt()
+        val distanceMeters = actorLocation.distanceTo(breach.definition.location)
+        val isInUploadRange = distanceMeters <= breach.definition.interactionRadiusMeters
 
-        return if (breach.canStartUpload) {
+        return if (isInUploadRange) {
             BreachDirectionalGuidanceUiState.OnTarget(
                 breachNodeId = breach.definition.id,
                 districtName = breach.definition.districtName,
-                distanceMeters = distanceMeters,
-                canStartUpload = true,
+                distanceMeters = distanceMeters.toInt(),
+                canStartUpload = isInUploadRange,
             )
         } else {
             BreachDirectionalGuidanceUiState.FloatingArrow(
                 breachNodeId = breach.definition.id,
                 districtName = breach.definition.districtName,
                 bearingDegrees = actorLocation.bearingTo(breach.definition.location),
-                distanceMeters = distanceMeters,
-                canStartUpload = false,
+                distanceMeters = distanceMeters.toInt(),
+                canStartUpload = isInUploadRange,
             )
         }
     }
