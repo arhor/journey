@@ -50,6 +50,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -94,9 +95,8 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose light exploration mode before breach pulse`() = runTest {
+    fun `uiState should expose light exploration mode before breach pulse`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val fixture = createFixture(
             selectedMapStyle = MapStyle.styleById("urban-noir")!!,
         )
@@ -182,9 +182,8 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose breach tactical mode after pulse`() = runTest {
+    fun `uiState should expose breach tactical mode after pulse`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
         val breachRecord = breachRecord(
             id = "breach-node:v1:h3r9:cell-9",
@@ -240,9 +239,8 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should restore exploration mode when breach panel is dismissed`() = runTest {
+    fun `uiState should restore exploration mode when breach panel is dismissed`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
         val breachRecord = breachRecord(
             id = "breach-node:v1:h3r9:cell-10",
@@ -293,9 +291,8 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should keep breach tactical mode and disable upload affordance when location becomes unavailable`() = runTest {
+    fun `uiState should keep breach tactical mode and disable upload affordance when location becomes unavailable`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
         val breachRecord = breachRecord(
             id = "breach-node:v1:h3r9:cell-11",
@@ -348,8 +345,7 @@ class MapViewModelTest {
             actual.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
                 breachNodeId = breachRecord.definition.id,
                 districtName = breachRecord.definition.districtName,
-                distanceMeters = null,
-                signalStrengthPercent = 0,
+                distanceMeters = 0,
                 canStartUpload = false,
                 disabledReason = "Location required to continue breach scan.",
             )
@@ -1017,7 +1013,7 @@ class MapViewModelTest {
                 breachNodePresenter = BreachNodePresenter(),
                 breachDirectionalGuidancePresenter = BreachDirectionalGuidancePresenter(),
             ),
-            trackingSessionFlow = trackingSessionFlow,
+            trackingSessionFlow = resolvedTrackingSessionFlow,
         )
     }
 

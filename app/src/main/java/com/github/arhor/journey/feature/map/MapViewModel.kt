@@ -314,16 +314,6 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    private fun State.resolveBreachProtocolUiState(
-        trackingSession: ExplorationTrackingSession,
-    ): BreachProtocolUiState {
-        if (breachPhase != BreachSessionPhase.SIGNAL_LOCKED) {
-            return breachProtocol
-        }
-
-        return lockedBreach?.toSignalLockedUiState(trackingSession.lastKnownLocation) ?: breachProtocol
-    }
-
     private fun MapBaseUiState.toUiState(): MapUiState = when (this) {
         is MapBaseUiState.Failure -> MapUiState.Failure(errorMessage)
         is MapBaseUiState.Content -> {
