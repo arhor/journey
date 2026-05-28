@@ -237,6 +237,24 @@ class MapScreenTest {
         composeRule.onAllNodesWithTag(MAP_STARTUP_SPLASH_TEST_TAG).assertCountEquals(0)
     }
 
+    @Test
+    fun `MapContent should hide guidance hud when breach guidance uses the default hidden state`() {
+        // Given
+        composeRule.setContent {
+            MaterialTheme {
+                MapContent(
+                    state = contentState(isStartupSplashVisible = false),
+                    dispatch = {},
+                    mapContent = { modifier, _ -> Box(modifier = modifier) },
+                )
+            }
+        }
+
+        // Then
+        composeRule.onAllNodesWithTag(BREACH_DIRECTIONAL_GUIDANCE_FLOATING_ARROW_TEST_TAG).assertCountEquals(0)
+        composeRule.onAllNodesWithTag(BREACH_DIRECTIONAL_GUIDANCE_ON_TARGET_TEST_TAG).assertCountEquals(0)
+    }
+
     private fun contentState(
         isStartupSplashVisible: Boolean,
         breachProtocol: BreachProtocolUiState = BreachProtocolUiState.Idle,
