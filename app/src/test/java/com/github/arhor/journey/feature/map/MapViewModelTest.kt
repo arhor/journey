@@ -48,12 +48,14 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -82,6 +84,27 @@ class MapViewModelTest {
 
             // Then
             actual.breachProtocol shouldBe BreachProtocolUiState.Idle
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should expose light exploration mode before breach pulse`() = runTest {
+        // Given
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val fixture = createFixture(
+            selectedMapStyle = MapStyle.styleById("urban-noir")!!,
+        )
+
+        try {
+            // When
+            val actual = fixture.viewModel.awaitContent()
+
+            // Then
+            actual.mapMode shouldBe MapMode.Exploration(
+                styleUri = "asset://map/styles/light.json",
+            )
         } finally {
             tearDownMainDispatcher(fixture.viewModel)
         }
@@ -146,6 +169,184 @@ class MapViewModelTest {
             )
             coVerify(exactly = 1) { findNearestBreachNode.invoke(actorLocation) }
         } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should expose breach tactical mode after pulse`() = runTest {
+        // Given
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-9",
+            cellId = "cell-9",
+            location = actorLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        val discoverBreachNode = mockk<DiscoverBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        coEvery {
+            discoverBreachNode.invoke(
+                id = breachRecord.definition.id,
+                actorLocation = actorLocation,
+            )
+        } returns Output.Success(
+            BreachNodeState(
+                breachNodeId = breachRecord.definition.id,
+                h3CellId = breachRecord.definition.h3CellId,
+                discoveredAt = FIXED_INSTANT,
+                controlledAt = null,
+                lockdownUntil = null,
+                updatedAt = FIXED_INSTANT,
+            ),
+        )
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+            discoverBreachNode = discoverBreachNode,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.mapMode is MapMode.BreachTactical
+            }
+            actual.mapMode shouldBe MapMode.BreachTactical(
+                styleUri = "asset://map/styles/cyberpunk.json",
+                isLocationAvailable = true,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should restore exploration mode when breach panel is dismissed`() = runTest {
+        // Given
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-10",
+            cellId = "cell-10",
+            location = actorLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        val discoverBreachNode = mockk<DiscoverBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        coEvery {
+            discoverBreachNode.invoke(
+                id = breachRecord.definition.id,
+                actorLocation = actorLocation,
+            )
+        } returns Output.Success(breachRecord.state!!)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+            discoverBreachNode = discoverBreachNode,
+        )
+        val stateCollectionJob = keepUiStateHot(fixture.viewModel)
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.DismissBreachPanel)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.breachProtocol is BreachProtocolUiState.Idle
+            }
+            actual.mapMode shouldBe MapMode.Exploration(
+                styleUri = "asset://map/styles/light.json",
+            )
+            actual.breachProtocol shouldBe BreachProtocolUiState.Idle
+        } finally {
+            stateCollectionJob.cancel()
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should keep breach tactical mode and disable upload affordance when location becomes unavailable`() = runTest {
+        // Given
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-11",
+            cellId = "cell-11",
+            location = actorLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        val discoverBreachNode = mockk<DiscoverBreachNodeUseCase>()
+        val trackingSessionFlow = MutableStateFlow(
+            ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+        )
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        coEvery {
+            discoverBreachNode.invoke(
+                id = breachRecord.definition.id,
+                actorLocation = actorLocation,
+            )
+        } returns Output.Success(breachRecord.state!!)
+        val fixture = createFixture(
+            trackingSession = trackingSessionFlow.value,
+            trackingSessionFlow = trackingSessionFlow,
+            findNearestBreachNode = findNearestBreachNode,
+            discoverBreachNode = discoverBreachNode,
+        )
+        val stateCollectionJob = keepUiStateHot(fixture.viewModel)
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            // When
+            trackingSessionFlow.value = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TEMPORARILY_UNAVAILABLE,
+                lastKnownLocation = null,
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.uiState.value as MapUiState.Content
+            actual.mapMode shouldBe MapMode.BreachTactical(
+                styleUri = "asset://map/styles/cyberpunk.json",
+                isLocationAvailable = false,
+            )
+            actual.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = null,
+                signalStrengthPercent = 0,
+                canStartUpload = false,
+                disabledReason = "Location required to continue breach scan.",
+            )
+        } finally {
+            stateCollectionJob.cancel()
             tearDownMainDispatcher(fixture.viewModel)
         }
     }
@@ -358,6 +559,11 @@ class MapViewModelTest {
         .mapNotNull { it as? MapUiState.Content }
         .first(predicate)
 
+    private fun TestScope.keepUiStateHot(viewModel: MapViewModel): Job =
+        backgroundScope.launch(StandardTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect {}
+        }
+
     private fun TestScope.tearDownMainDispatcher(viewModel: MapViewModel) {
         viewModel.viewModelScope.cancel()
         advanceTimeBy(5_000L)
@@ -429,6 +635,7 @@ class MapViewModelTest {
     private fun createFixture(
         exploredTiles: Set<MapTile> = emptySet(),
         trackingSession: ExplorationTrackingSession = ExplorationTrackingSession(),
+        trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>? = null,
         selectedMapStyle: MapStyle = MapStyle.defaultStyle,
         tileRuntimeConfig: ExplorationTileRuntimeConfig = ExplorationTileRuntimeConfig(),
         startTrackingResult: Output<Unit, StartExplorationTrackingSessionError> = Output.Success(Unit),
@@ -445,13 +652,13 @@ class MapViewModelTest {
         val observeExplorationTrackingSession = mockk<ObserveExplorationTrackingSessionUseCase>()
         val startTrackingSession = mockk<StartExplorationTrackingSessionUseCase>()
 
-        val trackingSessionFlow = MutableStateFlow(trackingSession)
+        val resolvedTrackingSessionFlow = trackingSessionFlow ?: MutableStateFlow(trackingSession)
 
         every { observePackedExploredTiles.invoke(any()) } returns MutableStateFlow(
             Output.Success(exploredTiles.toPackedLongArray()),
         )
         every { observeExplorationTileRuntimeConfig.invoke() } returns MutableStateFlow(Output.Success(tileRuntimeConfig))
-        every { observeExplorationTrackingSession.invoke() } returns trackingSessionFlow.map { Output.Success(it) }
+        every { observeExplorationTrackingSession.invoke() } returns resolvedTrackingSessionFlow.map { Output.Success(it) }
         every { observeVisibleBreachNodes.invoke(any()) } returns flowOf(Output.Success(emptyList()))
         every { observeControlledBreachRevealCells.invoke(any()) } returns flowOf(Output.Success(emptySet()))
         coEvery { getPackedExploredTiles.invoke(any()) } returns Output.Success(exploredTiles.toPackedLongArray())

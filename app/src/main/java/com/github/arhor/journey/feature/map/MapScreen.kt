@@ -49,7 +49,7 @@ internal fun MapContent(
     mapContent: @Composable (Modifier, (MapIntent) -> Unit) -> Unit = { modifier, mapDispatch ->
         MapLibreViewMapScreen(
             modifier = modifier,
-            styleUri = state.mapStyleUri,
+            mapMode = state.mapMode,
             visibleObjects = state.visibleObjects,
             fogOfWar = state.fogOfWar.toRenderState(),
             onViewportChanged = { visibleBounds ->

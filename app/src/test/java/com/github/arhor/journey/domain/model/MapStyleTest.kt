@@ -7,18 +7,18 @@ import org.junit.Test
 class MapStyleTest {
 
     @Test
-    fun `availableStyles should expose bundled map styles with cyberpunk as default`() {
+    fun `availableStyles should expose bundled map styles with light as default`() {
         // Given
         val expectedStyles = listOf(
-            MapStyle.bundle(
-                id = "cyberpunk",
-                name = "Cyberpunk",
-                value = "asset://map/styles/cyberpunk.json",
-            ),
             MapStyle.bundle(
                 id = "light",
                 name = "Light",
                 value = "asset://map/styles/light.json",
+            ),
+            MapStyle.bundle(
+                id = "cyberpunk",
+                name = "Cyberpunk",
+                value = "asset://map/styles/cyberpunk.json",
             ),
             MapStyle.bundle(
                 id = "urban-noir",

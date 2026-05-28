@@ -181,6 +181,9 @@ class MapScreenTest {
             breachProtocol = breachProtocol,
             isStartupSplashVisible = isStartupSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
+            mapMode = MapMode.Exploration(
+                styleUri = "asset://map/styles/light.json",
+            ),
             mapStyleUri = "asset://map/styles/cyberpunk.json",
             visibleObjects = emptyList(),
             fogOfWar = FogOfWarUiState(),

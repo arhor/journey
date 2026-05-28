@@ -29,6 +29,7 @@ sealed interface MapUiState {
         val breachProtocol: BreachProtocolUiState,
         val isStartupSplashVisible: Boolean,
         @StringRes val startupSplashMessage: Int,
+        val mapMode: MapMode,
         val mapStyleUri: String,
         val visibleObjects: List<MapObjectUiModel>,
         val fogOfWar: FogOfWarUiState,

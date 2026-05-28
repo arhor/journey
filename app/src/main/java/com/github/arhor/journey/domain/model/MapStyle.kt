@@ -12,19 +12,23 @@ data class MapStyle(
     }
 
     companion object {
-        val defaultStyle = bundle(
+        val light = bundle(
+            id = "light",
+            name = "Light",
+            value = "asset://map/styles/light.json",
+        )
+
+        val cyberpunk = bundle(
             id = "cyberpunk",
             name = "Cyberpunk",
             value = "asset://map/styles/cyberpunk.json",
         )
 
+        val defaultStyle = light
+
         val availableStyles = listOf(
-            defaultStyle,
-            bundle(
-                id = "light",
-                name = "Light",
-                value = "asset://map/styles/light.json",
-            ),
+            light,
+            cyberpunk,
             bundle(
                 id = "urban-noir",
                 name = "Urban Noir",
