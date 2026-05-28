@@ -51,10 +51,74 @@ class MapScreenTest {
     }
 
     @Test
-    fun `MapContent should show signal strength text when breach protocol is signal locked`() {
+    fun `MapContent should show floating guidance arrow when breach guidance is floating`() {
         // Given
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val signalStrength = context.getString(R.string.breach_signal_strength, 82)
+        composeRule.setContent {
+            MaterialTheme {
+                MapContent(
+                    state = contentState(
+                        isStartupSplashVisible = false,
+                        breachProtocol = BreachProtocolUiState.SignalLocked(
+                            breachNodeId = "breach-node:v1:h3r9:test",
+                            districtName = "Downtown",
+                            distanceMeters = 12,
+                            canStartUpload = true,
+                            disabledReason = null,
+                        ),
+                        breachGuidance = BreachDirectionalGuidanceUiState.FloatingArrow(
+                            breachNodeId = "breach-node:v1:h3r9:test",
+                            districtName = "Downtown",
+                            bearingDegrees = 135.0,
+                            distanceMeters = 12,
+                            canStartUpload = true,
+                        ),
+                    ),
+                    dispatch = {},
+                    mapContent = { modifier, _ -> Box(modifier = modifier) },
+                )
+            }
+        }
+
+        // Then
+        composeRule.onNodeWithTag(BREACH_DIRECTIONAL_GUIDANCE_FLOATING_ARROW_TEST_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `MapContent should show on target marker when breach guidance is on target`() {
+        // Given
+        composeRule.setContent {
+            MaterialTheme {
+                MapContent(
+                    state = contentState(
+                        isStartupSplashVisible = false,
+                        breachProtocol = BreachProtocolUiState.SignalLocked(
+                            breachNodeId = "breach-node:v1:h3r9:test",
+                            districtName = "Downtown",
+                            distanceMeters = 0,
+                            canStartUpload = true,
+                            disabledReason = null,
+                        ),
+                        breachGuidance = BreachDirectionalGuidanceUiState.OnTarget(
+                            breachNodeId = "breach-node:v1:h3r9:test",
+                            districtName = "Downtown",
+                            distanceMeters = 0,
+                            canStartUpload = true,
+                        ),
+                    ),
+                    dispatch = {},
+                    mapContent = { modifier, _ -> Box(modifier = modifier) },
+                )
+            }
+        }
+
+        // Then
+        composeRule.onNodeWithTag(BREACH_DIRECTIONAL_GUIDANCE_ON_TARGET_TEST_TAG).assertIsDisplayed()
+    }
+
+    @Test
+    fun `MapContent should show unavailable guidance message when location is missing`() {
+        // Given
+        val message = "Location required to continue breach scan."
 
         composeRule.setContent {
             MaterialTheme {
@@ -65,9 +129,13 @@ class MapScreenTest {
                             breachNodeId = "breach-node:v1:h3r9:test",
                             districtName = "Downtown",
                             distanceMeters = 12,
-                            signalStrengthPercent = 82,
-                            canStartUpload = true,
-                            disabledReason = null,
+                            canStartUpload = false,
+                            disabledReason = message,
+                        ),
+                        breachGuidance = BreachDirectionalGuidanceUiState.Unavailable(
+                            breachNodeId = "breach-node:v1:h3r9:test",
+                            districtName = "Downtown",
+                            message = message,
                         ),
                     ),
                     dispatch = {},
@@ -77,7 +145,7 @@ class MapScreenTest {
         }
 
         // Then
-        composeRule.onNodeWithText(signalStrength).assertIsDisplayed()
+        composeRule.onNodeWithText(message).assertIsDisplayed()
     }
 
     @Test
@@ -172,6 +240,7 @@ class MapScreenTest {
     private fun contentState(
         isStartupSplashVisible: Boolean,
         breachProtocol: BreachProtocolUiState = BreachProtocolUiState.Idle,
+        breachGuidance: BreachDirectionalGuidanceUiState = BreachDirectionalGuidanceUiState.Hidden,
     ): MapUiState.Content =
         MapUiState.Content(
             northResetRequestToken = 0,
@@ -179,6 +248,7 @@ class MapScreenTest {
             explorationTrackingCadence = ExplorationTrackingCadence.FOREGROUND,
             explorationTrackingStatus = ExplorationTrackingStatus.TRACKING,
             breachProtocol = breachProtocol,
+            breachGuidance = breachGuidance,
             isStartupSplashVisible = isStartupSplashVisible,
             startupSplashMessage = R.string.map_view_startup_loading_message,
             mapStyleUri = "asset://map/styles/cyberpunk.json",

@@ -109,6 +109,7 @@ internal fun MapContent(
 
         BreachProtocolOverlay(
             state = state.breachProtocol,
+            breachGuidance = state.breachGuidance,
             dispatch = dispatch,
             modifier = Modifier.fillMaxSize(),
         )
