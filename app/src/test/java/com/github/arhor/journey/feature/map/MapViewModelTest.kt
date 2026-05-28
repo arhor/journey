@@ -301,6 +301,73 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `uiState should expose unavailable breach guidance when current location is lost during signal locked tracking`() = runTest(mainDispatcher.scheduler) {
+        // Given
+        val actorLocation = GeoPoint(lat = 0.0, lon = 0.0)
+        val breachLocation = GeoPoint(lat = 0.0, lon = 0.01)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-location-loss",
+            cellId = "cell-location-loss",
+            location = breachLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            val lockedOutOfRange = fixture.viewModel.awaitContent { content ->
+                content.breachProtocol is BreachProtocolUiState.SignalLocked &&
+                    content.breachGuidance is BreachDirectionalGuidanceUiState.FloatingArrow
+            }
+            lockedOutOfRange.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = actorLocation.distanceTo(breachLocation).toInt(),
+                canStartUpload = false,
+                disabledReason = "Move closer to start upload.",
+            )
+
+            // When
+            fixture.trackingSessionFlow.value = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = null,
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.breachGuidance is BreachDirectionalGuidanceUiState.Unavailable
+            }
+            actual.breachGuidance shouldBe BreachDirectionalGuidanceUiState.Unavailable(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                message = "Location required to continue breach scan.",
+            )
+            actual.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = actorLocation.distanceTo(breachLocation).toInt(),
+                canStartUpload = false,
+                disabledReason = "Location required to continue breach scan.",
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
     fun `uiState should expose on target breach guidance when actor is within interaction radius`() = runTest(mainDispatcher.scheduler) {
         // Given
         val actorLocation = GeoPoint(lat = 50.45, lon = 30.52)
