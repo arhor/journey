@@ -26,7 +26,6 @@
     <string name="map_view_startup_timeout_message">Map startup is taking longer than expected. Continuing...</string>
     <string name="breach_pulse_button">Pulse</string>
     <string name="breach_scanning">Scanning nearby hex cells...</string>
-    <string name="breach_signal_strength">Signal strength: %1$d%%</string>
     <string name="breach_distance_meters">%1$d m away</string>
     <string name="breach_start_upload">Start upload</string>
     <string name="breach_upload_progress">Upload progress: %1$d%%</string>

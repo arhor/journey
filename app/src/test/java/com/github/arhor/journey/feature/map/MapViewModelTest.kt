@@ -5,6 +5,7 @@ package com.github.arhor.journey.feature.map
 import androidx.lifecycle.viewModelScope
 import com.github.arhor.journey.core.common.Output
 import com.github.arhor.journey.core.testing.FakeH3Grid
+import com.github.arhor.journey.core.testing.MainDispatcherRule
 import com.github.arhor.journey.domain.CANONICAL_ZOOM
 import com.github.arhor.journey.domain.internal.bounds
 import com.github.arhor.journey.domain.model.BreachNode
@@ -41,14 +42,14 @@ import com.github.arhor.journey.feature.map.model.BreachMarkerState
 import com.github.arhor.journey.feature.map.model.LatLng
 import com.github.arhor.journey.feature.map.model.MapObjectKind
 import com.github.arhor.journey.feature.map.model.MapObjectUiModel
+import com.github.arhor.journey.feature.map.BreachDirectionalGuidanceUiState
 import com.github.arhor.journey.feature.map.presentation.BreachNodePresenter
+import com.github.arhor.journey.feature.map.presentation.BreachDirectionalGuidancePresenter
 import io.kotest.matchers.shouldBe
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -60,11 +61,10 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.Ignore
+import org.junit.Rule
 import org.junit.Test
 import java.time.Instant
 
@@ -72,10 +72,14 @@ import java.time.Instant
 
 class MapViewModelTest {
 
+    private val mainDispatcher = StandardTestDispatcher()
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule(mainDispatcher)
+
     @Test
-    fun `uiState should expose idle breach protocol state before pulse`() = runTest {
+    fun `uiState should expose idle breach protocol state before pulse`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val fixture = createFixture()
 
         try {
@@ -111,9 +115,8 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose signal locked breach protocol state after pulse`() = runTest {
+    fun `uiState should expose signal locked breach protocol state after pulse`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
         val breachRecord = breachRecord(
             id = "breach-node:v1:h3r9:cell-1",
@@ -163,9 +166,14 @@ class MapViewModelTest {
                 breachNodeId = breachRecord.definition.id,
                 districtName = breachRecord.definition.districtName,
                 distanceMeters = 0,
-                signalStrengthPercent = 100,
                 canStartUpload = true,
                 disabledReason = null,
+            )
+            actual.breachGuidance shouldBe BreachDirectionalGuidanceUiState.OnTarget(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = 0,
+                canStartUpload = true,
             )
             coVerify(exactly = 1) { findNearestBreachNode.invoke(actorLocation) }
         } finally {
@@ -352,9 +360,331 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should complete breach upload after repeated ticks`() = runTest {
+    fun `uiState should expose floating breach guidance when locked breach is outside upload radius`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val actorLocation = GeoPoint(lat = 0.0, lon = 0.0)
+        val breachLocation = GeoPoint(lat = 0.0, lon = 0.01)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-guidance",
+            cellId = "cell-guidance",
+            location = breachLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        val discoverBreachNode = mockk<DiscoverBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        coEvery {
+            discoverBreachNode.invoke(
+                id = breachRecord.definition.id,
+                actorLocation = actorLocation,
+            )
+        } returns Output.Success(
+            BreachNodeState(
+                breachNodeId = breachRecord.definition.id,
+                h3CellId = breachRecord.definition.h3CellId,
+                discoveredAt = FIXED_INSTANT,
+                controlledAt = null,
+                lockdownUntil = null,
+                updatedAt = FIXED_INSTANT,
+            ),
+        )
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+            discoverBreachNode = discoverBreachNode,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.breachGuidance is BreachDirectionalGuidanceUiState.FloatingArrow
+            }
+            actual.breachGuidance shouldBe BreachDirectionalGuidanceUiState.FloatingArrow(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                bearingDegrees = actorLocation.bearingTo(breachLocation),
+                distanceMeters = actorLocation.distanceTo(breachLocation).toInt(),
+                canStartUpload = false,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should update signal locked breach protocol when tracking location moves into range`() = runTest(mainDispatcher.scheduler) {
+        // Given
+        val outOfRangeLocation = GeoPoint(lat = 0.0, lon = 0.0)
+        val inRangeLocation = GeoPoint(lat = 0.0, lon = 0.01)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-live-update",
+            cellId = "cell-live-update",
+            location = inRangeLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(outOfRangeLocation) } returns Output.Success(breachRecord)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = outOfRangeLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            val lockedOutOfRange = fixture.viewModel.awaitContent { content ->
+                content.breachProtocol is BreachProtocolUiState.SignalLocked &&
+                    content.breachGuidance is BreachDirectionalGuidanceUiState.FloatingArrow
+            }
+            lockedOutOfRange.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = outOfRangeLocation.distanceTo(inRangeLocation).toInt(),
+                canStartUpload = false,
+                disabledReason = "Move closer to start upload.",
+            )
+
+            // When
+            fixture.trackingSessionFlow.value = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = inRangeLocation,
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.breachGuidance is BreachDirectionalGuidanceUiState.OnTarget
+            }
+            actual.breachGuidance shouldBe BreachDirectionalGuidanceUiState.OnTarget(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = 0,
+                canStartUpload = true,
+            )
+            actual.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = 0,
+                canStartUpload = true,
+                disabledReason = null,
+            )
+
+            // And
+            fixture.viewModel.dispatch(MapIntent.StartBreachUpload)
+            advanceUntilIdle()
+            val uploading = fixture.viewModel.awaitContent { content ->
+                content.breachProtocol is BreachProtocolUiState.Uploading
+            }
+            uploading.breachProtocol shouldBe BreachProtocolUiState.Uploading(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                progressPercent = 0,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should expose unavailable breach guidance when current location is lost during signal locked tracking`() = runTest(mainDispatcher.scheduler) {
+        // Given
+        val actorLocation = GeoPoint(lat = 0.0, lon = 0.0)
+        val breachLocation = GeoPoint(lat = 0.0, lon = 0.01)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-location-loss",
+            cellId = "cell-location-loss",
+            location = breachLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            val lockedOutOfRange = fixture.viewModel.awaitContent { content ->
+                content.breachProtocol is BreachProtocolUiState.SignalLocked &&
+                    content.breachGuidance is BreachDirectionalGuidanceUiState.FloatingArrow
+            }
+            lockedOutOfRange.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = actorLocation.distanceTo(breachLocation).toInt(),
+                canStartUpload = false,
+                disabledReason = "Move closer to start upload.",
+            )
+
+            // When
+            fixture.trackingSessionFlow.value = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = null,
+            )
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.breachGuidance is BreachDirectionalGuidanceUiState.Unavailable
+            }
+            actual.breachGuidance shouldBe BreachDirectionalGuidanceUiState.Unavailable(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                message = "Location required to continue breach scan.",
+            )
+            actual.breachProtocol shouldBe BreachProtocolUiState.SignalLocked(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = actorLocation.distanceTo(breachLocation).toInt(),
+                canStartUpload = false,
+                disabledReason = "Location required to continue breach scan.",
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should expose on target breach guidance when actor is within interaction radius`() = runTest(mainDispatcher.scheduler) {
+        // Given
+        val actorLocation = GeoPoint(lat = 50.45, lon = 30.52)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-on-target",
+            cellId = "cell-on-target",
+            location = actorLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        val discoverBreachNode = mockk<DiscoverBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        coEvery {
+            discoverBreachNode.invoke(
+                id = breachRecord.definition.id,
+                actorLocation = actorLocation,
+            )
+        } returns Output.Success(
+            BreachNodeState(
+                breachNodeId = breachRecord.definition.id,
+                h3CellId = breachRecord.definition.h3CellId,
+                discoveredAt = FIXED_INSTANT,
+                controlledAt = null,
+                lockdownUntil = null,
+                updatedAt = FIXED_INSTANT,
+            ),
+        )
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+            discoverBreachNode = discoverBreachNode,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.breachGuidance is BreachDirectionalGuidanceUiState.OnTarget
+            }
+            actual.breachGuidance shouldBe BreachDirectionalGuidanceUiState.OnTarget(
+                breachNodeId = breachRecord.definition.id,
+                districtName = breachRecord.definition.districtName,
+                distanceMeters = 0,
+                canStartUpload = true,
+            )
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should hide breach guidance when breach panel is dismissed`() = runTest(mainDispatcher.scheduler) {
+        // Given
+        val actorLocation = GeoPoint(lat = 50.45, lon = 30.52)
+        val breachRecord = breachRecord(
+            id = "breach-node:v1:h3r9:cell-dismiss",
+            cellId = "cell-dismiss",
+            location = actorLocation,
+        )
+        val findNearestBreachNode = mockk<FindNearestBreachNodeUseCase>()
+        val discoverBreachNode = mockk<DiscoverBreachNodeUseCase>()
+        coEvery { findNearestBreachNode.invoke(actorLocation) } returns Output.Success(breachRecord)
+        coEvery {
+            discoverBreachNode.invoke(
+                id = breachRecord.definition.id,
+                actorLocation = actorLocation,
+            )
+        } returns Output.Success(
+            BreachNodeState(
+                breachNodeId = breachRecord.definition.id,
+                h3CellId = breachRecord.definition.h3CellId,
+                discoveredAt = FIXED_INSTANT,
+                controlledAt = null,
+                lockdownUntil = null,
+                updatedAt = FIXED_INSTANT,
+            ),
+        )
+        val fixture = createFixture(
+            trackingSession = ExplorationTrackingSession(
+                isActive = true,
+                status = ExplorationTrackingStatus.TRACKING,
+                lastKnownLocation = actorLocation,
+            ),
+            findNearestBreachNode = findNearestBreachNode,
+            discoverBreachNode = discoverBreachNode,
+        )
+
+        try {
+            fixture.viewModel.awaitContent()
+            fixture.viewModel.dispatch(MapIntent.PulseClicked)
+            advanceUntilIdle()
+
+            // When
+            fixture.viewModel.dispatch(MapIntent.DismissBreachPanel)
+            advanceUntilIdle()
+
+            // Then
+            val actual = fixture.viewModel.awaitContent { content ->
+                content.breachGuidance is BreachDirectionalGuidanceUiState.Hidden
+            }
+            actual.breachGuidance shouldBe BreachDirectionalGuidanceUiState.Hidden
+        } finally {
+            tearDownMainDispatcher(fixture.viewModel)
+        }
+    }
+
+    @Test
+    fun `uiState should complete breach upload after repeated ticks`() = runTest(mainDispatcher.scheduler) {
+        // Given
         val actorLocation = GeoPoint(lat = 50.4500, lon = 30.5200)
         val breachRecord = breachRecord(
             id = "breach-node:v1:h3r9:cell-2",
@@ -438,8 +768,7 @@ class MapViewModelTest {
 
     @Test
     @Ignore("flaky")
-    fun `uiState should expose selected map style uri`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    fun `uiState should expose selected map style uri`() = runTest(mainDispatcher.scheduler) {
 
         // Given
         val fixture = createFixture(
@@ -458,8 +787,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun `uiState should expose empty visible objects when viewport changes`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+    fun `uiState should expose empty visible objects when viewport changes`() = runTest(mainDispatcher.scheduler) {
 
         // Given
         val fixture = createFixture(
@@ -498,9 +826,8 @@ class MapViewModelTest {
 
     @Test
     @Ignore("flaky")
-    fun `uiState should expose breach visible objects when viewport changes`() = runTest {
+    fun `uiState should expose breach visible objects when viewport changes`() = runTest(mainDispatcher.scheduler) {
         // Given
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val breachNode = visibleBreachNode(
             id = "breach-node:v1:h3r9:cell-visible",
             cellId = "cell-visible",
@@ -569,7 +896,6 @@ class MapViewModelTest {
         advanceTimeBy(5_000L)
         runCurrent()
         advanceUntilIdle()
-        Dispatchers.resetMain()
     }
 
     private fun breachRecord(
@@ -630,6 +956,7 @@ class MapViewModelTest {
 
     private data class Fixture(
         val viewModel: MapViewModel,
+        val trackingSessionFlow: MutableStateFlow<ExplorationTrackingSession>,
     )
 
     private fun createFixture(
@@ -688,7 +1015,9 @@ class MapViewModelTest {
                 observeVisibleBreachNodes = observeVisibleBreachNodes,
                 observeControlledBreachRevealCells = observeControlledBreachRevealCells,
                 breachNodePresenter = BreachNodePresenter(),
+                breachDirectionalGuidancePresenter = BreachDirectionalGuidancePresenter(),
             ),
+            trackingSessionFlow = trackingSessionFlow,
         )
     }
 
