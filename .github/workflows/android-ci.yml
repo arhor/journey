@@ -17,8 +17,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 concurrency:
   group: android-build-${{ github.ref }}
@@ -29,9 +27,11 @@ env:
 
 jobs:
   build:
-    name: Lint, unit test, and debug assemble
+    name: Lint, unit test, and debug APK assemblies
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    outputs:
+      debug_apk_url: ${{ steps.upload_debug_apk.outputs.artifact-url }}
 
     steps:
       - name: Checkout repository
@@ -57,7 +57,7 @@ jobs:
 
       - name: Assemble debug
         shell: bash
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./gradlew assembleDebug assembleDebugAndroidTest --stacktrace
 
       - name: Upload debug APK
         id: upload_debug_apk
@@ -69,8 +69,17 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  comment:
+    name: Share debug APK link
+    needs: build
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
       - name: Find Comment
-        if: ${{ github.event_name == 'pull_request' }}
         uses: peter-evans/find-comment@v4
         id: find-comment
         with:
@@ -79,7 +88,6 @@ jobs:
           body-includes: A debug APK is available for download
 
       - name: Share debug APK download link
-        if: ${{ github.event_name == 'pull_request' }}
         uses: peter-evans/create-or-update-comment@v5
         with:
           edit-mode: replace
@@ -87,4 +95,4 @@ jobs:
           issue-number: ${{ github.event.pull_request.number }}
           body: |
             A debug APK is available for download:  
-            [Download app-debug.apk](${{ steps.upload_debug_apk.outputs.artifact-url }})
+            [Download app-debug.apk](${{ needs.build.outputs.debug_apk_url }})

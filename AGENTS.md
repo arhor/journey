@@ -40,6 +40,10 @@ Use the narrowest relevant command for the files changed.
   `./gradlew :app:assembleDebugAndroidTest`
 - Compile Hilt instrumentation-test sources after DI changes affecting `androidTest`:
   `./gradlew :app:hiltJavaCompileDebugAndroidTest`
+- Assemble the debug app after native C++ or MapLibre interop changes:
+  `./gradlew :app:assembleDebug`
+- Run lint when changing Android resources, manifests, or UI:
+  `./gradlew :app:lintDebug`
 
 ## Coding Conventions
 
