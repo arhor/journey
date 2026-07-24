@@ -1,4 +1,4 @@
-@file:Suppress("ChromeOsAbiSupport", "UnstableApiUsage", "unused")
+@file:Suppress("ChromeOsAbiSupport", "UnstableApiUsage", "AvoidDuplicateDependencies")
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
