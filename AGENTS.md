@@ -25,7 +25,6 @@ unless a more deeply nested `AGENTS.md` overrides it.
 - `app/src/main/java/com/github/arhor/journey/feature`: screen and feature implementations.
 - `app/src/test/java`: JVM unit tests.
 - `app/src/androidTest/java`: instrumentation and Compose UI tests.
-- `docs/superpowers`: planning and design documents used by the Superpowers workflow.
 
 ## Build And Validation Commands
 
@@ -82,7 +81,6 @@ Use the narrowest relevant command for the files changed.
 ## Documentation And Planning
 
 - Keep docs concise and task-oriented.
-- For nontrivial design work, use the existing `docs/superpowers/specs` and `docs/superpowers/plans` locations.
 - Do not update generated build output or IDE metadata unless the task explicitly requires it.
 
 ## Git And Change Hygiene
